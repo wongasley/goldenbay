@@ -1,0 +1,79 @@
+/* 1. Register Local Quicksand Fonts */
+@font-face {
+  font-family: 'Quicksand';
+  src: url('./assets/fonts/Quicksand-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Quicksand';
+  src: url('./assets/fonts/Quicksand-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+}
+
+/* 2. Register Local Playfair Display (Replacing the @import) */
+/* This points to the files in your 'static' folder screenshot */
+@font-face {
+  font-family: 'TheErupha';
+  src: url('./assets/fonts/TheErupha.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Noto Serif SC';
+  src: url('./assets/fonts/NotoSerifSC-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Noto Serif SC';
+  src: url('./assets/fonts/NotoSerifSC-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Noto Serif SC';
+  src: url('./assets/fonts/NotoSerifSC-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+}
+
+/* Optional: Add Light/Thin if you plan to use them for elegant subtitles */
+@font-face {
+  font-family: 'Noto Serif SC';
+  src: url('./assets/fonts/NotoSerifSC-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+}
+
+/* 3. Global Styles */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  background-color: #0a0a0a;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Quicksand', sans-serif;
+  color: #ffffff;
+}
+
+/* 4. Heading Specifics */
+h1, h2, h3, h4 {
+  font-family: 'TheErupha', serif;
+  font-weight: 700; /* This triggers the PlayfairDisplay-Bold.ttf file */
+}
+
+h2 {
+  font-size: 2.5rem; /* Adjust size as needed */
+  letter-spacing: -0.01em; /* Gives it that tight, high-end look */
+}

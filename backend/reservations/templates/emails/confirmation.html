@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Reservation - Golden Bay</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+    
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f5; padding: 40px 0;">
+        <tr>
+            <td align="center">
+                <table border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow: hidden;">
+                    
+                    <tr>
+                        <td align="center" style="padding: 40px 0 30px 0; border-bottom: 4px solid #D4AF37;">
+                            <h1 style="color: #1a1a1a; font-size: 26px; letter-spacing: 2px; text-transform: uppercase; margin: 0; font-weight: 300;">Golden Bay</h1>
+                            <p style="color: #D4AF37; font-size: 10px; text-transform: uppercase; letter-spacing: 3px; margin-top: 8px; font-weight: bold;">Fresh Seafood Restaurant</p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding: 40px 50px;">
+                            <h2 style="color: #1a1a1a; font-size: 22px; margin: 0 0 20px 0; font-weight: normal;">
+                                Hello {{ name }},
+                            </h2>
+                            
+                            <p style="color: #555555; font-size: 15px; line-height: 26px; margin-bottom: 30px;">
+                                {% if status == 'CONFIRMED' %}
+                                    We are pleased to confirm your reservation. We look forward to welcoming you.
+                                {% elif status == 'PENDING' %}
+                                    We have received your request. Our team is currently reviewing availability for your chosen date and time. You will receive a final confirmation shortly.
+                                {% elif status == 'CANCELLED' %}
+                                    We regret to inform you that your reservation request has been cancelled. Please contact us if you wish to reschedule.
+                                {% endif %}
+                            </p>
+
+                            <table border="0" cellpadding="15" cellspacing="0" width="100%" style="background-color: #fafafa; border: 1px solid #eeeeee; border-radius: 4px; margin-bottom: 30px;">
+                                <tr>
+                                    <td width="30%" style="color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #eeeeee;">Date</td>
+                                    <td style="color: #1a1a1a; font-weight: bold; font-size: 14px; border-bottom: 1px solid #eeeeee;">{{ date }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #eeeeee;">Time</td>
+                                    <td style="color: #1a1a1a; font-weight: bold; font-size: 14px; border-bottom: 1px solid #eeeeee;">{{ time }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #eeeeee;">Guests</td>
+                                    <td style="color: #1a1a1a; font-weight: bold; font-size: 14px; border-bottom: 1px solid #eeeeee;">{{ pax }} People</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #eeeeee;">Area</td>
+                                    <td style="color: #1a1a1a; font-weight: bold; font-size: 14px; border-bottom: 1px solid #eeeeee;">{{ area }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 1px;">Ref ID</td>
+                                    <td style="color: #888888; font-size: 14px;">#{{ id }}</td>
+                                </tr>
+                            </table>
+
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <a href="https://goldenbay.com.ph/menu" style="display: inline-block; padding: 14px 40px; background-color: #1a1a1a; color: #ffffff; text-decoration: none; font-weight: bold; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; border-radius: 2px;">
+                                            View Menu
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="background-color: #f9f9f9; padding: 30px; text-align: center; border-top: 1px solid #eeeeee;">
+                            <p style="color: #1a1a1a; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 10px 0;">Golden Bay Fresh Seafood Restaurant</p>
+                            <p style="color: #999999; font-size: 11px; margin: 0 0 5px 0;">Lot 3&4 Block A2, Diosdado Macapagal Blvd, Pasay City</p>
+                            <p style="color: #999999; font-size: 11px; margin: 0;">(02) 8804-0332 | marketing@goldenbay.com.ph</p>
+                        </td>
+                    </tr>
+
+                </table>
+                
+                <p style="color: #bbbbbb; font-size: 11px; margin-top: 20px;">&copy; 2026 Golden Bay. All rights reserved.</p>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

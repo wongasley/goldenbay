@@ -1,0 +1,5 @@
+frontend/public/videos/hero-background.mp4
+env/
+*.pyc
+__pycache__/
+.env
