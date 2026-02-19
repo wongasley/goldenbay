@@ -60,6 +60,16 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    # ADD THESE LINES BELOW:
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/day',      # General API limit for guests
+        'user': '1000/day',     # Limit for logged-in staff
+        'burst': '5/minute',    # Burst limit for sensitive endpoints
+    }
 }
 
 SIMPLE_JWT = {
