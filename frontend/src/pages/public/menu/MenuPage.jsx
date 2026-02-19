@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { Search, X } from 'lucide-react'; // <-- Added Lucide icons for search
 import logo from '../../../assets/images/goldenbaylogo.svg'; 
 import heroimage from '../../../assets/images/heroimage.webp'; 
-import { FaFacebookF, FaInstagram, FaYoutube } from 'react-icons/fa';
 
 const BACKEND_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 const MenuPage = () => {
   const [menuData, setMenuData] = useState([]);
   const [activeTab, setActiveTab] = useState("All");
+  const [searchQuery, setSearchQuery] = useState(""); // <-- New Search State
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -20,14 +21,12 @@ const MenuPage = () => {
         if (!response.ok) throw new Error('Failed to fetch menu data');
         const data = await response.json();
         
-        // FIX: Sort items naturally within each category
+        // Sort items naturally within each category
         const sortedData = data.map(category => {
             const sortedItems = [...category.items].sort((a, b) => {
-                // If both have codes, sort by code naturally
                 if (a.code && b.code) {
                     return a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' });
                 }
-                // Fallback to name sorting if no code
                 return a.name.localeCompare(b.name);
             });
             return { ...category, items: sortedItems };
@@ -46,9 +45,23 @@ const MenuPage = () => {
 
   const categories = ["All", ...menuData.map(cat => cat.name)];
 
-  const displayedCategories = activeTab === "All" 
-    ? menuData 
-    : menuData.filter(cat => cat.name === activeTab);
+  // --- NEW ADVANCED FILTERING LOGIC ---
+  const displayedCategories = menuData.map(category => {
+      // 1. Filter items based on the search query (Checks English, Chinese, and Code)
+      const filteredItems = category.items.filter(item => {
+          const query = searchQuery.toLowerCase();
+          const matchEn = item.name.toLowerCase().includes(query);
+          const matchZh = item.name_zh && item.name_zh.includes(query);
+          const matchCode = item.code && item.code.toLowerCase().includes(query);
+          return matchEn || matchZh || matchCode;
+      });
+      return { ...category, items: filteredItems };
+  }).filter(category => {
+      // 2. Filter categories based on Active Tab AND if they have any items left after searching
+      const matchesTab = activeTab === "All" || category.name === activeTab;
+      const hasItems = category.items.length > 0;
+      return matchesTab && hasItems;
+  });
 
   if (loading) {
     return (
@@ -74,7 +87,6 @@ const MenuPage = () => {
       whileInView={{ opacity: 1 }}
       className="group bg-white border border-gray-200 hover:border-gold-400/50 transition-all duration-500 rounded-sm overflow-hidden flex flex-col shadow-sm hover:shadow-lg"
     >
-        {/* Standard Image Area */}
         <div className="aspect-[4/3] overflow-hidden relative bg-gray-50 border-b border-gray-100">
             {item.image ? (
                 <img src={`${BACKEND_URL}${item.image}`} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={item.name} />
@@ -88,7 +100,6 @@ const MenuPage = () => {
             </div>
         </div>
 
-        {/* Content */}
         <div className="p-6 flex-1 flex flex-col">
             <div className="mb-4 text-center">
                 <h3 className="text-2xl font-serif font-bold text-gray-900 uppercase tracking-widest">{item.name}</h3>
@@ -98,7 +109,6 @@ const MenuPage = () => {
 
             <div className="h-px w-full bg-gray-100 mb-4"></div>
 
-            {/* Cooking Methods List */}
             <div className="flex-1">
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 text-center">Available Cooking Styles</p>
                 <div className="flex flex-wrap justify-center gap-2">
@@ -131,12 +141,45 @@ const MenuPage = () => {
 
       <div className="px-6 py-12 md:px-24">
         
+        {/* --- SEARCH BAR --- */}
+        <div className="max-w-md mx-auto mb-10 relative">
+          <div className="relative flex items-center w-full h-12 rounded-full bg-white overflow-hidden border border-gray-200 focus-within:border-gold-400 focus-within:ring-1 focus-within:ring-gold-400 transition-all shadow-sm">
+            <div className="grid place-items-center h-full w-12 text-gray-400">
+              <Search size={18} />
+            </div>
+            <input
+              className="peer h-full w-full outline-none text-sm text-gray-700 pr-2 bg-transparent font-medium"
+              type="text"
+              id="search"
+              placeholder="Search by name, code, or ingredient..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <AnimatePresence>
+              {searchQuery && (
+                <motion.button 
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  onClick={() => setSearchQuery('')}
+                  className="grid place-items-center h-full w-12 text-gray-400 hover:text-gold-600 transition-colors"
+                >
+                  <X size={16} />
+                </motion.button>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
         {/* --- CATEGORY TABS --- */}
         <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 mb-20">
           {categories.map(cat => (
             <button
               key={cat}
-              onClick={() => setActiveTab(cat)}
+              onClick={() => {
+                setActiveTab(cat);
+                setSearchQuery(''); // Clear search when changing tabs
+              }}
               className={`text-sm md:text-base tracking-[0.2em] uppercase transition-all duration-300 relative pb-2 ${
                 activeTab === cat 
                 ? "text-gold-600 font-bold" 
@@ -150,6 +193,23 @@ const MenuPage = () => {
             </button>
           ))}
         </div>
+
+        {/* --- EMPTY STATE FOR SEARCH --- */}
+        {displayedCategories.length === 0 && (
+          <div className="text-center py-20">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 text-gray-400 mb-4">
+              <Search size={24} />
+            </div>
+            <h3 className="text-xl font-serif text-gray-900 mb-2">No dishes found</h3>
+            <p className="text-gray-500 text-sm">We couldn't find anything matching "{searchQuery}".</p>
+            <button 
+              onClick={() => setSearchQuery('')}
+              className="mt-6 text-xs font-bold uppercase tracking-widest text-gold-600 border-b border-gold-600 pb-1 hover:text-black transition-colors"
+            >
+              Clear Search
+            </button>
+          </div>
+        )}
 
         {/* --- MENU DISPLAY --- */}
         {displayedCategories.map((category) => (
@@ -182,7 +242,7 @@ const MenuPage = () => {
                     <div className="aspect-[4/3] overflow-hidden relative bg-gray-50 border-b border-gray-100">
                       {item.image ? (
                         <img 
-                          src={`${BACKEND_URL}${item.image}`} 
+                          src={item.image.startsWith('http') ? item.image : `${BACKEND_URL}${item.image}`} 
                           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
                           alt={item.name} 
                         />
