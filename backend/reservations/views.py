@@ -1,5 +1,6 @@
 import threading
 import requests
+import os
 from django.db import transaction
 from rest_framework import generics, status
 from datetime import date
@@ -61,54 +62,88 @@ class AvailableRoomsView(APIView):
         return Response(results)
 
 def send_notifications_task(reservation_id):
-    """
-    Refined background task with better logging.
-    """
+    """ Fired when a NEW booking is created """
     try:
-        # 1. Fetch fresh data. Using .select_related handles the dining_area join
         reservation = Reservation.objects.select_related('dining_area').get(id=reservation_id)
+        area_name = reservation.dining_area.name if reservation.dining_area else "Main Dining Hall"
         
-        print(f"DEBUG: Processing notifications for Reservation #{reservation.id}")
-
-        # 2. Email Admin
-        admin_subject = f'New Booking Request: {reservation.customer_name} ({reservation.date})'
-        admin_message = f"""
-        New Reservation Request:
-        ------------------------
-        Name: {reservation.customer_name}
-        Date: {reservation.date}
-        Time: {reservation.time}
-        Guests: {reservation.pax}
-        Contact: {reservation.customer_contact}
-        Room: {reservation.dining_area.name if reservation.dining_area else 'Main Hall'}
-        Notes: {reservation.special_request or 'None'}
-
-        Please log in to the dashboard to Confirm or Cancel.
-        """
+        # ==========================================
+        # 1. NOTIFY THE RESTAURANT ADMINS
+        # ==========================================
+        
+        # A. Email Admin
+        admin_context = {
+            'name': reservation.customer_name,
+            'contact': reservation.customer_contact,
+            'date': reservation.date.strftime('%B %d, %Y'),
+            'time': reservation.time.strftime('%I:%M %p'),
+            'pax': reservation.pax,
+            'area': area_name,
+            'notes': reservation.special_request or 'None',
+            'id': reservation.id
+        }
+        admin_html = render_to_string('emails/admin_notification.html', admin_context)
+        admin_plain = strip_tags(admin_html)
         
         send_mail(
-            subject=admin_subject,
-            message=admin_message,
+            subject=f'New Booking Request: {reservation.customer_name}',
+            message=admin_plain,
             from_email=settings.EMAIL_HOST_USER,
             recipient_list=['marketing@goldenbay.com.ph'], 
-            fail_silently=False, # CHANGED to False so we see errors in terminal
+            html_message=admin_html,
+            fail_silently=False,
         )
 
-        # 3. Email Customer (Only if they provided an email)
-        if reservation.customer_email:
-            print(f"DEBUG: Sending confirmation to {reservation.customer_email}")
+        # B. SMS Admin(s)
+        admin_numbers_str = os.getenv('ADMIN_PHONE_NUMBERS', '')
+        if admin_numbers_str:
+            # Split the string by commas to get a list of numbers
+            admin_numbers = [num.strip() for num in admin_numbers_str.split(',') if num.strip()]
+            
+            admin_sms_body = f"Golden Bay Alert: New booking request from {reservation.customer_name} for {reservation.pax} pax on {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')}. Please check dashboard."
+            
+            # Send to each admin number
+            for number in admin_numbers:
+                send_sms(number, admin_sms_body)
+
+
+        # ==========================================
+        # 2. NOTIFY THE CUSTOMER
+        # ==========================================
+        
+        # A. Email Customer (Only if they provided an email address)
+        if reservation.customer_email and '@' in reservation.customer_email:
+            customer_context = {
+                'name': reservation.customer_name,
+                'status': 'PENDING',
+                'date': reservation.date.strftime('%B %d, %Y'),
+                'time': reservation.time.strftime('%I:%M %p'),
+                'pax': reservation.pax,
+                'area': area_name,
+                'id': reservation.id
+            }
+            customer_html = render_to_string('emails/confirmation.html', customer_context)
+            customer_plain = strip_tags(customer_html)
+            
             send_mail(
-                subject='Reservation Received - Golden Bay',
-                message=f'Dear {reservation.customer_name},\n\nWe received your request for {reservation.date} at {reservation.time}. Our staff will review and contact you shortly to confirm.',
+                subject='Reservation Request Received - Golden Bay',
+                message=customer_plain,
                 from_email=settings.EMAIL_HOST_USER,
                 recipient_list=[reservation.customer_email],
-                fail_silently=False, # CHANGED to False
+                html_message=customer_html,
+                fail_silently=False,
             )
             
-    except Reservation.DoesNotExist:
-        print(f"ERROR: Notification thread could not find Reservation ID {reservation_id}")
+        # B. SMS Customer (Only if they provided a phone number)
+        # We check if the contact field contains digits. If they entered "Viber: John123", we skip SMS.
+        contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
+        
+        if len(contact_digits) >= 10: # Ensure it looks like a valid phone number length
+            sms_body = f"Golden Bay: Hi {reservation.customer_name}, we received your request for {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')}. Our team is reviewing it and will confirm shortly."
+            send_sms(reservation.customer_contact, sms_body)
+
     except Exception as e:
-        print(f"SMTP ERROR in Background Thread: {e}")
+        print(f"Error in Notification Thread: {e}")
 
 class ReservationCreateView(generics.CreateAPIView):
     queryset = Reservation.objects.all()
@@ -150,47 +185,47 @@ class AdminReservationListView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated] # Enable this later when we add login
 
 def send_admin_update_notifications(reservation_id, new_status):
+    """ Fired when an ADMIN confirms or cancels a booking """
     try:
         reservation = Reservation.objects.get(id=reservation_id)
+        area_name = reservation.dining_area.name if reservation.dining_area else "Main Dining Hall"
         
-        # Only send if email exists and status is relevant
-        if reservation.customer_email and new_status in ['CONFIRMED', 'CANCELLED']:
-            
-            # 1. Prepare Data for the HTML Template
+        # 1. SEND HTML EMAIL (If email exists)
+        if reservation.customer_email and '@' in reservation.customer_email and new_status in ['CONFIRMED', 'CANCELLED']:
             context = {
                 'name': reservation.customer_name,
                 'status': new_status,
-                'date': reservation.date.strftime('%B %d, %Y'), # e.g. February 14, 2026
-                'time': reservation.time.strftime('%I:%M %p'),  # e.g. 07:00 PM
+                'date': reservation.date.strftime('%B %d, %Y'),
+                'time': reservation.time.strftime('%I:%M %p'),
                 'pax': reservation.pax,
-                'area': reservation.dining_area.name if reservation.dining_area else "Main Dining Hall",
+                'area': area_name,
                 'id': reservation.id
             }
-
-            # 2. Render HTML to String
             html_message = render_to_string('emails/confirmation.html', context)
-            
-            # 3. Create Plain Text Version (For spam filters/old email clients)
             plain_message = strip_tags(html_message)
 
-            # 4. Define Subject
-            subject = f'Reservation {new_status.capitalize()} - Golden Bay'
-
-            # 5. Send
             send_mail(
-                subject=subject,
-                message=plain_message, # Plain text fallback
+                subject=f'Reservation {new_status.capitalize()} - Golden Bay',
+                message=plain_message,
                 from_email=settings.EMAIL_HOST_USER,
                 recipient_list=[reservation.customer_email],
                 fail_silently=False,
-                html_message=html_message # <--- The Luxury HTML
+                html_message=html_message
             )
 
-            print(f"DEBUG: Sent HTML email to {reservation.customer_email}")
+        # 2. SEND SMS NOTIFICATION (If phone number exists)
+        contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
+        
+        if len(contact_digits) >= 10 and new_status in ['CONFIRMED', 'CANCELLED']:
+            if new_status == 'CONFIRMED':
+                sms_body = f"Golden Bay: Great news {reservation.customer_name}! Your table is CONFIRMED for {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')}. We look forward to serving you."
+            else:
+                sms_body = f"Golden Bay: Hi {reservation.customer_name}, your reservation for {reservation.date.strftime('%b %d')} has been cancelled. Please contact us at (02) 8804-0332 to reschedule."
+            
+            send_sms(reservation.customer_contact, sms_body)
             
     except Exception as e:
         print(f"⚠️ Notification Error for ID {reservation_id}: {e}")
-
 
 class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
     queryset = Reservation.objects.all()

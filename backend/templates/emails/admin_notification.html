@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>New Reservation Alert</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+    
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="padding: 40px 0;">
+        <tr>
+            <td align="center">
+                <table border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow: hidden;">
+                    
+                    <tr>
+                        <td align="center" style="background-color: #1a1a1a; padding: 30px 0;">
+                            <h1 style="color: #ffffff; font-size: 20px; letter-spacing: 2px; text-transform: uppercase; margin: 0;">New Action Required</h1>
+                            <p style="color: #D4AF37; font-size: 11px; text-transform: uppercase; letter-spacing: 3px; margin-top: 8px;">Golden Bay Dashboard</p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding: 40px 50px;">
+                            <h2 style="color: #1a1a1a; font-size: 22px; margin: 0 0 20px 0;">
+                                New Booking Request
+                            </h2>
+                            
+                            <table border="0" cellpadding="15" cellspacing="0" width="100%" style="background-color: #fafafa; border: 1px solid #eeeeee; border-radius: 4px; margin-bottom: 20px;">
+                                <tr>
+                                    <td width="30%" style="color: #888888; font-size: 11px; text-transform: uppercase;">Customer</td>
+                                    <td style="color: #1a1a1a; font-weight: bold; font-size: 14px;">{{ name }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #888888; font-size: 11px; text-transform: uppercase;">Contact</td>
+                                    <td style="color: #1a1a1a; font-weight: bold; font-size: 14px;">{{ contact }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #888888; font-size: 11px; text-transform: uppercase;">Date & Time</td>
+                                    <td style="color: #1a1a1a; font-weight: bold; font-size: 14px;">{{ date }} at {{ time }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #888888; font-size: 11px; text-transform: uppercase;">Area & Pax</td>
+                                    <td style="color: #1a1a1a; font-weight: bold; font-size: 14px;">{{ area }} ({{ pax }} Guests)</td>
+                                </tr>
+                            </table>
+
+                            <div style="background-color: #fff9e6; border-left: 4px solid #D4AF37; padding: 15px; margin-bottom: 30px;">
+                                <p style="margin: 0; color: #888888; font-size: 11px; text-transform: uppercase; margin-bottom: 5px;">Special Requests / Notes:</p>
+                                <p style="margin: 0; color: #1a1a1a; font-size: 14px;">{{ notes }}</p>
+                            </div>
+
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <a href="https://goldenbay.com.ph/admin/bookings" style="display: inline-block; padding: 14px 40px; background-color: #D4AF37; color: #ffffff; text-decoration: none; font-weight: bold; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; border-radius: 2px;">
+                                            Confirm in Dashboard
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

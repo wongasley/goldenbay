@@ -4,19 +4,29 @@ import os
 def send_sms(to_number, body):
     api_key = os.getenv('SEMAPHORE_API_KEY')
     if not api_key:
-        print(f"SMS LOG (No API Key): To {to_number} - {body}")
+        print(f"⚠️ SMS LOG (No API Key): To {to_number} - {body}")
         return
         
-    url = "https://semaphore.co/api/v4/messages"
-    # Ensure number starts with 09 for PH local
+    # Clean the phone number (remove spaces, dashes, etc.)
+    clean_number = ''.join(filter(str.isdigit, str(to_number)))
+    
+    # Semaphore prefers 0917 format over 63917 for local sending
+    if clean_number.startswith('63') and len(clean_number) == 12:
+        clean_number = '0' + clean_number[2:]
+
+    url = "https://api.semaphore.co/api/v4/messages"
+    
     data = {
         'apikey': api_key,
-        'number': to_number,
+        'number': clean_number,
         'message': body,
-        'sendername': 'GOLDENBAY' # Note: Requires Semaphore approval
+        'sendername': 'GOLDENBAY'  # Default is fine unless you register a custom one
     }
+    
     try:
-        response = requests.post(url, data=data)
-        return response.json()
+        response = requests.post(url, data=data, timeout=10)
+        result = response.json()
+        print(f"📲 SMS Sent to {clean_number}: {result}")
+        return result
     except Exception as e:
-        print(f"SMS Network Error: {e}")
+        print(f"❌ SMS Network Error: {e}")

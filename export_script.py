@@ -95,6 +95,8 @@ FILES_TO_READ = [
     'frontend/src/components/layout/AdminLayout.jsx',
     'frontend/src/pages/public/about/AboutPage.jsx',
     'frontend/src/pages/public/vip/VIPRoomsPage.jsx',
+    'backend/templates/emails/admin_notification.html',
+    'backend/reservations/management/commands/send_reminders.py',
     
 ]
 
