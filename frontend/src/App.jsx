@@ -1,6 +1,7 @@
 // src/App.jsx
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast'; // <--- 1. IMPORT TOASTER
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import AdminLayout from './components/layout/AdminLayout';
@@ -9,7 +10,7 @@ import AdminLayout from './components/layout/AdminLayout';
 import HomePage from './pages/public/home/HomePage';
 import MenuPage from './pages/public/menu/MenuPage';
 import ReservationPage from './pages/public/reservations/ReservationPage';
-import AboutPage from './pages/public/about/AboutPage'; // <--- IMPORT THIS
+import AboutPage from './pages/public/about/AboutPage'; 
 import LoginPage from './pages/admin/auth/LoginPage';
 import NewsPage from './pages/public/marketing/NewsPage';
 import SinglePostPage from './pages/public/marketing/SinglePostPage';
@@ -30,6 +31,28 @@ function App() {
     <Router>
       <div className="w-full min-h-screen font-sans bg-gray-50 text-gray-900">
         
+        {/* --- 2. ADD BRANDED TOASTER HERE --- */}
+        <Toaster 
+          position="top-center"
+          toastOptions={{
+            style: {
+              background: '#0a0a0a', // Midnight Black
+              color: '#ffffff', // White Text
+              border: '1px solid #D4AF37', // Gold Border
+              borderRadius: '4px',
+              fontSize: '14px',
+              letterSpacing: '0.05em',
+              fontFamily: 'Quicksand, sans-serif'
+            },
+            success: {
+              iconTheme: { primary: '#D4AF37', secondary: '#0a0a0a' }, // Gold Icon
+            },
+            error: {
+              iconTheme: { primary: '#ef4444', secondary: '#ffffff' }, // Red Icon
+            },
+          }}
+        />
+
         <Routes>
           {/* --- PUBLIC ROUTES --- */}
           <Route path="/" element={<><Navbar /><HomePage /></>} />

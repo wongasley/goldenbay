@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { Search, Plus, Check, X, Phone } from 'lucide-react';
 import ReservationForm from '../../../components/reservations/ReservationForm';
 
-const BACKEND_URL = "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 const BookingManager = () => {
   const [bookings, setBookings] = useState([]);
@@ -22,6 +23,7 @@ const BookingManager = () => {
       setBookings(data);
     } catch (err) {
       console.error("Failed to fetch bookings", err);
+      toast.error("Failed to load reservations.");
     }
   };
 
@@ -33,26 +35,31 @@ const BookingManager = () => {
 
   const updateStatus = async (id, newStatus) => {
     if (!window.confirm(`Are you sure you want to mark this as ${newStatus}?`)) return;
+    
+    // We use toast.promise to show a loading spinner while it saves to the backend!
     const token = localStorage.getItem('accessToken'); 
-
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/reservations/manage/${id}/`, {
+    const updatePromise = fetch(`${BACKEND_URL}/api/reservations/manage/${id}/`, {
         method: 'PATCH',
         headers: { 
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}` 
         },
         body: JSON.stringify({ status: newStatus })
-      });
-      
-      if (res.status === 401) { 
-          window.location.href = '/login';
-          return;
-      }
-      if (res.ok) fetchBookings(); 
-    } catch (err) {
-      alert("Error updating status");
-    }
+    }).then(async (res) => {
+        if (res.status === 401) { 
+            window.location.href = '/login';
+            throw new Error("Unauthorized");
+        }
+        if (!res.ok) throw new Error("Failed to update");
+        fetchBookings(); 
+        return res.json();
+    });
+
+    toast.promise(updatePromise, {
+        loading: 'Updating status...',
+        success: `Reservation marked as ${newStatus}!`,
+        error: 'Failed to update status.',
+    });
   };
 
   const filteredBookings = bookings.filter(b => 
@@ -204,7 +211,7 @@ const BookingManager = () => {
                     session="DINNER"  
                     selectedRoom={null} 
                     onSuccess={() => {
-                        alert("Booking Created!");
+                        toast.success("Manual booking created!");
                         setShowManualForm(false);
                         fetchBookings(); 
                     }}

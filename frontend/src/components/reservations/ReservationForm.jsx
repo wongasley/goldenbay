@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import toast from 'react-hot-toast';
 
-const BACKEND_URL = "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 const ReservationForm = ({ 
     selectedRoom, // Passed from visual grid (Customer Mode)
@@ -76,19 +77,19 @@ const ReservationForm = ({
         e.preventDefault();
         
         if (!formData.name || !formData.contact || !formData.pax) {
-            alert("Please fill in Name, Contact, and Guests.");
+            toast.error("Please fill in Name, Contact, and Guests.");
             return;
         }
 
         const finalRoomId = isManualEntry ? manualRoomId : selectedRoom;
         if (!finalRoomId) {
-            alert("Please select a Room or Dining Area.");
+            toast.error("Please select a Room or Dining Area.");
             return;
         }
 
         const finalTime = isManualEntry ? manualTime : selectedTime;
         if (!finalTime) {
-            alert("Please select an arrival time.");
+            toast.error("Please select an arrival time.");
             return;
         }
 
@@ -122,11 +123,11 @@ const ReservationForm = ({
                 const errorMessage = errData.non_field_errors 
                     ? errData.non_field_errors[0] 
                     : "Booking failed. Please check details.";
-                alert(errorMessage);
+                toast.error(errorMessage);
                 setSubmitStatus('error');
             }
         } catch (error) {
-            alert("Network error. Please try again.");
+            toast.error("Network error. Please try again.");
             setSubmitStatus('error');
         }
     };
