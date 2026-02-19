@@ -36,11 +36,11 @@ class Command(BaseCommand):
                 self.stdout.write(f"Sending reminder to {res.customer_name} for {res.time}...")
                 area_name = res.dining_area.name if res.dining_area else "Main Dining Hall"
 
-                # 1. SEND SMS REMINDER
-                contact_digits = ''.join(filter(str.isdigit, str(res.customer_contact)))
-                if len(contact_digits) >= 10:
-                    sms_body = f"Golden Bay Reminder: Hi {res.customer_name}, we look forward to seeing you today at {res.time.strftime('%I:%M %p')}! Please reply to this SMS or call (02) 8804-0332 for any changes."
-                    send_sms(res.customer_contact, sms_body)
+                # 1. SEND SMS REMINDER - TEMPORARILY DISABLED
+                # contact_digits = ''.join(filter(str.isdigit, str(res.customer_contact)))
+                # if len(contact_digits) >= 10:
+                #     sms_body = f"Golden Bay Reminder: Hi {res.customer_name}, we look forward to seeing you today at {res.time.strftime('%I:%M %p')}! Please reply to this SMS or call (02) 8804-0332 for any changes."
+                #     send_sms(res.customer_contact, sms_body)
 
                 # 2. SEND EMAIL REMINDER (Optional, but a nice touch)
                 if res.customer_email and '@' in res.customer_email:

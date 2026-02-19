@@ -4301,6 +4301,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../../../assets/images/goldenbaylogo.svg';
 
+// --- ADDED DYNAMIC BACKEND URL ---
+const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
+
 const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -4312,7 +4315,8 @@ const LoginPage = () => {
     setError('');
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/token/', {
+      // --- UPDATED TO USE BACKEND_URL ---
+      const response = await fetch(`${BACKEND_URL}/api/token/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -4334,7 +4338,7 @@ const LoginPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-      {/* Logo Container with background for visibility if logo is gold/white */}
+      {/* Logo Container */}
       <div className="bg-black/5 p-4 rounded-full mb-8">
         <img src={logo} className="h-20 w-auto" alt="Logo" />
       </div>
