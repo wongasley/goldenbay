@@ -6,7 +6,7 @@ import { Phone, Mail, MessageSquare, MonitorPlay, Users, Building, ChevronDown, 
 // Images
 import heroimage from '../../../assets/images/heroimage3.webp'; 
 import diningImg from '../../../assets/images/dining_area.webp';
-import wechatQr from '../../../assets/images/goldenbaylogo.svg'; 
+import wechatQr from '../../../assets/images/qrcode.svg'; 
 
 const EventInquiriesPage = () => {
   const [showWeChat, setShowWeChat] = useState(false);

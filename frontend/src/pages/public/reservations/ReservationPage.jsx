@@ -4,7 +4,7 @@ import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css'; 
 import { format } from 'date-fns';
 import { Users, CheckCircle, MessageSquare } from 'lucide-react';
-import wechatQr from '../../../assets/images/goldenbaylogo.svg'; 
+import wechatQr from '../../../assets/images/qrcode.svg'; 
 import heroimage from '../../../assets/images/heroimage4.webp'; // Banner Image
 import { Link } from 'react-router-dom';
 
