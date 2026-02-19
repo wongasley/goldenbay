@@ -97,6 +97,7 @@ FILES_TO_READ = [
     'frontend/src/pages/public/vip/VIPRoomsPage.jsx',
     'backend/templates/emails/admin_notification.html',
     'backend/reservations/management/commands/send_reminders.py',
+    '.github/workflows/deploy.yml',
     
 ]
 

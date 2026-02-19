@@ -1141,6 +1141,7 @@ import AboutPage from './pages/public/about/AboutPage'; // <--- IMPORT THIS
 import LoginPage from './pages/admin/auth/LoginPage';
 import NewsPage from './pages/public/marketing/NewsPage';
 import SinglePostPage from './pages/public/marketing/SinglePostPage';
+import EventInquiriesPage from './pages/public/events/EventInquiriesPage';
 
 // Admin Pages
 import AdminDashboardPage from './pages/admin/dashboard/AdminDashboardPage';
@@ -1162,7 +1163,8 @@ function App() {
           <Route path="/" element={<><Navbar /><HomePage /></>} />
           <Route path="/menu" element={<><Navbar /><MenuPage /><Footer /></>} />
           <Route path="/reservations" element={<><Navbar /><ReservationPage /><Footer /></>} />
-          <Route path="/about" element={<><Navbar /><AboutPage /><Footer /></>} /> {/* <--- ADDED ROUTE */}
+          <Route path="/events" element={<><Navbar /><EventInquiriesPage /><Footer /></>} />
+          <Route path="/about" element={<><Navbar /><AboutPage /><Footer /></>} />
           <Route path="/news" element={<><Navbar /><NewsPage /><Footer /></>} />
           <Route path="/news/:slug" element={<><Navbar /><SinglePostPage /><Footer /></>} />
           <Route path="/promotions" element={<><Navbar /><NewsPage /><Footer /></>} />
@@ -1358,6 +1360,7 @@ const Navbar = () => {
         <div className={`hidden md:flex items-center space-x-12 text-xs uppercase tracking-[0.2em] font-light
                         ${isHomePage ? 'text-gray-300' : 'text-gray-600'}`}>
           <Link to="/menu" className="hover:text-gold-500 transition-colors">Menu</Link>
+          <Link to="/events" className="hover:text-gold-500 transition-colors">Events</Link>
           <Link to="/news" className="hover:text-gold-500 transition-colors">News & Promos</Link>
           <Link to="/about" className="hover:text-gold-500 transition-colors">About Us</Link>
           <Link to="/vip-rooms" className="hover:text-gold-500 transition-colors">Private Rooms</Link> {/* Added */}
@@ -6035,3 +6038,51 @@ class Command(BaseCommand):
                 res.save()
 
         self.stdout.write(self.style.SUCCESS('Successfully checked and sent reminders.'))
+
+name: Lazy Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    name: Deploy to Linode
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Executing remote ssh commands
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.SSH_PORT }}
+        script: |
+          echo "🚀 Starting Deployment..."
+          
+          # 1. Navigate to Project
+          cd ~/goldenbay
+          
+          # 2. Pull Latest Code
+          git pull origin main
+          
+          # 3. Update Backend
+          echo "⚙️ Updating Backend..."
+          cd backend
+          source ../env/bin/activate
+          pip install -r requirements.txt
+          python manage.py migrate
+          python manage.py collectstatic --noinput
+          
+          # 4. Rebuild Frontend
+          echo "🎨 Building Frontend..."
+          cd ../frontend
+          npm install
+          npm run build
+          
+          # 5. Restart Servers (Using Password for Sudo)
+          echo "🔄 Restarting Services..."
+          echo "${{ secrets.SUDO_PASSWORD }}" | sudo -S systemctl restart gunicorn
+          
+          echo "✅ Deployment Complete! Site is live."
