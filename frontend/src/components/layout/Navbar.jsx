@@ -32,6 +32,7 @@ const Navbar = () => {
         <div className={`hidden md:flex items-center space-x-12 text-xs uppercase tracking-[0.2em] font-light
                         ${isHomePage ? 'text-gray-300' : 'text-gray-600'}`}>
           <Link to="/menu" className="hover:text-gold-500 transition-colors">Menu</Link>
+          <Link to="/events" className="hover:text-gold-500 transition-colors">Events</Link>
           <Link to="/news" className="hover:text-gold-500 transition-colors">News & Promos</Link>
           <Link to="/about" className="hover:text-gold-500 transition-colors">About Us</Link>
           <Link to="/vip-rooms" className="hover:text-gold-500 transition-colors">Private Rooms</Link> {/* Added */}

@@ -13,6 +13,7 @@ import AboutPage from './pages/public/about/AboutPage'; // <--- IMPORT THIS
 import LoginPage from './pages/admin/auth/LoginPage';
 import NewsPage from './pages/public/marketing/NewsPage';
 import SinglePostPage from './pages/public/marketing/SinglePostPage';
+import EventInquiriesPage from './pages/public/events/EventInquiriesPage';
 
 // Admin Pages
 import AdminDashboardPage from './pages/admin/dashboard/AdminDashboardPage';
@@ -34,7 +35,8 @@ function App() {
           <Route path="/" element={<><Navbar /><HomePage /></>} />
           <Route path="/menu" element={<><Navbar /><MenuPage /><Footer /></>} />
           <Route path="/reservations" element={<><Navbar /><ReservationPage /><Footer /></>} />
-          <Route path="/about" element={<><Navbar /><AboutPage /><Footer /></>} /> {/* <--- ADDED ROUTE */}
+          <Route path="/events" element={<><Navbar /><EventInquiriesPage /><Footer /></>} />
+          <Route path="/about" element={<><Navbar /><AboutPage /><Footer /></>} />
           <Route path="/news" element={<><Navbar /><NewsPage /><Footer /></>} />
           <Route path="/news/:slug" element={<><Navbar /><SinglePostPage /><Footer /></>} />
           <Route path="/promotions" element={<><Navbar /><NewsPage /><Footer /></>} />
