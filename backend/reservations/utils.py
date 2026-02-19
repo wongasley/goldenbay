@@ -20,7 +20,7 @@ def send_sms(to_number, body):
         'apikey': api_key,
         'number': clean_number,
         'message': body,
-        'sendername': 'SEMAPHORE'
+        'sendername': 'GOLDENBAY'
     }
     
     try:
