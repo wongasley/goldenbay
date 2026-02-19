@@ -145,6 +145,7 @@ DATABASES = {
         'PASSWORD': os.getenv('DB_PASSWORD'),
         'HOST': os.getenv('DB_HOST'),
         'PORT': os.getenv('DB_PORT'),
+        'CONN_MAX_AGE': 60,
     }
 }
 
@@ -4231,7 +4232,7 @@ export default LoginPage;
 # 🔐 SECURITY
 # ────────────────────────────────
 SECRET_KEY=django-insecure-d2_(mr&0a49w-$6l6lh(7)dwk83@#s0+r-b0sgrm!xa(w3#v1#
-DEBUG=False
+DEBUG=True
 SESSION_COOKIE_SECURE=False
 CSRF_COOKIE_SECURE=False
 SECURE_SSL_REDIRECT=False
