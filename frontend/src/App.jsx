@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast'; // <--- 1. IMPORT TOASTER
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
-import AdminLayout from './components/layout/staffLayout';
+import AdminLayout from './components/layout/AdminLayout';
 
 // Public Pages
 import HomePage from './pages/public/home/HomePage';
@@ -17,7 +17,7 @@ import SinglePostPage from './pages/public/marketing/SinglePostPage';
 import EventInquiriesPage from './pages/public/events/EventInquiriesPage';
 
 // Admin Pages
-import AdminDashboardPage from './pages/staff/dashboard/staffDashboardPage';
+import AdminDashboardPage from './pages/staff/dashboard/AdminDashboardPage';
 import BookingManager from './pages/staff/bookings/BookingManager';
 import MarketingManager from './pages/staff/marketing/MarketingManager';
 import PostEditor from './pages/staff/marketing/PostEditor';
