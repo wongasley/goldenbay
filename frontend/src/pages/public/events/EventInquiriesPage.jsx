@@ -58,36 +58,36 @@ const EventInquiriesPage = () => {
         </div>
       </div>
 
-      {/* --- CORE FEATURES (Simplified & Direct) --- */}
+      {/* --- HIGHLIGHTS SECTION --- */}
       <div className="max-w-7xl mx-auto px-6 py-20">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.1 }} className="space-y-4">
             <div className="w-16 h-16 mx-auto bg-gold-50 text-gold-600 rounded-full flex items-center justify-center mb-6">
-              <Users size={28} strokeWidth={1.5} />
+              <Building size={28} strokeWidth={1.5} />
             </div>
-            <h3 className="text-xl font-serif text-gray-900">Up to 800 Guests</h3>
-            <p className="text-sm text-gray-500 leading-relaxed font-light px-4">
-              Our expansive, pillar-less Grand Banquet Hall is engineered to host large-scale celebrations with absolute comfort.
+            <h3 className="text-xl font-serif text-gray-900">Versatile Spaces</h3>
+            <p className="text-sm text-gray-500 leading-relaxed font-light">
+              Choose from our grand dining hall or exclusive VIP rooms, equipped with modern amenities and elegant decor to suit any occasion.
             </p>
           </motion.div>
 
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.2 }} className="space-y-4">
             <div className="w-16 h-16 mx-auto bg-gold-50 text-gold-600 rounded-full flex items-center justify-center mb-6">
-              <MonitorPlay size={28} strokeWidth={1.5} />
+              <GlassWater size={28} strokeWidth={1.5} />
             </div>
-            <h3 className="text-xl font-serif text-gray-900">Modern LED Visuals</h3>
-            <p className="text-sm text-gray-500 leading-relaxed font-light px-4">
-              Newly installed, state-of-the-art LED walls provide stunning visual clarity for presentations and event ambiance.
+            <h3 className="text-xl font-serif text-gray-900">Bespoke Dining</h3>
+            <p className="text-sm text-gray-500 leading-relaxed font-light">
+              Elevate your event with our signature live seafood, authentic Chinese culinary masterpieces, and customizable set menus.
             </p>
           </motion.div>
 
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.3 }} className="space-y-4">
-            <div className="w-16 h-16 mx-auto bg-gray-900 text-gold-500 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-gray-900/20">
-              <Shield size={28} strokeWidth={1.5} />
+            <div className="w-16 h-16 mx-auto bg-gold-50 text-gold-600 rounded-full flex items-center justify-center mb-6">
+              <Users size={28} strokeWidth={1.5} />
             </div>
-            <h3 className="text-xl font-serif text-gray-900">Absolute Privacy</h3>
-            <p className="text-sm text-gray-500 leading-relaxed font-light px-4">
-              We respect your exclusive moments. We strictly do not use client events for our marketing. Your privacy is guaranteed.
+            <h3 className="text-xl font-serif text-gray-900">Dedicated Service</h3>
+            <p className="text-sm text-gray-500 leading-relaxed font-light">
+              Our experienced event specialists and attentive staff ensure flawless execution, allowing you to enjoy your celebration stress-free.
             </p>
           </motion.div>
         </div>
