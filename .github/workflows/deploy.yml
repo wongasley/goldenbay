@@ -18,21 +18,24 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         port: ${{ secrets.SSH_PORT }}
         script: |
+          set -e  # <--- THE MAGIC BULLET: Aborts the script immediately if any line fails
+          
           echo "🚀 Starting Deployment..."
           
           # 1. Navigate to Project
           cd ~/goldenbay
           
-          # 2. Pull Latest Code
+          # 2. Pull Latest Code (Will now abort if git fails)
+          git checkout main
           git pull origin main
           
-          # 3. Rebuild Frontend (DO THIS FIRST)
+          # 3. Rebuild Frontend (Happens first so backend can collect the new files)
           echo "🎨 Building Frontend..."
           cd frontend
           npm install
           npm run build
           
-          # 4. Update Backend & Collect Static (DO THIS SECOND)
+          # 4. Update Backend
           echo "⚙️ Updating Backend..."
           cd ../backend
           source ../env/bin/activate
