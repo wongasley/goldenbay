@@ -4,24 +4,24 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast'; // <--- 1. IMPORT TOASTER
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
-import AdminLayout from './components/layout/AdminLayout';
+import AdminLayout from './components/layout/staffLayout';
 
 // Public Pages
 import HomePage from './pages/public/home/HomePage';
 import MenuPage from './pages/public/menu/MenuPage';
 import ReservationPage from './pages/public/reservations/ReservationPage';
 import AboutPage from './pages/public/about/AboutPage'; 
-import LoginPage from './pages/admin/auth/LoginPage';
+import LoginPage from './pages/staff/auth/LoginPage';
 import NewsPage from './pages/public/marketing/NewsPage';
 import SinglePostPage from './pages/public/marketing/SinglePostPage';
 import EventInquiriesPage from './pages/public/events/EventInquiriesPage';
 
 // Admin Pages
-import AdminDashboardPage from './pages/admin/dashboard/AdminDashboardPage';
-import BookingManager from './pages/admin/bookings/BookingManager';
-import MarketingManager from './pages/admin/marketing/MarketingManager';
-import PostEditor from './pages/admin/marketing/PostEditor';
-import PhoneBookPage from './pages/admin/customers/PhoneBookPage';
+import AdminDashboardPage from './pages/staff/dashboard/staffDashboardPage';
+import BookingManager from './pages/staff/bookings/BookingManager';
+import MarketingManager from './pages/staff/marketing/MarketingManager';
+import PostEditor from './pages/staff/marketing/PostEditor';
+import PhoneBookPage from './pages/staff/customers/PhoneBookPage';
 
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import VIPRoomsPage from './pages/public/vip/VIPRoomsPage';
@@ -68,7 +68,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
 
           {/* --- ADMIN ROUTES (NESTED) --- */}
-          <Route path="/admin" element={
+          <Route path="/staff" element={
             <ProtectedRoute>
               <AdminLayout />
             </ProtectedRoute>

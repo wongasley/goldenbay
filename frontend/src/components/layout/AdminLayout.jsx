@@ -14,10 +14,10 @@ const AdminLayout = () => {
   const location = useLocation();
 
   const navItems = [
-    { path: '/admin', label: 'Overview', icon: LayoutDashboard },
-    { path: '/admin/bookings', label: 'Reservations', icon: CalendarDays },
-    { path: '/admin/customers', label: 'Phone Book', icon: Users },
-    { path: '/admin/marketing', label: 'Marketing', icon: Megaphone },
+    { path: '/staff', label: 'Overview', icon: LayoutDashboard },
+    { path: '/staff/bookings', label: 'Reservations', icon: CalendarDays },
+    { path: '/staff/customers', label: 'Phone Book', icon: Users },
+    { path: '/staff/marketing', label: 'Marketing', icon: Megaphone },
   ];
 
   return (

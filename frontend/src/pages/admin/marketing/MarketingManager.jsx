@@ -41,7 +41,7 @@ const MarketingManager = () => {
             <h1 className="text-3xl font-bold text-gray-900 font-serif">Marketing & Blog</h1>
             <p className="text-gray-500 mt-1 text-sm">Manage news, events, and promotional content.</p>
         </div>
-        <Link to="/admin/marketing/create" className="bg-gold-600 text-white px-6 py-2.5 font-bold uppercase tracking-widest text-xs rounded shadow-md hover:bg-gold-700 transition-colors flex items-center gap-2">
+        <Link to="/staff/marketing/create" className="bg-gold-600 text-white px-6 py-2.5 font-bold uppercase tracking-widest text-xs rounded shadow-md hover:bg-gold-700 transition-colors flex items-center gap-2">
            <Plus size={16} /> New Post
         </Link>
       </div>
@@ -78,7 +78,7 @@ const MarketingManager = () => {
                                     : <span className="text-gray-400 text-xs font-bold uppercase tracking-wide">Draft</span>}
                             </td>
                             <td className="p-5 text-right flex justify-end gap-2">
-                                <Link to={`/admin/marketing/edit/${post.id}`} className="bg-white border border-gray-200 p-2 rounded hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm">
+                                <Link to={`/staff/marketing/edit/${post.id}`} className="bg-white border border-gray-200 p-2 rounded hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm">
                                     <Edit2 size={16} />
                                 </Link>
                                 <button onClick={() => handleDelete(post.id)} className="bg-white border border-gray-200 p-2 rounded hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all shadow-sm">

@@ -714,8 +714,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from django.db.models import Sum, Count, Q
-from .models import DiningArea, Reservation, Customer, Reservation
-from .serializers import ReservationSerializer, DiningAreaSerializer, CustomerSerializer # We will create these next
+from .models import DiningArea, Reservation, Customer
+from .serializers import ReservationSerializer, DiningAreaSerializer, CustomerSerializer
 from django.core.mail import send_mail
 from django.conf import settings
 from .utils import send_sms
@@ -800,17 +800,13 @@ def send_notifications_task(reservation_id):
             fail_silently=False,
         )
 
-        # B. SMS Admin(s)
-        admin_numbers_str = os.getenv('ADMIN_PHONE_NUMBERS', '')
-        if admin_numbers_str:
-            # Split the string by commas to get a list of numbers
-            admin_numbers = [num.strip() for num in admin_numbers_str.split(',') if num.strip()]
-            
-            admin_sms_body = f"Golden Bay Alert: New booking request from {reservation.customer_name} for {reservation.pax} pax on {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')}. Please check dashboard."
-            
-            # Send to each admin number
-            for number in admin_numbers:
-                send_sms(number, admin_sms_body)
+        # B. SMS Admin(s) - TEMPORARILY DISABLED
+        # admin_numbers_str = os.getenv('ADMIN_PHONE_NUMBERS', '')
+        # if admin_numbers_str:
+        #     admin_numbers = [num.strip() for num in admin_numbers_str.split(',') if num.strip()]
+        #     admin_sms_body = f"Golden Bay Alert: New booking request from {reservation.customer_name} for {reservation.pax} pax on {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')}. Please check dashboard."
+        #     for number in admin_numbers:
+        #         send_sms(number, admin_sms_body)
 
 
         # ==========================================
@@ -840,13 +836,11 @@ def send_notifications_task(reservation_id):
                 fail_silently=False,
             )
             
-        # B. SMS Customer (Only if they provided a phone number)
-        # We check if the contact field contains digits. If they entered "Viber: John123", we skip SMS.
-        contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
-        
-        if len(contact_digits) >= 10: # Ensure it looks like a valid phone number length
-            sms_body = f"Golden Bay: Hi {reservation.customer_name}, we received your request for {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')}. Our team is reviewing it and will confirm shortly."
-            send_sms(reservation.customer_contact, sms_body)
+        # B. SMS Customer - TEMPORARILY DISABLED
+        # contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
+        # if len(contact_digits) >= 10: 
+        #     sms_body = f"Golden Bay: Hi {reservation.customer_name}, we received your request for {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')}. Our team is reviewing it and will confirm shortly."
+        #     send_sms(reservation.customer_contact, sms_body)
 
     except Exception as e:
         print(f"Error in Notification Thread: {e}")
@@ -888,7 +882,7 @@ class AdminReservationListView(generics.ListCreateAPIView):
     # Lists all bookings (newest first) OR creates a manual one
     queryset = Reservation.objects.all().order_by('-created_at')
     serializer_class = ReservationSerializer
-    permission_classes = [IsAuthenticated] # Enable this later when we add login
+    permission_classes = [IsAuthenticated] 
 
 def send_admin_update_notifications(reservation_id, new_status):
     """ Fired when an ADMIN confirms or cancels a booking """
@@ -919,16 +913,14 @@ def send_admin_update_notifications(reservation_id, new_status):
                 html_message=html_message
             )
 
-        # 2. SEND SMS NOTIFICATION (If phone number exists)
-        contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
-        
-        if len(contact_digits) >= 10 and new_status in ['CONFIRMED', 'CANCELLED']:
-            if new_status == 'CONFIRMED':
-                sms_body = f"Golden Bay: Great news {reservation.customer_name}! Your table is CONFIRMED for {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')}. We look forward to serving you."
-            else:
-                sms_body = f"Golden Bay: Hi {reservation.customer_name}, your reservation for {reservation.date.strftime('%b %d')} has been cancelled. Please contact us at (02) 8804-0332 to reschedule."
-            
-            send_sms(reservation.customer_contact, sms_body)
+        # 2. SEND SMS NOTIFICATION - TEMPORARILY DISABLED
+        # contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
+        # if len(contact_digits) >= 10 and new_status in ['CONFIRMED', 'CANCELLED']:
+        #     if new_status == 'CONFIRMED':
+        #         sms_body = f"Golden Bay: Great news {reservation.customer_name}! Your table is CONFIRMED for {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')}. We look forward to serving you."
+        #     else:
+        #         sms_body = f"Golden Bay: Hi {reservation.customer_name}, your reservation for {reservation.date.strftime('%b %d')} has been cancelled. Please contact us at (02) 8804-0332 to reschedule."
+        #     send_sms(reservation.customer_contact, sms_body)
             
     except Exception as e:
         print(f"⚠️ Notification Error for ID {reservation_id}: {e}")
@@ -6100,11 +6092,11 @@ class Command(BaseCommand):
                 self.stdout.write(f"Sending reminder to {res.customer_name} for {res.time}...")
                 area_name = res.dining_area.name if res.dining_area else "Main Dining Hall"
 
-                # 1. SEND SMS REMINDER
-                contact_digits = ''.join(filter(str.isdigit, str(res.customer_contact)))
-                if len(contact_digits) >= 10:
-                    sms_body = f"Golden Bay Reminder: Hi {res.customer_name}, we look forward to seeing you today at {res.time.strftime('%I:%M %p')}! Please reply to this SMS or call (02) 8804-0332 for any changes."
-                    send_sms(res.customer_contact, sms_body)
+                # 1. SEND SMS REMINDER - TEMPORARILY DISABLED
+                # contact_digits = ''.join(filter(str.isdigit, str(res.customer_contact)))
+                # if len(contact_digits) >= 10:
+                #     sms_body = f"Golden Bay Reminder: Hi {res.customer_name}, we look forward to seeing you today at {res.time.strftime('%I:%M %p')}! Please reply to this SMS or call (02) 8804-0332 for any changes."
+                #     send_sms(res.customer_contact, sms_body)
 
                 # 2. SEND EMAIL REMINDER (Optional, but a nice touch)
                 if res.customer_email and '@' in res.customer_email:

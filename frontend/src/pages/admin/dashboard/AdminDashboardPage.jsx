@@ -86,7 +86,7 @@ const AdminDashboardPage = () => {
              value={loading ? "..." : stats.today_count} 
              icon={Users} 
              colorClass="blue" 
-             linkTo="/admin/bookings"
+             linkTo="/staff/bookings"
              subText="Reservations"
           />
 
@@ -96,12 +96,12 @@ const AdminDashboardPage = () => {
              value={loading ? "..." : stats.pending_count} 
              icon={AlertCircle} 
              colorClass="red" 
-             linkTo="/admin/bookings"
+             linkTo="/staff/bookings"
              subText="Urgent"
           />
           
           {/* LINK 1: PHONE BOOK */}
-          <Link to="/admin/customers" className="group block h-full">
+          <Link to="/staff/customers" className="group block h-full">
             <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-gold-300 transition-all duration-300 h-full flex flex-col justify-between relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-24 h-24 bg-orange-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
                 <div className="relative z-10 flex justify-between items-start mb-4">
@@ -117,7 +117,7 @@ const AdminDashboardPage = () => {
           </Link>
 
           {/* LINK 2: MARKETING (Replaced Revenue) */}
-          <Link to="/admin/marketing" className="group block h-full">
+          <Link to="/staff/marketing" className="group block h-full">
             <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-gold-300 transition-all duration-300 h-full flex flex-col justify-between relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
                 <div className="relative z-10 flex justify-between items-start mb-4">
@@ -137,7 +137,7 @@ const AdminDashboardPage = () => {
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
           <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
              <h3 className="font-bold text-gray-900 text-lg">Recent Reservations</h3>
-             <Link to="/admin/bookings" className="text-sm font-medium text-gold-600 hover:text-gold-700 flex items-center gap-1">
+             <Link to="/staff/bookings" className="text-sm font-medium text-gold-600 hover:text-gold-700 flex items-center gap-1">
                 View All <ArrowRight size={14} />
              </Link>
           </div>
@@ -178,7 +178,7 @@ const AdminDashboardPage = () => {
 
                       {/* Action */}
                       <div className="col-span-1 text-right">
-                         <Link to="/admin/bookings" className="text-gray-300 hover:text-gold-600">
+                         <Link to="/staff/bookings" className="text-gray-300 hover:text-gold-600">
                             <ArrowRight size={18} />
                          </Link>
                       </div>

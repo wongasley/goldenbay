@@ -28,7 +28,7 @@ const LoginPage = () => {
       if (response.ok) {
         localStorage.setItem('accessToken', data.access);
         localStorage.setItem('refreshToken', data.refresh);
-        navigate('/admin');
+        navigate('/staff');
       } else {
         setError('Invalid Username or Password');
       }

@@ -37,7 +37,7 @@ const Navbar = () => {
           <Link to="/about" className="hover:text-gold-500 transition-colors">About Us</Link>
           <Link to="/vip-rooms" className="hover:text-gold-500 transition-colors">Private Rooms</Link> {/* Added */}
           {/* Admin link hidden or kept subtle */}
-           {/* <Link to="/admin" className={`${isHomePage ? 'text-white/20' : 'text-gray-300'} hover:text-gold-500 transition-colors`}>Admin</Link> */}
+           {/* <Link to="/staff" className={`${isHomePage ? 'text-white/20' : 'text-gray-300'} hover:text-gold-500 transition-colors`}>Admin</Link> */}
         </div>
 
         {/* CTA BUTTON */}
