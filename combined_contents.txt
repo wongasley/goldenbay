@@ -1125,24 +1125,24 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast'; // <--- 1. IMPORT TOASTER
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
-import AdminLayout from './components/layout/AdminLayout';
+import AdminLayout from './components/layout/staffLayout';
 
 // Public Pages
 import HomePage from './pages/public/home/HomePage';
 import MenuPage from './pages/public/menu/MenuPage';
 import ReservationPage from './pages/public/reservations/ReservationPage';
 import AboutPage from './pages/public/about/AboutPage'; 
-import LoginPage from './pages/admin/auth/LoginPage';
+import LoginPage from './pages/staff/auth/LoginPage';
 import NewsPage from './pages/public/marketing/NewsPage';
 import SinglePostPage from './pages/public/marketing/SinglePostPage';
 import EventInquiriesPage from './pages/public/events/EventInquiriesPage';
 
 // Admin Pages
-import AdminDashboardPage from './pages/admin/dashboard/AdminDashboardPage';
-import BookingManager from './pages/admin/bookings/BookingManager';
-import MarketingManager from './pages/admin/marketing/MarketingManager';
-import PostEditor from './pages/admin/marketing/PostEditor';
-import PhoneBookPage from './pages/admin/customers/PhoneBookPage';
+import AdminDashboardPage from './pages/staff/dashboard/staffDashboardPage';
+import BookingManager from './pages/staff/bookings/BookingManager';
+import MarketingManager from './pages/staff/marketing/MarketingManager';
+import PostEditor from './pages/staff/marketing/PostEditor';
+import PhoneBookPage from './pages/staff/customers/PhoneBookPage';
 
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import VIPRoomsPage from './pages/public/vip/VIPRoomsPage';
@@ -1189,7 +1189,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
 
           {/* --- ADMIN ROUTES (NESTED) --- */}
-          <Route path="/admin" element={
+          <Route path="/staff" element={
             <ProtectedRoute>
               <AdminLayout />
             </ProtectedRoute>
@@ -1381,7 +1381,7 @@ const Navbar = () => {
           <Link to="/about" className="hover:text-gold-500 transition-colors">About Us</Link>
           <Link to="/vip-rooms" className="hover:text-gold-500 transition-colors">Private Rooms</Link> {/* Added */}
           {/* Admin link hidden or kept subtle */}
-           {/* <Link to="/admin" className={`${isHomePage ? 'text-white/20' : 'text-gray-300'} hover:text-gold-500 transition-colors`}>Admin</Link> */}
+           {/* <Link to="/staff" className={`${isHomePage ? 'text-white/20' : 'text-gray-300'} hover:text-gold-500 transition-colors`}>Admin</Link> */}
         </div>
 
         {/* CTA BUTTON */}
@@ -1493,7 +1493,7 @@ const AdminDashboardPage = () => {
              value={loading ? "..." : stats.today_count} 
              icon={Users} 
              colorClass="blue" 
-             linkTo="/admin/bookings"
+             linkTo="/staff/bookings"
              subText="Reservations"
           />
 
@@ -1503,12 +1503,12 @@ const AdminDashboardPage = () => {
              value={loading ? "..." : stats.pending_count} 
              icon={AlertCircle} 
              colorClass="red" 
-             linkTo="/admin/bookings"
+             linkTo="/staff/bookings"
              subText="Urgent"
           />
           
           {/* LINK 1: PHONE BOOK */}
-          <Link to="/admin/customers" className="group block h-full">
+          <Link to="/staff/customers" className="group block h-full">
             <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-gold-300 transition-all duration-300 h-full flex flex-col justify-between relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-24 h-24 bg-orange-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
                 <div className="relative z-10 flex justify-between items-start mb-4">
@@ -1524,7 +1524,7 @@ const AdminDashboardPage = () => {
           </Link>
 
           {/* LINK 2: MARKETING (Replaced Revenue) */}
-          <Link to="/admin/marketing" className="group block h-full">
+          <Link to="/staff/marketing" className="group block h-full">
             <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-gold-300 transition-all duration-300 h-full flex flex-col justify-between relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
                 <div className="relative z-10 flex justify-between items-start mb-4">
@@ -1544,7 +1544,7 @@ const AdminDashboardPage = () => {
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
           <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
              <h3 className="font-bold text-gray-900 text-lg">Recent Reservations</h3>
-             <Link to="/admin/bookings" className="text-sm font-medium text-gold-600 hover:text-gold-700 flex items-center gap-1">
+             <Link to="/staff/bookings" className="text-sm font-medium text-gold-600 hover:text-gold-700 flex items-center gap-1">
                 View All <ArrowRight size={14} />
              </Link>
           </div>
@@ -1585,7 +1585,7 @@ const AdminDashboardPage = () => {
 
                       {/* Action */}
                       <div className="col-span-1 text-right">
-                         <Link to="/admin/bookings" className="text-gray-300 hover:text-gold-600">
+                         <Link to="/staff/bookings" className="text-gray-300 hover:text-gold-600">
                             <ArrowRight size={18} />
                          </Link>
                       </div>
@@ -4319,7 +4319,7 @@ const LoginPage = () => {
       if (response.ok) {
         localStorage.setItem('accessToken', data.access);
         localStorage.setItem('refreshToken', data.refresh);
-        navigate('/admin');
+        navigate('/staff');
       } else {
         setError('Invalid Username or Password');
       }
@@ -4721,7 +4721,7 @@ const MarketingManager = () => {
             <h1 className="text-3xl font-bold text-gray-900 font-serif">Marketing & Blog</h1>
             <p className="text-gray-500 mt-1 text-sm">Manage news, events, and promotional content.</p>
         </div>
-        <Link to="/admin/marketing/create" className="bg-gold-600 text-white px-6 py-2.5 font-bold uppercase tracking-widest text-xs rounded shadow-md hover:bg-gold-700 transition-colors flex items-center gap-2">
+        <Link to="/staff/marketing/create" className="bg-gold-600 text-white px-6 py-2.5 font-bold uppercase tracking-widest text-xs rounded shadow-md hover:bg-gold-700 transition-colors flex items-center gap-2">
            <Plus size={16} /> New Post
         </Link>
       </div>
@@ -4758,7 +4758,7 @@ const MarketingManager = () => {
                                     : <span className="text-gray-400 text-xs font-bold uppercase tracking-wide">Draft</span>}
                             </td>
                             <td className="p-5 text-right flex justify-end gap-2">
-                                <Link to={`/admin/marketing/edit/${post.id}`} className="bg-white border border-gray-200 p-2 rounded hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm">
+                                <Link to={`/staff/marketing/edit/${post.id}`} className="bg-white border border-gray-200 p-2 rounded hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm">
                                     <Edit2 size={16} />
                                 </Link>
                                 <button onClick={() => handleDelete(post.id)} className="bg-white border border-gray-200 p-2 rounded hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all shadow-sm">
@@ -4847,7 +4847,7 @@ const PostEditor = () => {
             data: data,
             headers: { "Content-Type": "multipart/form-data" }
         });
-        navigate('/admin/marketing');
+        navigate('/staff/marketing');
     } catch (err) {
         console.error(err);
         alert(`Failed to save: ${err.message}`);
@@ -4873,7 +4873,7 @@ const PostEditor = () => {
            <div className="flex gap-3">
                <button 
                   type="button" 
-                  onClick={() => navigate('/admin/marketing')} 
+                  onClick={() => navigate('/staff/marketing')} 
                   className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
                 >
                   <X size={16} /> Cancel
@@ -5603,10 +5603,10 @@ const AdminLayout = () => {
   const location = useLocation();
 
   const navItems = [
-    { path: '/admin', label: 'Overview', icon: LayoutDashboard },
-    { path: '/admin/bookings', label: 'Reservations', icon: CalendarDays },
-    { path: '/admin/customers', label: 'Phone Book', icon: Users },
-    { path: '/admin/marketing', label: 'Marketing', icon: Megaphone },
+    { path: '/staff', label: 'Overview', icon: LayoutDashboard },
+    { path: '/staff/bookings', label: 'Reservations', icon: CalendarDays },
+    { path: '/staff/customers', label: 'Phone Book', icon: Users },
+    { path: '/staff/marketing', label: 'Marketing', icon: Megaphone },
   ];
 
   return (
