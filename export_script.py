@@ -99,6 +99,8 @@ FILES_TO_READ = [
     'backend/reservations/management/commands/send_reminders.py',
     '.github/workflows/deploy.yml',
     'frontend/src/pages/public/events/EventInquiriesPage.jsx',
+    'frontend/public/sitemap.xml',
+    'frontend/public/robots.txt',
     
 ]
 
