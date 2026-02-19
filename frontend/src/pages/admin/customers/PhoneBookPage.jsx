@@ -1,16 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    Search, 
-    Plus, 
-    Phone, 
-    Mail, 
-    Edit2, 
-    Trash2, 
-    ArrowUpDown, 
-    X,
-    User,
-    StickyNote
-} from 'lucide-react';
+import { Search, Plus, Phone, Mail, Trash2, ArrowUpDown, X, User, StickyNote } from 'lucide-react';
 import { FaWeixin, FaViber, FaWhatsapp, FaTelegram } from 'react-icons/fa';
 
 const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
@@ -88,7 +77,8 @@ const PhoneBookPage = () => {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id, e) => {
+      e.stopPropagation(); // Prevents row click from opening the edit modal
       if(!window.confirm("Are you sure you want to delete this customer?")) return;
       const token = localStorage.getItem('accessToken');
       try {
@@ -132,120 +122,102 @@ const PhoneBookPage = () => {
     .filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search))
     .sort((a, b) => sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
 
-  const inputClass = "w-full bg-white border border-gray-300 p-2.5 text-gray-900 text-sm focus:border-gold-500 focus:ring-1 focus:ring-gold-500 outline-none rounded-md transition-all shadow-sm";
+  const inputClass = "w-full bg-white border border-gray-300 p-2 text-gray-900 text-sm focus:border-gold-500 focus:ring-1 focus:ring-gold-500 outline-none rounded-sm transition-all shadow-sm";
   const labelClass = "block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       
-      {/* 1. UNIFIED HEADER */}
-      <div className="flex justify-between items-end border-b border-gray-200 pb-6">
+      {/* 1. COMPACT HEADER */}
+      <div className="flex justify-between items-end border-b border-gray-200 pb-3">
         <div>
-            <h1 className="text-3xl font-bold text-gray-900 font-serif">Clientele</h1>
-            <p className="text-gray-500 mt-1 text-sm">Manage customer profiles and contact details.</p>
+            <h1 className="text-xl font-bold text-gray-900 font-serif">Clientele</h1>
+            <p className="text-gray-500 text-xs">Manage customer profiles and contact details.</p>
         </div>
         <div className="flex gap-2">
-             {/* Search */}
              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                 <input 
                     type="text" 
                     placeholder="Search name or phone..." 
-                    className="pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-md text-sm outline-none focus:border-gold-500 w-64 shadow-sm"
+                    className="pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded text-xs outline-none focus:border-gold-500 w-56 shadow-sm"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                 />
             </div>
-            {/* Sort */}
             <button 
                 onClick={() => setSortAsc(!sortAsc)} 
-                className="bg-white border border-gray-200 p-2.5 rounded-md hover:bg-gray-50 text-gray-600 shadow-sm"
+                className="bg-white border border-gray-200 px-2 py-1.5 rounded hover:bg-gray-50 text-gray-600 shadow-sm"
                 title={sortAsc ? "Sort Z-A" : "Sort A-Z"}
             >
-                <ArrowUpDown size={18}/>
+                <ArrowUpDown size={14}/>
             </button>
-            {/* Add */}
             <button 
                 onClick={openCreate} 
-                className="bg-gold-600 text-white px-6 py-2.5 font-bold uppercase tracking-widest text-xs rounded shadow-md hover:bg-gold-700 transition-all flex items-center gap-2"
+                className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-all flex items-center gap-1.5"
             >
-               <Plus size={16} /> Add New
+               <Plus size={14} /> Add New
             </button>
         </div>
       </div>
 
-      {/* 2. CUSTOMER GRID */}
+      {/* 2. COMPACT DENSE LIST */}
       {loading ? (
-          <div className="p-8 text-center text-gray-400 animate-pulse text-sm">Loading contacts...</div>
+          <div className="p-8 text-center text-gray-400 animate-pulse text-xs">Loading contacts...</div>
       ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="flex flex-col gap-1.5">
             {filtered.length === 0 ? (
-                <div className="col-span-full text-center py-20 text-gray-400 text-sm">
+                <div className="text-center py-10 text-gray-400 text-xs">
                     No customers found matching your criteria.
                 </div>
             ) : (
                 filtered.map(c => (
-                    <div key={c.id} className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-gold-300 transition-all group relative flex flex-col h-full">
-                        
-                        {/* Header */}
-                        <div className="flex justify-between items-start mb-4">
+                    <div 
+                        key={c.id} 
+                        onClick={() => openEdit(c)}
+                        className="bg-white px-4 py-2.5 rounded border border-gray-200 shadow-sm hover:bg-gold-50 hover:border-gold-300 transition-all group cursor-pointer flex items-center justify-between"
+                    >
+                        {/* Name & Badge */}
+                        <div className="flex items-center gap-3 w-1/3">
+                            <div className="w-7 h-7 rounded bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-xs flex-shrink-0">
+                                {c.name.charAt(0).toUpperCase()}
+                            </div>
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <h3 className="font-bold text-lg text-gray-900 line-clamp-1">{c.name}</h3>
+                                    <h3 className="font-bold text-sm text-gray-900 line-clamp-1">{c.name}</h3>
                                     {c.notes && c.notes.toLowerCase().includes('vip') && (
-                                        <span className="bg-gold-100 text-gold-700 text-[10px] font-bold px-2 py-0.5 rounded border border-gold-200">VIP</span>
+                                        <span className="bg-gold-100 text-gold-700 text-[9px] font-bold px-1.5 py-0.5 rounded border border-gold-200">VIP</span>
                                     )}
                                 </div>
-                                <p className="text-xs text-gray-400 mt-0.5 font-medium">Added: {new Date(c.created_at).toLocaleDateString()}</p>
-                            </div>
-                            
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => openEdit(c)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded">
-                                    <Edit2 size={14}/>
-                                </button>
-                                <button onClick={() => handleDelete(c.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
-                                    <Trash2 size={14}/>
-                                </button>
+                                <p className="text-[10px] text-gray-400 font-medium">Added: {new Date(c.created_at).toLocaleDateString()}</p>
                             </div>
                         </div>
 
-                        {/* Contact Details */}
-                        <div className="space-y-3 mb-6 flex-grow">
-                            <div className="flex items-center gap-3 text-sm text-gray-700">
-                                <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 flex-shrink-0">
-                                    <Phone size={14} />
-                                </div>
-                                <span className="font-medium font-mono text-gray-600">{c.phone}</span>
-                            </div>
-                            
-                            {c.email ? (
-                                <div className="flex items-center gap-3 text-sm text-gray-700">
-                                    <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 flex-shrink-0">
-                                        <Mail size={14} />
-                                    </div>
-                                    <span className="truncate text-gray-600">{c.email}</span>
-                                </div>
-                            ) : null}
+                        {/* Phone */}
+                        <div className="w-1/5 flex items-center gap-2 text-xs font-medium text-gray-600 font-mono">
+                            <Phone size={12} className="text-gray-400"/> {c.phone}
                         </div>
 
-                        <div className="h-px bg-gray-100 w-full mb-4"></div>
+                        {/* Email */}
+                        <div className="w-1/4 flex items-center gap-2 text-xs text-gray-500 truncate">
+                            {c.email ? <><Mail size={12} className="text-gray-400"/> {c.email}</> : <span className="text-gray-300 italic">- No Email -</span>}
+                        </div>
 
-                        {/* Social Apps */}
-                        <div className="flex justify-between items-center">
-                            <div className="flex gap-2">
-                                <div className={`p-2 rounded-full transition-colors ${c.wechat ? 'text-green-600 bg-green-50' : 'text-gray-200 bg-gray-50'}`} title={c.wechat || "No WeChat"}>
-                                    <FaWeixin size={16}/>
-                                </div>
-                                <div className={`p-2 rounded-full transition-colors ${c.viber ? 'text-purple-600 bg-purple-50' : 'text-gray-200 bg-gray-50'}`} title={c.viber || "No Viber"}>
-                                    <FaViber size={16}/>
-                                </div>
-                                <div className={`p-2 rounded-full transition-colors ${c.whatsapp ? 'text-green-500 bg-green-50' : 'text-gray-200 bg-gray-50'}`} title={c.whatsapp || "No WhatsApp"}>
-                                    <FaWhatsapp size={16}/>
-                                </div>
-                                <div className={`p-2 rounded-full transition-colors ${c.telegram ? 'text-blue-500 bg-blue-50' : 'text-gray-200 bg-gray-50'}`} title={c.telegram || "No Telegram"}>
-                                    <FaTelegram size={16}/>
-                                </div>
+                        {/* Actions & Socials */}
+                        <div className="flex items-center justify-end gap-4 w-auto">
+                            <div className="flex gap-1.5">
+                                {c.wechat && <FaWeixin className="text-green-600" size={14} title="WeChat"/>}
+                                {c.viber && <FaViber className="text-purple-600" size={14} title="Viber"/>}
+                                {c.whatsapp && <FaWhatsapp className="text-green-500" size={14} title="WhatsApp"/>}
+                                {c.telegram && <FaTelegram className="text-blue-500" size={14} title="Telegram"/>}
                             </div>
+                            <button 
+                                onClick={(e) => handleDelete(c.id, e)} 
+                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                title="Delete Client"
+                            >
+                                <Trash2 size={14}/>
+                            </button>
                         </div>
                     </div>
                 ))
@@ -253,101 +225,80 @@ const PhoneBookPage = () => {
           </div>
       )}
 
-      {/* --- ADD / EDIT MODAL --- */}
+      {/* --- ADD / EDIT MODAL (Also Compacted) --- */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
             <div className="bg-white w-full max-w-2xl rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                 
-                {/* Modal Header */}
-                <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-white">
+                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-white">
                     <div>
-                        <h2 className="text-2xl font-serif text-gray-900 font-bold">{editingCustomer ? 'Edit Profile' : 'New Client'}</h2>
-                        <p className="text-gray-400 text-xs uppercase tracking-widest mt-1">Customer Database</p>
+                        <h2 className="text-lg font-serif text-gray-900 font-bold">{editingCustomer ? 'Edit Profile' : 'New Client'}</h2>
                     </div>
-                    <button onClick={closeModal} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500">
-                        <X size={20}/>
+                    <button onClick={closeModal} className="p-1.5 hover:bg-gray-100 rounded text-gray-500">
+                        <X size={18}/>
                     </button>
                 </div>
                 
-                {/* Modal Body */}
-                <div className="p-8 overflow-y-auto bg-gray-50/50">
-                    <form id="contactForm" onSubmit={handleSubmit} className="space-y-6">
-                        
-                        {/* Primary Info */}
-                        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-4">
-                            <h3 className="text-xs font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-2 mb-4 flex items-center gap-2">
-                                <User size={14}/> Primary Details
+                <div className="p-6 overflow-y-auto bg-gray-50/50">
+                    <form id="contactForm" onSubmit={handleSubmit} className="space-y-4">
+                        <div className="bg-white p-4 rounded border border-gray-200 shadow-sm space-y-3">
+                            <h3 className="text-[10px] font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-1.5 mb-2 flex items-center gap-1.5">
+                                <User size={12}/> Primary Details
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className={labelClass}>Full Name <span className="text-red-500">*</span></label>
-                                    <input required type="text" className={inputClass} 
-                                        placeholder="e.g. John Doe"
-                                        value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                                    <input required type="text" className={inputClass} placeholder="e.g. John Doe" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Phone Number <span className="text-red-500">*</span></label>
-                                    <input required type="text" className={inputClass} 
-                                        placeholder="e.g. 0917 123 4567"
-                                        value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                                    <input required type="text" className={inputClass} placeholder="e.g. 0917 123 4567" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
                                 </div>
                             </div>
                             <div>
                                 <label className={labelClass}>Email Address</label>
-                                <input type="email" className={inputClass} 
-                                    placeholder="client@example.com"
-                                    value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                                <input type="email" className={inputClass} placeholder="client@example.com" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                             </div>
                         </div>
 
-                        {/* Social Media */}
-                        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-4">
-                            <h3 className="text-xs font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-2 mb-4 flex items-center gap-2">
-                                <Phone size={14}/> Social IDs
+                        <div className="bg-white p-4 rounded border border-gray-200 shadow-sm space-y-3">
+                            <h3 className="text-[10px] font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-1.5 mb-2 flex items-center gap-1.5">
+                                <Phone size={12}/> Social IDs
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className={`${labelClass} flex items-center gap-2`}><FaWeixin className="text-green-600"/> WeChat ID</label>
-                                    <input type="text" className={inputClass} 
-                                        value={formData.wechat} onChange={e => setFormData({...formData, wechat: e.target.value})} />
+                                    <label className={`${labelClass} flex items-center gap-1.5`}><FaWeixin className="text-green-600"/> WeChat ID</label>
+                                    <input type="text" className={inputClass} value={formData.wechat} onChange={e => setFormData({...formData, wechat: e.target.value})} />
                                 </div>
                                 <div>
-                                    <label className={`${labelClass} flex items-center gap-2`}><FaViber className="text-purple-600"/> Viber Number</label>
-                                    <input type="text" className={inputClass} 
-                                        value={formData.viber} onChange={e => setFormData({...formData, viber: e.target.value})} />
+                                    <label className={`${labelClass} flex items-center gap-1.5`}><FaViber className="text-purple-600"/> Viber Number</label>
+                                    <input type="text" className={inputClass} value={formData.viber} onChange={e => setFormData({...formData, viber: e.target.value})} />
                                 </div>
                                 <div>
-                                    <label className={`${labelClass} flex items-center gap-2`}><FaWhatsapp className="text-green-500"/> WhatsApp</label>
-                                    <input type="text" className={inputClass} 
-                                        value={formData.whatsapp} onChange={e => setFormData({...formData, whatsapp: e.target.value})} />
+                                    <label className={`${labelClass} flex items-center gap-1.5`}><FaWhatsapp className="text-green-500"/> WhatsApp</label>
+                                    <input type="text" className={inputClass} value={formData.whatsapp} onChange={e => setFormData({...formData, whatsapp: e.target.value})} />
                                 </div>
                                 <div>
-                                    <label className={`${labelClass} flex items-center gap-2`}><FaTelegram className="text-blue-500"/> Telegram</label>
-                                    <input type="text" className={inputClass} 
-                                        value={formData.telegram} onChange={e => setFormData({...formData, telegram: e.target.value})} />
+                                    <label className={`${labelClass} flex items-center gap-1.5`}><FaTelegram className="text-blue-500"/> Telegram</label>
+                                    <input type="text" className={inputClass} value={formData.telegram} onChange={e => setFormData({...formData, telegram: e.target.value})} />
                                 </div>
                             </div>
                         </div>
 
-                        {/* Notes */}
-                        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-4">
-                            <h3 className="text-xs font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-2 mb-4 flex items-center gap-2">
-                                <StickyNote size={14}/> Internal Notes
+                        <div className="bg-white p-4 rounded border border-gray-200 shadow-sm space-y-3">
+                            <h3 className="text-[10px] font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-1.5 mb-2 flex items-center gap-1.5">
+                                <StickyNote size={12}/> Internal Notes
                             </h3>
-                            <textarea className={`${inputClass} h-24 resize-none`} 
-                                placeholder="E.g. VIP, prefers window seat, allergic to shrimp..."
-                                value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} />
+                            <textarea className={`${inputClass} h-16 resize-none`} placeholder="E.g. VIP, prefers window seat..." value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} />
                         </div>
-
                     </form>
                 </div>
 
-                {/* Modal Footer */}
-                <div className="p-6 bg-white border-t border-gray-100 flex justify-end gap-3">
-                    <button onClick={closeModal} className="px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-md transition-colors">
+                <div className="p-4 bg-white border-t border-gray-100 flex justify-end gap-2">
+                    <button onClick={closeModal} className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded transition-colors">
                         Cancel
                     </button>
-                    <button form="contactForm" type="submit" disabled={isSubmitting} className="bg-gold-600 text-white px-8 py-2.5 font-bold uppercase tracking-widest text-xs rounded-md shadow-md hover:bg-gold-700 transition-colors disabled:opacity-50">
+                    <button form="contactForm" type="submit" disabled={isSubmitting} className="bg-gold-600 text-white px-6 py-2 font-bold uppercase tracking-widest text-xs rounded shadow-sm hover:bg-gold-700 transition-colors disabled:opacity-50">
                         {isSubmitting ? 'Saving...' : 'Save Profile'}
                     </button>
                 </div>

@@ -33,56 +33,56 @@ const MarketingManager = () => {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       
-      {/* 1. UNIFIED HEADER */}
-      <div className="flex justify-between items-end border-b border-gray-200 pb-6">
+      {/* 1. COMPACT HEADER */}
+      <div className="flex justify-between items-end border-b border-gray-200 pb-3">
         <div>
-            <h1 className="text-3xl font-bold text-gray-900 font-serif">Marketing & Blog</h1>
-            <p className="text-gray-500 mt-1 text-sm">Manage news, events, and promotional content.</p>
+            <h1 className="text-xl font-bold text-gray-900 font-serif">Marketing & Blog</h1>
+            <p className="text-gray-500 text-xs">Manage news, events, and promotional content.</p>
         </div>
-        <Link to="/staff/marketing/create" className="bg-gold-600 text-white px-6 py-2.5 font-bold uppercase tracking-widest text-xs rounded shadow-md hover:bg-gold-700 transition-colors flex items-center gap-2">
-           <Plus size={16} /> New Post
+        <Link to="/staff/marketing/create" className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-colors flex items-center gap-1.5">
+           <Plus size={14} /> New Post
         </Link>
       </div>
 
-      {/* 2. CONTENT TABLE */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+      {/* 2. COMPACT TABLE */}
+      <div className="bg-white border border-gray-200 rounded overflow-hidden shadow-sm">
         <table className="w-full text-left">
-            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-widest text-xs font-semibold">
+            <thead className="bg-gray-50 border-b border-gray-200 text-gray-400 uppercase tracking-widest text-[10px] font-bold">
                 <tr>
-                    <th className="p-5 font-bold">Title</th>
-                    <th className="p-5 font-bold">Type</th>
-                    <th className="p-5 font-bold">Status</th>
-                    <th className="p-5 font-bold text-right">Actions</th>
+                    <th className="px-4 py-2.5">Title</th>
+                    <th className="px-4 py-2.5">Type</th>
+                    <th className="px-4 py-2.5">Status</th>
+                    <th className="px-4 py-2.5 text-right">Actions</th>
                 </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 text-xs">
                 {loading ? (
-                    <tr><td colSpan="4" className="p-8 text-center text-gray-400 text-sm animate-pulse">Loading posts...</td></tr>
+                    <tr><td colSpan="4" className="px-4 py-8 text-center text-gray-400 animate-pulse">Loading posts...</td></tr>
                 ) : posts.length === 0 ? (
-                    <tr><td colSpan="4" className="p-8 text-center text-gray-400 text-sm">No posts found.</td></tr>
+                    <tr><td colSpan="4" className="px-4 py-8 text-center text-gray-400">No posts found.</td></tr>
                 ) : (
                     posts.map(post => (
                         <tr key={post.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="p-5 font-bold text-gray-900 text-sm">{post.title}</td>
-                            <td className="p-5">
-                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border
+                            <td className="px-4 py-2.5 font-bold text-gray-900">{post.title}</td>
+                            <td className="px-4 py-2.5">
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border
                                     ${post.type === 'PROMO' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
                                     {post.type === 'PROMO' ? 'Promotion' : 'News'}
                                 </span>
                             </td>
-                            <td className="p-5">
+                            <td className="px-4 py-2.5">
                                 {post.is_active 
-                                    ? <span className="text-green-600 text-xs font-bold uppercase tracking-wide flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Published</span> 
-                                    : <span className="text-gray-400 text-xs font-bold uppercase tracking-wide">Draft</span>}
+                                    ? <span className="text-green-600 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Published</span> 
+                                    : <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Draft</span>}
                             </td>
-                            <td className="p-5 text-right flex justify-end gap-2">
-                                <Link to={`/staff/marketing/edit/${post.id}`} className="bg-white border border-gray-200 p-2 rounded hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm">
-                                    <Edit2 size={16} />
+                            <td className="px-4 py-2.5 text-right flex justify-end gap-1.5">
+                                <Link to={`/staff/marketing/edit/${post.id}`} className="bg-white border border-gray-200 p-1.5 rounded hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 shadow-sm transition-colors">
+                                    <Edit2 size={14} />
                                 </Link>
-                                <button onClick={() => handleDelete(post.id)} className="bg-white border border-gray-200 p-2 rounded hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all shadow-sm">
-                                    <Trash2 size={16} />
+                                <button onClick={() => handleDelete(post.id)} className="bg-white border border-gray-200 p-1.5 rounded hover:bg-red-50 hover:text-red-600 hover:border-red-200 shadow-sm transition-colors">
+                                    <Trash2 size={14} />
                                 </button>
                             </td>
                         </tr>
