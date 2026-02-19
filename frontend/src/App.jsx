@@ -1,27 +1,27 @@
 // src/App.jsx
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast'; // <--- 1. IMPORT TOASTER
+import { Toaster } from 'react-hot-toast';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
-import AdminLayout from './components/layout/AdminLayout';
+import AdminLayout from './components/layout/AdminLayout'; // FIXED THIS LINE
 
 // Public Pages
 import HomePage from './pages/public/home/HomePage';
 import MenuPage from './pages/public/menu/MenuPage';
 import ReservationPage from './pages/public/reservations/ReservationPage';
 import AboutPage from './pages/public/about/AboutPage'; 
-import LoginPage from './pages/staff/auth/LoginPage';
+import LoginPage from './pages/admin/auth/LoginPage'; // FIXED THIS LINE
 import NewsPage from './pages/public/marketing/NewsPage';
 import SinglePostPage from './pages/public/marketing/SinglePostPage';
 import EventInquiriesPage from './pages/public/events/EventInquiriesPage';
 
 // Admin Pages
-import AdminDashboardPage from './pages/staff/dashboard/AdminDashboardPage';
-import BookingManager from './pages/staff/bookings/BookingManager';
-import MarketingManager from './pages/staff/marketing/MarketingManager';
-import PostEditor from './pages/staff/marketing/PostEditor';
-import PhoneBookPage from './pages/staff/customers/PhoneBookPage';
+import AdminDashboardPage from './pages/admin/dashboard/AdminDashboardPage'; // FIXED THIS LINE
+import BookingManager from './pages/admin/bookings/BookingManager'; // FIXED THIS LINE
+import MarketingManager from './pages/admin/marketing/MarketingManager'; // FIXED THIS LINE
+import PostEditor from './pages/admin/marketing/PostEditor'; // FIXED THIS LINE
+import PhoneBookPage from './pages/admin/customers/PhoneBookPage'; // FIXED THIS LINE
 
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import VIPRoomsPage from './pages/public/vip/VIPRoomsPage';
@@ -31,24 +31,23 @@ function App() {
     <Router>
       <div className="w-full min-h-screen font-sans bg-gray-50 text-gray-900">
         
-        {/* --- 2. ADD BRANDED TOASTER HERE --- */}
         <Toaster 
           position="top-center"
           toastOptions={{
             style: {
-              background: '#0a0a0a', // Midnight Black
-              color: '#ffffff', // White Text
-              border: '1px solid #D4AF37', // Gold Border
+              background: '#0a0a0a',
+              color: '#ffffff',
+              border: '1px solid #D4AF37',
               borderRadius: '4px',
               fontSize: '14px',
               letterSpacing: '0.05em',
               fontFamily: 'Quicksand, sans-serif'
             },
             success: {
-              iconTheme: { primary: '#D4AF37', secondary: '#0a0a0a' }, // Gold Icon
+              iconTheme: { primary: '#D4AF37', secondary: '#0a0a0a' },
             },
             error: {
-              iconTheme: { primary: '#ef4444', secondary: '#ffffff' }, // Red Icon
+              iconTheme: { primary: '#ef4444', secondary: '#ffffff' },
             },
           }}
         />
@@ -67,7 +66,7 @@ function App() {
           
           <Route path="/login" element={<LoginPage />} />
 
-          {/* --- ADMIN ROUTES (NESTED) --- */}
+          {/* --- ADMIN ROUTES (NESTED) - NOW ACCESSED VIA /staff --- */}
           <Route path="/staff" element={
             <ProtectedRoute>
               <AdminLayout />
