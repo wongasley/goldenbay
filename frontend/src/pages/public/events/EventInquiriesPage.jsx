@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Phone, Mail, MessageSquare, MonitorPlay, Users, Shield, ChevronDown, X } from 'lucide-react';
+import { Phone, Mail, MessageSquare, MonitorPlay, Users, Building, ChevronDown, X } from 'lucide-react';
 
 // Images
 import heroimage from '../../../assets/images/heroimage3.webp'; 
@@ -23,8 +23,8 @@ const EventInquiriesPage = () => {
 
   const faqs = [
     {
-      question: "What is the maximum capacity of the Banquet Hall?",
-      answer: "Our Grand Banquet Hall can comfortably accommodate up to 800 guests, making it the perfect venue for large-scale weddings, corporate galas, and grand celebrations."
+      question: "What are the capacities of your event spaces?",
+      answer: "We offer versatile spaces for any occasion. Our Grand Banquet Hall accommodates up to 800 guests. For mid-sized celebrations, our Main Dining Hall can be converted into a mini banquet hall for up to 200 guests, and our premier VIP Manila room comfortably hosts up to 60 guests."
     },
     {
       question: "Do you provide audio-visual equipment?",
@@ -32,11 +32,11 @@ const EventInquiriesPage = () => {
     },
     {
       question: "Can we customize the event menu?",
-      answer: "Absolutely. Our Executive Chef will work closely with you to curate a bespoke menu featuring our signature fresh seafood and authentic Chinese culinary masterpieces."
+      answer: "Absolutely. Our Executive Chef will work closely with you to curate a bespoke menu featuring our signature fresh seafood and authentic Chinese culinary masterpieces tailored to your event."
     },
     {
       question: "How far in advance should we book?",
-      answer: "For grand events, we highly recommend booking 3 to 6 months in advance to secure your preferred date and allow our specialists ample time to prepare."
+      answer: "For grand events, we highly recommend booking 3 to 6 months in advance to secure your preferred date and allow our event specialists ample time to prepare every detail."
     }
   ];
 
@@ -50,44 +50,44 @@ const EventInquiriesPage = () => {
           <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-cream-50"></div>
         </div>
         <div className="relative z-10 text-center px-4">
-          <span className="text-gold-500 text-xs font-bold uppercase tracking-[0.3em] mb-4 block">The Grand Banquet</span>
+          <span className="text-gold-500 text-xs font-bold uppercase tracking-[0.3em] mb-4 block">Celebrate With Us</span>
           <h1 className="text-4xl md:text-6xl font-serif tracking-widest text-white drop-shadow-lg mb-6">Event Inquiries</h1>
           <p className="text-gray-300 max-w-2xl mx-auto text-sm md:text-base font-light leading-relaxed">
-            Unrivaled scale. Absolute privacy. Let Golden Bay be the exclusive stage for your most significant milestones.
+            Unrivaled scale and elegance. Let Golden Bay be the spectacular stage for your most significant milestones, from intimate gatherings to grand galas.
           </p>
         </div>
       </div>
 
-      {/* --- CORE FEATURES (Simplified & Direct) --- */}
+      {/* --- CORE FEATURES --- */}
       <div className="max-w-7xl mx-auto px-6 py-20">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.1 }} className="space-y-4">
             <div className="w-16 h-16 mx-auto bg-gold-50 text-gold-600 rounded-full flex items-center justify-center mb-6">
               <Users size={28} strokeWidth={1.5} />
             </div>
-            <h3 className="text-xl font-serif text-gray-900">Up to 800 Guests</h3>
+            <h3 className="text-xl font-serif text-gray-900">Grand Banquet Hall</h3>
             <p className="text-sm text-gray-500 leading-relaxed font-light px-4">
-              Our expansive, pillar-less Grand Banquet Hall is engineered to host large-scale celebrations with absolute comfort.
+              Our expansive, pillar-less Grand Banquet Hall is engineered to host spectacular, large-scale celebrations for up to 800 guests.
             </p>
           </motion.div>
 
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.2 }} className="space-y-4">
+            <div className="w-16 h-16 mx-auto bg-gold-50 text-gold-600 rounded-full flex items-center justify-center mb-6">
+              <Building size={28} strokeWidth={1.5} />
+            </div>
+            <h3 className="text-xl font-serif text-gray-900">Versatile Spaces</h3>
+            <p className="text-sm text-gray-500 leading-relaxed font-light px-4">
+              Host up to 200 guests in our converted Main Dining mini-banquet, or enjoy an exclusive gathering for 60 in our premier VIP Manila room.
+            </p>
+          </motion.div>
+
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.3 }} className="space-y-4">
             <div className="w-16 h-16 mx-auto bg-gold-50 text-gold-600 rounded-full flex items-center justify-center mb-6">
               <MonitorPlay size={28} strokeWidth={1.5} />
             </div>
             <h3 className="text-xl font-serif text-gray-900">Modern LED Visuals</h3>
             <p className="text-sm text-gray-500 leading-relaxed font-light px-4">
               Newly installed, state-of-the-art LED walls provide stunning visual clarity for presentations and event ambiance.
-            </p>
-          </motion.div>
-
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.3 }} className="space-y-4">
-            <div className="w-16 h-16 mx-auto bg-gray-900 text-gold-500 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-gray-900/20">
-              <Shield size={28} strokeWidth={1.5} />
-            </div>
-            <h3 className="text-xl font-serif text-gray-900">Absolute Privacy</h3>
-            <p className="text-sm text-gray-500 leading-relaxed font-light px-4">
-              We respect your exclusive moments. We strictly do not use client events for our marketing. Your privacy is guaranteed.
             </p>
           </motion.div>
         </div>
@@ -108,7 +108,7 @@ const EventInquiriesPage = () => {
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}>
               <h2 className="text-3xl md:text-4xl font-serif text-gray-900 mb-6">Connect With Our Specialists</h2>
               <p className="text-gray-500 text-sm leading-loose mb-10">
-                Due to the bespoke nature of grand events, we prefer to speak with you directly. Contact our dedicated event team to discuss availability, menus, and logistics.
+                Due to the bespoke nature of customized events, we prefer to speak with you directly. Contact our dedicated event team to discuss availability, menus, and logistics.
               </p>
 
               <div className="space-y-4">
