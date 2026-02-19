@@ -1,5 +1,6 @@
 // src/App.jsx
 import React from 'react';
+import { HelmetProvider } from 'react-helmet-async';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Navbar from './components/layout/Navbar';
@@ -28,6 +29,7 @@ import VIPRoomsPage from './pages/public/vip/VIPRoomsPage';
 
 function App() {
   return (
+    <HelmetProvider>
     <Router>
       <div className="w-full min-h-screen font-sans bg-gray-50 text-gray-900">
         
@@ -83,6 +85,7 @@ function App() {
         </Routes>
       </div>
     </Router>
+    </HelmetProvider>
   );
 }
 

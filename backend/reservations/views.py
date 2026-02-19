@@ -2,7 +2,7 @@ import requests
 import os
 from django.db import transaction
 from rest_framework import generics, status
-from datetime import date
+from datetime import date, timedelta
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
@@ -118,6 +118,16 @@ class DashboardStatsView(APIView):
         pax_today = Reservation.objects.filter(date=today, status='CONFIRMED').aggregate(Sum('pax'))['pax__sum'] or 0
         expected_revenue = pax_today * 1500 
 
+        # Generate last 7 days chart data
+        chart_data = []
+        for i in range(6, -1, -1):
+            target_date = today - timedelta(days=i)
+            count = Reservation.objects.filter(date=target_date).count()
+            chart_data.append({
+                "date": target_date.strftime("%b %d"),
+                "bookings": count
+            })
+
         return Response({
             "stats": {
                 "today_count": Reservation.objects.filter(date=today).count(),
@@ -125,6 +135,7 @@ class DashboardStatsView(APIView):
                 "vip_pax": Reservation.objects.filter(date=today, dining_area__area_type='VIP').aggregate(total=Sum('pax'))['total'] or 0,
                 "revenue": f"₱{expected_revenue:,}"
             },
+            "chart_data": chart_data,  # <--- New Chart Data
             "recent_bookings": ReservationSerializer(Reservation.objects.all().order_by('-created_at')[:5], many=True).data
         })
     

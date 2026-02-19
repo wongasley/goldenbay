@@ -708,7 +708,7 @@ import requests
 import os
 from django.db import transaction
 from rest_framework import generics, status
-from datetime import date
+from datetime import date, timedelta
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
@@ -824,6 +824,16 @@ class DashboardStatsView(APIView):
         pax_today = Reservation.objects.filter(date=today, status='CONFIRMED').aggregate(Sum('pax'))['pax__sum'] or 0
         expected_revenue = pax_today * 1500 
 
+        # Generate last 7 days chart data
+        chart_data = []
+        for i in range(6, -1, -1):
+            target_date = today - timedelta(days=i)
+            count = Reservation.objects.filter(date=target_date).count()
+            chart_data.append({
+                "date": target_date.strftime("%b %d"),
+                "bookings": count
+            })
+
         return Response({
             "stats": {
                 "today_count": Reservation.objects.filter(date=today).count(),
@@ -831,6 +841,7 @@ class DashboardStatsView(APIView):
                 "vip_pax": Reservation.objects.filter(date=today, dining_area__area_type='VIP').aggregate(total=Sum('pax'))['total'] or 0,
                 "revenue": f"₱{expected_revenue:,}"
             },
+            "chart_data": chart_data,  # <--- New Chart Data
             "recent_bookings": ReservationSerializer(Reservation.objects.all().order_by('-created_at')[:5], many=True).data
         })
     
@@ -955,6 +966,9 @@ class MarketingConfig(AppConfig):
 
 
 from django.db import models
+from PIL import Image
+from io import BytesIO
+from django.core.files.base import ContentFile
 
 class Post(models.Model):
     TYPE_CHOICES = [
@@ -976,6 +990,27 @@ class Post(models.Model):
 
     def __str__(self):
         return f"[{self.type}] {self.title}"
+
+    # Auto-Compress Image before saving
+    def save(self, *args, **kwargs):
+        try:
+            this = Post.objects.get(id=self.id)
+            image_changed = (this.image != self.image)
+        except:
+            image_changed = True
+
+        if self.image and image_changed:
+            img = Image.open(self.image)
+            if img.mode in ("RGBA", "P"): 
+                img = img.convert("RGB")
+            # Resize if massively large
+            img.thumbnail((1200, 1200))
+            buffer = BytesIO()
+            # Compress to WebP
+            img.save(buffer, format='WEBP', quality=75)
+            self.image = ContentFile(buffer.getvalue(), name=self.image.name.rsplit('.', 1)[0] + '.webp')
+
+        super().save(*args, **kwargs)
 
 from rest_framework import serializers
 from .models import Post
@@ -1056,6 +1091,7 @@ from django.shortcuts import render
 
 // src/App.jsx
 import React from 'react';
+import { HelmetProvider } from 'react-helmet-async';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Navbar from './components/layout/Navbar';
@@ -1084,6 +1120,7 @@ import VIPRoomsPage from './pages/public/vip/VIPRoomsPage';
 
 function App() {
   return (
+    <HelmetProvider>
     <Router>
       <div className="w-full min-h-screen font-sans bg-gray-50 text-gray-900">
         
@@ -1139,6 +1176,7 @@ function App() {
         </Routes>
       </div>
     </Router>
+    </HelmetProvider>
   );
 }
 
@@ -1340,198 +1378,111 @@ const Navbar = () => {
 export default Navbar;
 
 import React, { useEffect, useState } from 'react';
-import { 
-    Users, 
-    Calendar, 
-    Clock, 
-    Contact, 
-    Megaphone, // Added for Marketing
-    AlertCircle,
-    ArrowRight
-} from 'lucide-react';
+import { Users, Contact, Megaphone, AlertCircle, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
 
-// --- PROFESSIONAL STAT CARD COMPONENT ---
 const StatCard = ({ title, value, icon: Icon, colorClass, linkTo, subText }) => (
   <Link to={linkTo} className="group block h-full">
-    <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-gold-300 transition-all duration-300 h-full flex flex-col justify-between relative overflow-hidden">
-        
-        {/* Background Decoration */}
-        <div className={`absolute top-0 right-0 w-24 h-24 bg-${colorClass}-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110`}></div>
-
-        <div className="relative z-10 flex justify-between items-start mb-4">
-            <div className={`p-3 rounded-md ${colorClass === 'gold' ? 'bg-amber-100 text-amber-700' : `bg-${colorClass}-100 text-${colorClass}-700`}`}>
-                <Icon size={24} />
+    <div className="bg-white p-4 rounded border border-gray-200 shadow-sm hover:shadow hover:border-gold-300 transition-all duration-200 h-full flex flex-col justify-between relative overflow-hidden">
+        <div className={`absolute top-0 right-0 w-16 h-16 bg-${colorClass}-50 rounded-bl-full -mr-2 -mt-2 transition-transform group-hover:scale-110`}></div>
+        <div className="relative z-10 flex justify-between items-start mb-2">
+            <div className={`p-2 rounded ${colorClass === 'gold' ? 'bg-amber-50 text-amber-600' : `bg-${colorClass}-50 text-${colorClass}-600`}`}>
+                <Icon size={18} />
             </div>
-            {subText && <span className="text-xs font-medium text-gray-400 bg-gray-50 px-2 py-1 rounded">{subText}</span>}
+            {subText && <span className="text-[9px] font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 uppercase tracking-widest">{subText}</span>}
         </div>
-
         <div className="relative z-10">
-            <h3 className="text-3xl font-bold text-gray-900 font-sans tracking-tight mb-1 group-hover:text-gold-600 transition-colors">{value}</h3>
-            <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">{title}</p>
+            <h3 className="text-2xl font-bold text-gray-900 font-sans tracking-tight mb-0.5 group-hover:text-gold-600 transition-colors">{value}</h3>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{title}</p>
         </div>
     </div>
   </Link>
 );
 
 const AdminDashboardPage = () => {
-  const [stats, setStats] = useState({ 
-    today_count: 0, 
-    pending_count: 0, 
-    vip_pax: 0,
-  });
-  const [recentBookings, setRecentBookings] = useState([]);
+  const [data, setData] = useState({ stats: { today_count: 0, pending_count: 0 }, recent_bookings: [], chart_data: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       const token = localStorage.getItem('accessToken');
       try {
-        const response = await fetch(`${BACKEND_URL}/api/reservations/dashboard/`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            setStats(data.stats);
-            setRecentBookings(data.recent_bookings);
-        }
+        const response = await fetch(`${BACKEND_URL}/api/reservations/dashboard/`, { headers: { 'Authorization': `Bearer ${token}` }});
+        if (response.ok) setData(await response.json());
       } catch (error) {
-        console.error("Failed to fetch dashboard stats:", error);
-      } finally {
-        setLoading(false);
-      }
+        console.error(error);
+      } finally { setLoading(false); }
     };
     fetchDashboardData();
   }, []);
 
   return (
-    <div className="space-y-8">
-      
-      {/* 1. UNIFIED HEADER */}
-      <div className="flex justify-between items-end border-b border-gray-200 pb-6">
+    <div className="space-y-4">
+      <div className="flex justify-between items-end border-b border-gray-200 pb-3">
          <div>
-            <h1 className="text-3xl font-bold text-gray-900 font-serif">Dashboard Overview</h1>
-            <p className="text-gray-500 mt-1 text-sm">Real-time insights for {new Date().toLocaleDateString('en-US', { dateStyle: 'full' })}</p>
+            <h1 className="text-xl font-bold text-gray-900 font-serif">Dashboard Overview</h1>
+            <p className="text-gray-500 text-xs">Insights for {new Date().toLocaleDateString('en-US', { dateStyle: 'medium' })}</p>
          </div>
       </div>
 
-      {/* 2. KEY METRICS GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          
-          {/* STAT 1: RESERVATIONS */}
-          <StatCard 
-             title="Today's Guests" 
-             value={loading ? "..." : stats.today_count} 
-             icon={Users} 
-             colorClass="blue" 
-             linkTo="/staff/bookings"
-             subText="Reservations"
-          />
-
-          {/* STAT 2: PENDING */}
-          <StatCard 
-             title="Pending Actions" 
-             value={loading ? "..." : stats.pending_count} 
-             icon={AlertCircle} 
-             colorClass="red" 
-             linkTo="/staff/bookings"
-             subText="Urgent"
-          />
-          
-          {/* LINK 1: PHONE BOOK */}
-          <Link to="/staff/customers" className="group block h-full">
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-gold-300 transition-all duration-300 h-full flex flex-col justify-between relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-orange-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                <div className="relative z-10 flex justify-between items-start mb-4">
-                    <div className="p-3 rounded-md bg-orange-100 text-orange-700">
-                        <Contact size={24} />
-                    </div>
-                </div>
-                <div className="relative z-10">
-                    <h3 className="text-3xl font-bold text-gray-900 font-sans tracking-tight mb-1 group-hover:text-gold-600 transition-colors">CRM</h3>
-                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Phone Book</p>
-                </div>
-            </div>
-          </Link>
-
-          {/* LINK 2: MARKETING (Replaced Revenue) */}
-          <Link to="/staff/marketing" className="group block h-full">
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-gold-300 transition-all duration-300 h-full flex flex-col justify-between relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                <div className="relative z-10 flex justify-between items-start mb-4">
-                    <div className="p-3 rounded-md bg-purple-100 text-purple-700">
-                        <Megaphone size={24} />
-                    </div>
-                </div>
-                <div className="relative z-10">
-                    <h3 className="text-3xl font-bold text-gray-900 font-sans tracking-tight mb-1 group-hover:text-gold-600 transition-colors">Content</h3>
-                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">News & Promos</p>
-                </div>
-            </div>
-          </Link>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard title="Today's Guests" value={loading ? "-" : data.stats.today_count} icon={Users} colorClass="blue" linkTo="/staff/bookings" subText="Reservations" />
+          <StatCard title="Pending Actions" value={loading ? "-" : data.stats.pending_count} icon={AlertCircle} colorClass="red" linkTo="/staff/bookings" subText="Urgent" />
+          <StatCard title="CRM" value="Phone Book" icon={Contact} colorClass="orange" linkTo="/staff/customers" />
+          <StatCard title="Content" value="Marketing" icon={Megaphone} colorClass="purple" linkTo="/staff/marketing" />
       </div>
 
-      {/* 3. RECENT ACTIVITY TABLE */}
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-          <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-             <h3 className="font-bold text-gray-900 text-lg">Recent Reservations</h3>
-             <Link to="/staff/bookings" className="text-sm font-medium text-gold-600 hover:text-gold-700 flex items-center gap-1">
-                View All <ArrowRight size={14} />
-             </Link>
-          </div>
-          
-          <div className="divide-y divide-gray-100">
-             {loading ? (
-                <div className="p-8 text-center text-gray-400 animate-pulse text-sm">Loading data...</div>
-             ) : recentBookings.length === 0 ? (
-                <div className="p-8 text-center text-gray-400 text-sm">No new bookings today.</div>
-             ) : (
-                recentBookings.map((booking) => (
-                   <div key={booking.id} className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-gray-50 transition-colors items-center">
-                      
-                      {/* Customer */}
-                      <div className="col-span-4">
-                         <p className="font-bold text-gray-900 text-sm">{booking.customer_name}</p>
-                         <p className="text-xs text-gray-500 font-medium">{booking.customer_contact}</p>
-                      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* CHART SECTION */}
+        <div className="lg:col-span-2 bg-white border border-gray-200 rounded shadow-sm p-5">
+            <h3 className="font-bold text-gray-900 text-xs uppercase tracking-widest mb-4">7-Day Booking Trend</h3>
+            {loading ? <div className="h-64 bg-gray-50 animate-pulse rounded w-full"></div> : (
+                <div className="h-64 w-full text-xs">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={data.chart_data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id="colorBookings" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.8}/>
+                                    <stop offset="95%" stopColor="#D4AF37" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                            <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#9ca3af'}} />
+                            <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af'}} />
+                            <Tooltip contentStyle={{ borderRadius: '4px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
+                            <Area type="monotone" dataKey="bookings" stroke="#D4AF37" strokeWidth={2} fillOpacity={1} fill="url(#colorBookings)" />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </div>
+            )}
+        </div>
 
-                      {/* Details */}
-                      <div className="col-span-4">
-                         <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded uppercase tracking-wide">{booking.time}</span>
-                            <span className="text-xs text-gray-600 font-medium">{booking.pax} Pax</span>
-                         </div>
-                         <p className="text-xs text-gray-500 mt-1 font-medium">{booking.room_name || 'Main Hall'}</p>
-                      </div>
-
-                      {/* Status */}
-                      <div className="col-span-3">
-                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border
-                            ${booking.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 
-                              booking.status === 'CONFIRMED' ? 'bg-green-50 text-green-700 border-green-200' : 
-                              'bg-red-50 text-red-700 border-red-200'}`}>
-                            {booking.status}
-                         </span>
-                      </div>
-
-                      {/* Action */}
-                      <div className="col-span-1 text-right">
-                         <Link to="/staff/bookings" className="text-gray-300 hover:text-gold-600">
-                            <ArrowRight size={18} />
-                         </Link>
-                      </div>
-                   </div>
-                ))
-             )}
-          </div>
+        {/* RECENT BOOKINGS */}
+        <div className="bg-white border border-gray-200 rounded shadow-sm overflow-hidden flex flex-col">
+            <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <h3 className="font-bold text-gray-900 text-xs uppercase tracking-widest">Recent</h3>
+                <Link to="/staff/bookings" className="text-[10px] font-bold text-gold-600 hover:text-gold-700 uppercase flex items-center gap-1">View All <ArrowRight size={12} /></Link>
+            </div>
+            <div className="divide-y divide-gray-100 flex-1 overflow-y-auto">
+                {loading ? <div className="p-4 text-center text-gray-400 animate-pulse text-xs">Loading...</div> : 
+                 data.recent_bookings.map((b) => (
+                    <div key={b.id} className="p-4 hover:bg-gray-50 transition-colors">
+                        <div className="flex justify-between mb-1">
+                            <p className="font-bold text-gray-900 text-xs">{b.customer_name}</p>
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest border ${b.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : b.status === 'CONFIRMED' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>{b.status}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500">{b.date} • {b.time} • {b.pax} Pax</p>
+                    </div>
+                ))}
+            </div>
+        </div>
       </div>
     </div>
   );
 };
-
 export default AdminDashboardPage;
 
 import React from 'react';
@@ -2263,7 +2214,7 @@ export default ReservationPage;
 
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { Search, Plus, Check, X, Phone } from 'lucide-react';
+import { Plus, Check, X, Phone } from 'lucide-react';
 import ReservationForm from '../../../components/reservations/ReservationForm';
 
 const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
@@ -2277,9 +2228,7 @@ const BookingManager = () => {
     const token = localStorage.getItem('accessToken'); 
     try {
       const res = await fetch(`${BACKEND_URL}/api/reservations/manage/`, {
-        headers: {
-            'Authorization': `Bearer ${token}` 
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.status === 401) window.location.href = '/login'; 
       const data = await res.json();
@@ -2298,8 +2247,6 @@ const BookingManager = () => {
 
   const updateStatus = async (id, newStatus) => {
     if (!window.confirm(`Are you sure you want to mark this as ${newStatus}?`)) return;
-    
-    // We use toast.promise to show a loading spinner while it saves to the backend!
     const token = localStorage.getItem('accessToken'); 
     const updatePromise = fetch(`${BACKEND_URL}/api/reservations/manage/${id}/`, {
         method: 'PATCH',
@@ -2319,51 +2266,44 @@ const BookingManager = () => {
     });
 
     toast.promise(updatePromise, {
-        loading: 'Updating status...',
-        success: `Reservation marked as ${newStatus}!`,
-        error: 'Failed to update status.',
+        loading: 'Updating...',
+        success: `Marked as ${newStatus}!`,
+        error: 'Failed to update.',
     });
   };
 
-  const filteredBookings = bookings.filter(b => 
-    filter === 'ALL' ? true : b.status === filter
-  );
-
+  const filteredBookings = bookings.filter(b => filter === 'ALL' ? true : b.status === filter);
   const isStale = (bookingDate, status) => {
     if (status !== 'PENDING') return false;
-    const created = new Date(bookingDate); 
-    const now = new Date();
-    const diffInHours = (now - created) / 1000 / 60 / 60;
+    const diffInHours = (new Date() - new Date(bookingDate)) / 1000 / 60 / 60;
     return diffInHours > 2; 
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       
-      {/* 1. UNIFIED HEADER */}
-      <div className="flex justify-between items-end border-b border-gray-200 pb-6">
+      {/* 1. COMPACT HEADER */}
+      <div className="flex justify-between items-end border-b border-gray-200 pb-3">
         <div>
-            <h1 className="text-3xl font-bold text-gray-900 font-serif">Booking Management</h1>
-            <p className="text-gray-500 mt-1 text-sm">Manage, confirm, and track all reservations.</p>
+            <h1 className="text-xl font-bold text-gray-900 font-serif">Booking Management</h1>
+            <p className="text-gray-500 text-xs">Manage, confirm, and track all reservations.</p>
         </div>
         <button 
           onClick={() => setShowManualForm(true)}
-          className="bg-gold-600 text-white px-6 py-2.5 font-bold uppercase tracking-widest text-xs rounded shadow-md hover:bg-gold-700 transition-all flex items-center gap-2"
+          className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-all flex items-center gap-1.5"
         >
-          <Plus size={16} /> Manual Booking
+          <Plus size={14} /> Manual Booking
         </button>
       </div>
 
       {/* 2. FILTERS */}
-      <div className="flex gap-2">
+      <div className="flex gap-1.5">
         {['ALL', 'PENDING', 'CONFIRMED', 'CANCELLED'].map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`text-xs font-bold uppercase tracking-widest px-4 py-2.5 rounded-sm transition-all border ${
-              filter === f 
-              ? 'bg-gray-900 text-white border-gray-900 shadow-md' 
-              : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50 hover:text-gray-900'
+            className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded transition-all border ${
+              filter === f ? 'bg-gray-900 text-white border-gray-900 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50 hover:text-gray-900'
             }`}
           >
             {f}
@@ -2371,115 +2311,73 @@ const BookingManager = () => {
         ))}
       </div>
 
-      {/* 3. TABLE */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+      {/* 3. COMPACT TABLE */}
+      <div className="bg-white border border-gray-200 rounded overflow-hidden shadow-sm">
         <table className="w-full text-left">
-          <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-widest text-xs font-semibold">
+          <thead className="bg-gray-50 border-b border-gray-200 text-gray-400 uppercase tracking-widest text-[10px] font-bold">
             <tr>
-              <th className="p-5 font-bold">ID</th>
-              <th className="p-5 font-bold">Customer</th>
-              <th className="p-5 font-bold">Date / Time</th>
-              <th className="p-5 font-bold">Details</th>
-              <th className="p-5 font-bold">Status</th>
-              <th className="p-5 font-bold text-right">Actions</th>
+              <th className="px-4 py-2.5">ID</th>
+              <th className="px-4 py-2.5">Customer</th>
+              <th className="px-4 py-2.5">Date / Time</th>
+              <th className="px-4 py-2.5">Details</th>
+              <th className="px-4 py-2.5">Status</th>
+              <th className="px-4 py-2.5 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
-            {filteredBookings.map((b) => (
-              <tr 
-                key={b.id} 
-                className={`transition-colors ${
-                    isStale(b.created_at, b.status) 
-                    ? 'bg-red-50' 
-                    : 'hover:bg-gray-50'
-                }`}
-              >
-                <td className="p-5 text-gray-400 font-mono text-sm">#{b.id}</td>
-                
-                <td className="p-5">
-                  <div className="font-bold text-gray-900 text-sm">{b.customer_name}</div>
-                  <div className="text-xs text-gray-500 flex gap-2 mt-1 font-medium items-center">
-                    <Phone size={12} className="text-gray-400"/> {b.customer_contact}
-                  </div>
-                </td>
-
-                <td className="p-5">
-                  <div className="text-gold-700 font-bold text-sm">{b.date}</div>
-                  <div className="text-xs font-medium text-gray-600 mt-1">{b.time} <span className="text-gray-400 font-normal">({b.session})</span></div>
-                </td>
-
-                <td className="p-5">
-                  <div className="text-gray-900 font-bold text-sm">
-                    {b.room_name || 'Main Dining Hall'}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1 font-medium">{b.pax} Guests</div>
-                </td>
-
-                <td className="p-5">
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
-                    b.status === 'PENDING' ? 'text-yellow-700 bg-yellow-50 border-yellow-200' :
-                    b.status === 'CONFIRMED' ? 'text-green-700 bg-green-50 border-green-200' :
-                    'text-red-700 bg-red-50 border-red-200'
-                  }`}>
-                    {b.status}
-                  </span>
-                  {isStale(b.created_at, b.status) && (
-                      <div className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-wide flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> Needs Action
-                      </div>
-                  )}
-                </td>
-
-                <td className="p-5 text-right">
-                  {b.status !== 'CANCELLED' && (
-                    <div className="flex justify-end gap-2">
-                      {b.status === 'PENDING' && (
-                        <button 
-                          onClick={() => updateStatus(b.id, 'CONFIRMED')}
-                          className="bg-green-50 text-green-600 p-2 rounded border border-green-200 hover:bg-green-100 transition-colors"
-                          title="Confirm Booking"
-                        >
-                          <Check size={16} />
+          <tbody className="divide-y divide-gray-100 text-xs">
+            {filteredBookings.length === 0 ? (
+                <tr><td colSpan="6" className="px-4 py-8 text-center text-gray-400">No bookings found in this category.</td></tr>
+            ) : (
+                filteredBookings.map((b) => (
+                <tr key={b.id} className={`transition-colors ${isStale(b.created_at, b.status) ? 'bg-red-50/50' : 'hover:bg-gray-50'}`}>
+                    <td className="px-4 py-2 text-gray-400 font-mono">#{b.id}</td>
+                    <td className="px-4 py-2">
+                        <div className="font-bold text-gray-900">{b.customer_name}</div>
+                        <div className="text-[10px] text-gray-500 flex gap-1 mt-0.5 font-mono items-center"><Phone size={10}/> {b.customer_contact}</div>
+                    </td>
+                    <td className="px-4 py-2">
+                        <div className="text-gold-700 font-bold">{b.date}</div>
+                        <div className="text-[10px] text-gray-500 mt-0.5 uppercase tracking-wide">{b.time} ({b.session})</div>
+                    </td>
+                    <td className="px-4 py-2">
+                        <div className="font-bold text-gray-900">{b.room_name || 'Main Dining Hall'}</div>
+                        <div className="text-[10px] text-gray-500 mt-0.5">{b.pax} Guests</div>
+                    </td>
+                    <td className="px-4 py-2">
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border inline-block ${
+                            b.status === 'PENDING' ? 'text-yellow-700 bg-yellow-50 border-yellow-200' :
+                            b.status === 'CONFIRMED' ? 'text-green-700 bg-green-50 border-green-200' :
+                            'text-red-700 bg-red-50 border-red-200'
+                        }`}>
+                            {b.status}
+                        </span>
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                    {b.status !== 'CANCELLED' && (
+                        <div className="flex justify-end gap-1.5">
+                        {b.status === 'PENDING' && (
+                            <button onClick={() => updateStatus(b.id, 'CONFIRMED')} className="bg-green-50 text-green-600 p-1.5 rounded border border-green-200 hover:bg-green-100" title="Confirm">
+                                <Check size={14} />
+                            </button>
+                        )}
+                        <button onClick={() => updateStatus(b.id, 'CANCELLED')} className="bg-red-50 text-red-600 p-1.5 rounded border border-red-200 hover:bg-red-100" title="Cancel">
+                            <X size={14} />
                         </button>
-                      )}
-                      <button 
-                        onClick={() => updateStatus(b.id, 'CANCELLED')}
-                        className="bg-red-50 text-red-600 p-2 rounded border border-red-200 hover:bg-red-100 transition-colors"
-                        title="Cancel Booking"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
+                        </div>
+                    )}
+                    </td>
+                </tr>
+                ))
+            )}
           </tbody>
         </table>
-        
-        {filteredBookings.length === 0 && (
-            <div className="p-12 text-center text-gray-400 text-sm">No bookings found in this category.</div>
-        )}
       </div>
 
-      {/* Manual Booking Form Modal */}
       {showManualForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white p-8 rounded-lg w-full max-w-lg relative shadow-2xl">
-                <h2 className="text-2xl font-serif text-gray-900 mb-6 font-bold">Manual Staff Entry</h2>
-                
-                <ReservationForm 
-                    isManualEntry={true}
-                    date={new Date()} 
-                    session="DINNER"  
-                    selectedRoom={null} 
-                    onSuccess={() => {
-                        toast.success("Manual booking created!");
-                        setShowManualForm(false);
-                        fetchBookings(); 
-                    }}
-                    onCancel={() => setShowManualForm(false)}
-                />
+            <div className="bg-white p-6 rounded shadow-2xl w-full max-w-lg">
+                <h2 className="text-xl font-serif text-gray-900 mb-4 font-bold border-b border-gray-100 pb-2">Manual Staff Entry</h2>
+                <ReservationForm isManualEntry={true} date={new Date()} session="DINNER" selectedRoom={null} onSuccess={() => { toast.success("Created!"); setShowManualForm(false); fetchBookings(); }} onCancel={() => setShowManualForm(false)} />
             </div>
         </div>
       )}
@@ -4536,6 +4434,7 @@ export default NewsPage;
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Calendar, ArrowLeft } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
 
 const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
 
@@ -4548,10 +4447,7 @@ const SinglePostPage = () => {
     const fetchPost = async () => {
       try {
         const res = await fetch(`${BACKEND_URL}/api/marketing/${slug}/`);
-        if (res.ok) {
-            const data = await res.json();
-            setPost(data);
-        }
+        if (res.ok) setPost(await res.json());
       } catch (err) {
         console.error("Error fetching post", err);
       } finally {
@@ -4561,20 +4457,45 @@ const SinglePostPage = () => {
     fetchPost();
   }, [slug]);
 
-  if (loading) return <div className="min-h-screen bg-cream-50 dark:bg-black text-gold-600 dark:text-white flex items-center justify-center pt-24 transition-colors duration-300">Loading...</div>;
-  if (!post) return <div className="min-h-screen bg-cream-50 dark:bg-black text-gray-900 dark:text-white flex items-center justify-center pt-24 transition-colors duration-300">Post not found.</div>;
+  const getExcerpt = (htmlContent) => {
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = htmlContent;
+    const text = tempDiv.textContent || tempDiv.innerText || "";
+    return text.length > 150 ? text.substring(0, 150) + "..." : text;
+  };
+
+  if (loading) return (
+      <div className="min-h-screen bg-cream-50 pt-32 px-6 max-w-3xl mx-auto">
+          {/* Skeleton Loader */}
+          <div className="h-4 w-24 bg-gray-200 animate-pulse mb-8 rounded"></div>
+          <div className="h-6 w-32 bg-gray-200 animate-pulse mb-4 rounded"></div>
+          <div className="h-12 w-full bg-gray-300 animate-pulse mb-10 rounded"></div>
+          <div className="h-[400px] w-full bg-gray-200 animate-pulse rounded"></div>
+      </div>
+  );
+  if (!post) return <div className="min-h-screen flex items-center justify-center pt-24">Post not found.</div>;
+
+  const imageUrl = post.image ? (post.image.startsWith('http') ? post.image : `${BACKEND_URL}${post.image}`) : '';
 
   return (
-    <div className="min-h-screen bg-cream-50 dark:bg-neutral-950 text-gray-900 dark:text-white pt-32 pb-20 px-6 md:px-24 transition-colors duration-300">
+    <div className="min-h-screen bg-cream-50 text-gray-900 pt-32 pb-20 px-6 md:px-24">
+      {/* DYNAMIC SEO TAGS */}
+      <Helmet>
+        <title>{post.title} | Golden Bay</title>
+        <meta name="description" content={getExcerpt(post.content)} />
+        <meta property="og:title" content={post.title} />
+        <meta property="og:description" content={getExcerpt(post.content)} />
+        {imageUrl && <meta property="og:image" content={imageUrl} />}
+      </Helmet>
+
       <div className="max-w-3xl mx-auto">
-        
-        <Link to="/news" className="inline-flex items-center text-gold-600 dark:text-gold-400 hover:text-black dark:hover:text-white mb-8 transition-colors text-xs uppercase tracking-widest">
+        <Link to="/news" className="inline-flex items-center text-gold-600 hover:text-black mb-8 transition-colors text-xs uppercase tracking-widest">
             <ArrowLeft size={14} className="mr-2" /> Back to News
         </Link>
 
         <div className="mb-10">
             <div className="flex items-center gap-4 text-xs text-gray-500 uppercase tracking-widest mb-4">
-                <span className="px-2 py-1 border border-gold-600/30 dark:border-gold-400/30 text-gold-600 dark:text-gold-400 rounded-sm">
+                <span className="px-2 py-1 border border-gold-600/30 text-gold-600 rounded-sm">
                     {post.type === 'PROMO' ? 'Promotion' : 'Event'}
                 </span>
                 <span className="flex items-center gap-2">
@@ -4582,34 +4503,24 @@ const SinglePostPage = () => {
                     {new Date(post.created_at).toLocaleDateString()}
                 </span>
             </div>
-            <h1 className="text-4xl md:text-5xl font-serif text-gray-900 dark:text-white leading-tight">{post.title}</h1>
+            <h1 className="text-4xl md:text-5xl font-serif text-gray-900 leading-tight">{post.title}</h1>
         </div>
 
-        {post.image && (
-            <div className="w-full h-[300px] md:h-[500px] mb-12 overflow-hidden rounded-sm border border-gray-200 dark:border-white/10 shadow-lg dark:shadow-none">
-                <img 
-                    src={post.image.startsWith('http') ? post.image : `${BACKEND_URL}${post.image}`} 
-                    alt={post.title} 
-                    className="w-full h-full object-cover"
-                />
+        {imageUrl && (
+            <div className="w-full h-[300px] md:h-[500px] mb-12 overflow-hidden rounded-sm border border-gray-200 shadow-lg">
+                <img src={imageUrl} alt={post.title} className="w-full h-full object-cover" />
             </div>
         )}
 
         {/* RICH TEXT RENDERER */}
         <div 
-            className="prose prose-lg max-w-none 
-            text-gray-600 dark:text-gray-300 font-light leading-relaxed 
-            prose-headings:text-gold-600 dark:prose-headings:text-gold-400 prose-headings:font-serif 
-            prose-a:text-gold-600 dark:prose-a:text-gold-400 hover:prose-a:text-black dark:hover:prose-a:text-white
-            prose-strong:text-gray-900 dark:prose-strong:text-white"
+            className="prose prose-lg max-w-none text-gray-600 font-light leading-relaxed prose-headings:text-gold-600 prose-headings:font-serif prose-a:text-gold-600 hover:prose-a:text-black prose-strong:text-gray-900"
             dangerouslySetInnerHTML={{ __html: post.content }} 
         />
-
       </div>
     </div>
   );
 };
-
 export default SinglePostPage;
 
 import React, { useState, useEffect } from 'react';
@@ -4647,56 +4558,56 @@ const MarketingManager = () => {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       
-      {/* 1. UNIFIED HEADER */}
-      <div className="flex justify-between items-end border-b border-gray-200 pb-6">
+      {/* 1. COMPACT HEADER */}
+      <div className="flex justify-between items-end border-b border-gray-200 pb-3">
         <div>
-            <h1 className="text-3xl font-bold text-gray-900 font-serif">Marketing & Blog</h1>
-            <p className="text-gray-500 mt-1 text-sm">Manage news, events, and promotional content.</p>
+            <h1 className="text-xl font-bold text-gray-900 font-serif">Marketing & Blog</h1>
+            <p className="text-gray-500 text-xs">Manage news, events, and promotional content.</p>
         </div>
-        <Link to="/staff/marketing/create" className="bg-gold-600 text-white px-6 py-2.5 font-bold uppercase tracking-widest text-xs rounded shadow-md hover:bg-gold-700 transition-colors flex items-center gap-2">
-           <Plus size={16} /> New Post
+        <Link to="/staff/marketing/create" className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-colors flex items-center gap-1.5">
+           <Plus size={14} /> New Post
         </Link>
       </div>
 
-      {/* 2. CONTENT TABLE */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+      {/* 2. COMPACT TABLE */}
+      <div className="bg-white border border-gray-200 rounded overflow-hidden shadow-sm">
         <table className="w-full text-left">
-            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-widest text-xs font-semibold">
+            <thead className="bg-gray-50 border-b border-gray-200 text-gray-400 uppercase tracking-widest text-[10px] font-bold">
                 <tr>
-                    <th className="p-5 font-bold">Title</th>
-                    <th className="p-5 font-bold">Type</th>
-                    <th className="p-5 font-bold">Status</th>
-                    <th className="p-5 font-bold text-right">Actions</th>
+                    <th className="px-4 py-2.5">Title</th>
+                    <th className="px-4 py-2.5">Type</th>
+                    <th className="px-4 py-2.5">Status</th>
+                    <th className="px-4 py-2.5 text-right">Actions</th>
                 </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 text-xs">
                 {loading ? (
-                    <tr><td colSpan="4" className="p-8 text-center text-gray-400 text-sm animate-pulse">Loading posts...</td></tr>
+                    <tr><td colSpan="4" className="px-4 py-8 text-center text-gray-400 animate-pulse">Loading posts...</td></tr>
                 ) : posts.length === 0 ? (
-                    <tr><td colSpan="4" className="p-8 text-center text-gray-400 text-sm">No posts found.</td></tr>
+                    <tr><td colSpan="4" className="px-4 py-8 text-center text-gray-400">No posts found.</td></tr>
                 ) : (
                     posts.map(post => (
                         <tr key={post.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="p-5 font-bold text-gray-900 text-sm">{post.title}</td>
-                            <td className="p-5">
-                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border
+                            <td className="px-4 py-2.5 font-bold text-gray-900">{post.title}</td>
+                            <td className="px-4 py-2.5">
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border
                                     ${post.type === 'PROMO' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
                                     {post.type === 'PROMO' ? 'Promotion' : 'News'}
                                 </span>
                             </td>
-                            <td className="p-5">
+                            <td className="px-4 py-2.5">
                                 {post.is_active 
-                                    ? <span className="text-green-600 text-xs font-bold uppercase tracking-wide flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Published</span> 
-                                    : <span className="text-gray-400 text-xs font-bold uppercase tracking-wide">Draft</span>}
+                                    ? <span className="text-green-600 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Published</span> 
+                                    : <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Draft</span>}
                             </td>
-                            <td className="p-5 text-right flex justify-end gap-2">
-                                <Link to={`/staff/marketing/edit/${post.id}`} className="bg-white border border-gray-200 p-2 rounded hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm">
-                                    <Edit2 size={16} />
+                            <td className="px-4 py-2.5 text-right flex justify-end gap-1.5">
+                                <Link to={`/staff/marketing/edit/${post.id}`} className="bg-white border border-gray-200 p-1.5 rounded hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 shadow-sm transition-colors">
+                                    <Edit2 size={14} />
                                 </Link>
-                                <button onClick={() => handleDelete(post.id)} className="bg-white border border-gray-200 p-2 rounded hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all shadow-sm">
-                                    <Trash2 size={16} />
+                                <button onClick={() => handleDelete(post.id)} className="bg-white border border-gray-200 p-1.5 rounded hover:bg-red-50 hover:text-red-600 hover:border-red-200 shadow-sm transition-colors">
+                                    <Trash2 size={14} />
                                 </button>
                             </td>
                         </tr>
@@ -5160,18 +5071,7 @@ const Footer = () => {
 export default Footer;
 
 import React, { useState, useEffect } from 'react';
-import { 
-    Search, 
-    Plus, 
-    Phone, 
-    Mail, 
-    Edit2, 
-    Trash2, 
-    ArrowUpDown, 
-    X,
-    User,
-    StickyNote
-} from 'lucide-react';
+import { Search, Plus, Phone, Mail, Trash2, ArrowUpDown, X, User, StickyNote } from 'lucide-react';
 import { FaWeixin, FaViber, FaWhatsapp, FaTelegram } from 'react-icons/fa';
 
 const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
@@ -5249,7 +5149,8 @@ const PhoneBookPage = () => {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id, e) => {
+      e.stopPropagation(); // Prevents row click from opening the edit modal
       if(!window.confirm("Are you sure you want to delete this customer?")) return;
       const token = localStorage.getItem('accessToken');
       try {
@@ -5293,120 +5194,102 @@ const PhoneBookPage = () => {
     .filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search))
     .sort((a, b) => sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
 
-  const inputClass = "w-full bg-white border border-gray-300 p-2.5 text-gray-900 text-sm focus:border-gold-500 focus:ring-1 focus:ring-gold-500 outline-none rounded-md transition-all shadow-sm";
+  const inputClass = "w-full bg-white border border-gray-300 p-2 text-gray-900 text-sm focus:border-gold-500 focus:ring-1 focus:ring-gold-500 outline-none rounded-sm transition-all shadow-sm";
   const labelClass = "block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       
-      {/* 1. UNIFIED HEADER */}
-      <div className="flex justify-between items-end border-b border-gray-200 pb-6">
+      {/* 1. COMPACT HEADER */}
+      <div className="flex justify-between items-end border-b border-gray-200 pb-3">
         <div>
-            <h1 className="text-3xl font-bold text-gray-900 font-serif">Clientele</h1>
-            <p className="text-gray-500 mt-1 text-sm">Manage customer profiles and contact details.</p>
+            <h1 className="text-xl font-bold text-gray-900 font-serif">Clientele</h1>
+            <p className="text-gray-500 text-xs">Manage customer profiles and contact details.</p>
         </div>
         <div className="flex gap-2">
-             {/* Search */}
              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                 <input 
                     type="text" 
                     placeholder="Search name or phone..." 
-                    className="pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-md text-sm outline-none focus:border-gold-500 w-64 shadow-sm"
+                    className="pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded text-xs outline-none focus:border-gold-500 w-56 shadow-sm"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                 />
             </div>
-            {/* Sort */}
             <button 
                 onClick={() => setSortAsc(!sortAsc)} 
-                className="bg-white border border-gray-200 p-2.5 rounded-md hover:bg-gray-50 text-gray-600 shadow-sm"
+                className="bg-white border border-gray-200 px-2 py-1.5 rounded hover:bg-gray-50 text-gray-600 shadow-sm"
                 title={sortAsc ? "Sort Z-A" : "Sort A-Z"}
             >
-                <ArrowUpDown size={18}/>
+                <ArrowUpDown size={14}/>
             </button>
-            {/* Add */}
             <button 
                 onClick={openCreate} 
-                className="bg-gold-600 text-white px-6 py-2.5 font-bold uppercase tracking-widest text-xs rounded shadow-md hover:bg-gold-700 transition-all flex items-center gap-2"
+                className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-all flex items-center gap-1.5"
             >
-               <Plus size={16} /> Add New
+               <Plus size={14} /> Add New
             </button>
         </div>
       </div>
 
-      {/* 2. CUSTOMER GRID */}
+      {/* 2. COMPACT DENSE LIST */}
       {loading ? (
-          <div className="p-8 text-center text-gray-400 animate-pulse text-sm">Loading contacts...</div>
+          <div className="p-8 text-center text-gray-400 animate-pulse text-xs">Loading contacts...</div>
       ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="flex flex-col gap-1.5">
             {filtered.length === 0 ? (
-                <div className="col-span-full text-center py-20 text-gray-400 text-sm">
+                <div className="text-center py-10 text-gray-400 text-xs">
                     No customers found matching your criteria.
                 </div>
             ) : (
                 filtered.map(c => (
-                    <div key={c.id} className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-gold-300 transition-all group relative flex flex-col h-full">
-                        
-                        {/* Header */}
-                        <div className="flex justify-between items-start mb-4">
+                    <div 
+                        key={c.id} 
+                        onClick={() => openEdit(c)}
+                        className="bg-white px-4 py-2.5 rounded border border-gray-200 shadow-sm hover:bg-gold-50 hover:border-gold-300 transition-all group cursor-pointer flex items-center justify-between"
+                    >
+                        {/* Name & Badge */}
+                        <div className="flex items-center gap-3 w-1/3">
+                            <div className="w-7 h-7 rounded bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-xs flex-shrink-0">
+                                {c.name.charAt(0).toUpperCase()}
+                            </div>
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <h3 className="font-bold text-lg text-gray-900 line-clamp-1">{c.name}</h3>
+                                    <h3 className="font-bold text-sm text-gray-900 line-clamp-1">{c.name}</h3>
                                     {c.notes && c.notes.toLowerCase().includes('vip') && (
-                                        <span className="bg-gold-100 text-gold-700 text-[10px] font-bold px-2 py-0.5 rounded border border-gold-200">VIP</span>
+                                        <span className="bg-gold-100 text-gold-700 text-[9px] font-bold px-1.5 py-0.5 rounded border border-gold-200">VIP</span>
                                     )}
                                 </div>
-                                <p className="text-xs text-gray-400 mt-0.5 font-medium">Added: {new Date(c.created_at).toLocaleDateString()}</p>
-                            </div>
-                            
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => openEdit(c)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded">
-                                    <Edit2 size={14}/>
-                                </button>
-                                <button onClick={() => handleDelete(c.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
-                                    <Trash2 size={14}/>
-                                </button>
+                                <p className="text-[10px] text-gray-400 font-medium">Added: {new Date(c.created_at).toLocaleDateString()}</p>
                             </div>
                         </div>
 
-                        {/* Contact Details */}
-                        <div className="space-y-3 mb-6 flex-grow">
-                            <div className="flex items-center gap-3 text-sm text-gray-700">
-                                <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 flex-shrink-0">
-                                    <Phone size={14} />
-                                </div>
-                                <span className="font-medium font-mono text-gray-600">{c.phone}</span>
-                            </div>
-                            
-                            {c.email ? (
-                                <div className="flex items-center gap-3 text-sm text-gray-700">
-                                    <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 flex-shrink-0">
-                                        <Mail size={14} />
-                                    </div>
-                                    <span className="truncate text-gray-600">{c.email}</span>
-                                </div>
-                            ) : null}
+                        {/* Phone */}
+                        <div className="w-1/5 flex items-center gap-2 text-xs font-medium text-gray-600 font-mono">
+                            <Phone size={12} className="text-gray-400"/> {c.phone}
                         </div>
 
-                        <div className="h-px bg-gray-100 w-full mb-4"></div>
+                        {/* Email */}
+                        <div className="w-1/4 flex items-center gap-2 text-xs text-gray-500 truncate">
+                            {c.email ? <><Mail size={12} className="text-gray-400"/> {c.email}</> : <span className="text-gray-300 italic">- No Email -</span>}
+                        </div>
 
-                        {/* Social Apps */}
-                        <div className="flex justify-between items-center">
-                            <div className="flex gap-2">
-                                <div className={`p-2 rounded-full transition-colors ${c.wechat ? 'text-green-600 bg-green-50' : 'text-gray-200 bg-gray-50'}`} title={c.wechat || "No WeChat"}>
-                                    <FaWeixin size={16}/>
-                                </div>
-                                <div className={`p-2 rounded-full transition-colors ${c.viber ? 'text-purple-600 bg-purple-50' : 'text-gray-200 bg-gray-50'}`} title={c.viber || "No Viber"}>
-                                    <FaViber size={16}/>
-                                </div>
-                                <div className={`p-2 rounded-full transition-colors ${c.whatsapp ? 'text-green-500 bg-green-50' : 'text-gray-200 bg-gray-50'}`} title={c.whatsapp || "No WhatsApp"}>
-                                    <FaWhatsapp size={16}/>
-                                </div>
-                                <div className={`p-2 rounded-full transition-colors ${c.telegram ? 'text-blue-500 bg-blue-50' : 'text-gray-200 bg-gray-50'}`} title={c.telegram || "No Telegram"}>
-                                    <FaTelegram size={16}/>
-                                </div>
+                        {/* Actions & Socials */}
+                        <div className="flex items-center justify-end gap-4 w-auto">
+                            <div className="flex gap-1.5">
+                                {c.wechat && <FaWeixin className="text-green-600" size={14} title="WeChat"/>}
+                                {c.viber && <FaViber className="text-purple-600" size={14} title="Viber"/>}
+                                {c.whatsapp && <FaWhatsapp className="text-green-500" size={14} title="WhatsApp"/>}
+                                {c.telegram && <FaTelegram className="text-blue-500" size={14} title="Telegram"/>}
                             </div>
+                            <button 
+                                onClick={(e) => handleDelete(c.id, e)} 
+                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                title="Delete Client"
+                            >
+                                <Trash2 size={14}/>
+                            </button>
                         </div>
                     </div>
                 ))
@@ -5414,101 +5297,80 @@ const PhoneBookPage = () => {
           </div>
       )}
 
-      {/* --- ADD / EDIT MODAL --- */}
+      {/* --- ADD / EDIT MODAL (Also Compacted) --- */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
             <div className="bg-white w-full max-w-2xl rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                 
-                {/* Modal Header */}
-                <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-white">
+                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-white">
                     <div>
-                        <h2 className="text-2xl font-serif text-gray-900 font-bold">{editingCustomer ? 'Edit Profile' : 'New Client'}</h2>
-                        <p className="text-gray-400 text-xs uppercase tracking-widest mt-1">Customer Database</p>
+                        <h2 className="text-lg font-serif text-gray-900 font-bold">{editingCustomer ? 'Edit Profile' : 'New Client'}</h2>
                     </div>
-                    <button onClick={closeModal} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500">
-                        <X size={20}/>
+                    <button onClick={closeModal} className="p-1.5 hover:bg-gray-100 rounded text-gray-500">
+                        <X size={18}/>
                     </button>
                 </div>
                 
-                {/* Modal Body */}
-                <div className="p-8 overflow-y-auto bg-gray-50/50">
-                    <form id="contactForm" onSubmit={handleSubmit} className="space-y-6">
-                        
-                        {/* Primary Info */}
-                        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-4">
-                            <h3 className="text-xs font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-2 mb-4 flex items-center gap-2">
-                                <User size={14}/> Primary Details
+                <div className="p-6 overflow-y-auto bg-gray-50/50">
+                    <form id="contactForm" onSubmit={handleSubmit} className="space-y-4">
+                        <div className="bg-white p-4 rounded border border-gray-200 shadow-sm space-y-3">
+                            <h3 className="text-[10px] font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-1.5 mb-2 flex items-center gap-1.5">
+                                <User size={12}/> Primary Details
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className={labelClass}>Full Name <span className="text-red-500">*</span></label>
-                                    <input required type="text" className={inputClass} 
-                                        placeholder="e.g. John Doe"
-                                        value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                                    <input required type="text" className={inputClass} placeholder="e.g. John Doe" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Phone Number <span className="text-red-500">*</span></label>
-                                    <input required type="text" className={inputClass} 
-                                        placeholder="e.g. 0917 123 4567"
-                                        value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                                    <input required type="text" className={inputClass} placeholder="e.g. 0917 123 4567" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
                                 </div>
                             </div>
                             <div>
                                 <label className={labelClass}>Email Address</label>
-                                <input type="email" className={inputClass} 
-                                    placeholder="client@example.com"
-                                    value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                                <input type="email" className={inputClass} placeholder="client@example.com" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                             </div>
                         </div>
 
-                        {/* Social Media */}
-                        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-4">
-                            <h3 className="text-xs font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-2 mb-4 flex items-center gap-2">
-                                <Phone size={14}/> Social IDs
+                        <div className="bg-white p-4 rounded border border-gray-200 shadow-sm space-y-3">
+                            <h3 className="text-[10px] font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-1.5 mb-2 flex items-center gap-1.5">
+                                <Phone size={12}/> Social IDs
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className={`${labelClass} flex items-center gap-2`}><FaWeixin className="text-green-600"/> WeChat ID</label>
-                                    <input type="text" className={inputClass} 
-                                        value={formData.wechat} onChange={e => setFormData({...formData, wechat: e.target.value})} />
+                                    <label className={`${labelClass} flex items-center gap-1.5`}><FaWeixin className="text-green-600"/> WeChat ID</label>
+                                    <input type="text" className={inputClass} value={formData.wechat} onChange={e => setFormData({...formData, wechat: e.target.value})} />
                                 </div>
                                 <div>
-                                    <label className={`${labelClass} flex items-center gap-2`}><FaViber className="text-purple-600"/> Viber Number</label>
-                                    <input type="text" className={inputClass} 
-                                        value={formData.viber} onChange={e => setFormData({...formData, viber: e.target.value})} />
+                                    <label className={`${labelClass} flex items-center gap-1.5`}><FaViber className="text-purple-600"/> Viber Number</label>
+                                    <input type="text" className={inputClass} value={formData.viber} onChange={e => setFormData({...formData, viber: e.target.value})} />
                                 </div>
                                 <div>
-                                    <label className={`${labelClass} flex items-center gap-2`}><FaWhatsapp className="text-green-500"/> WhatsApp</label>
-                                    <input type="text" className={inputClass} 
-                                        value={formData.whatsapp} onChange={e => setFormData({...formData, whatsapp: e.target.value})} />
+                                    <label className={`${labelClass} flex items-center gap-1.5`}><FaWhatsapp className="text-green-500"/> WhatsApp</label>
+                                    <input type="text" className={inputClass} value={formData.whatsapp} onChange={e => setFormData({...formData, whatsapp: e.target.value})} />
                                 </div>
                                 <div>
-                                    <label className={`${labelClass} flex items-center gap-2`}><FaTelegram className="text-blue-500"/> Telegram</label>
-                                    <input type="text" className={inputClass} 
-                                        value={formData.telegram} onChange={e => setFormData({...formData, telegram: e.target.value})} />
+                                    <label className={`${labelClass} flex items-center gap-1.5`}><FaTelegram className="text-blue-500"/> Telegram</label>
+                                    <input type="text" className={inputClass} value={formData.telegram} onChange={e => setFormData({...formData, telegram: e.target.value})} />
                                 </div>
                             </div>
                         </div>
 
-                        {/* Notes */}
-                        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-4">
-                            <h3 className="text-xs font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-2 mb-4 flex items-center gap-2">
-                                <StickyNote size={14}/> Internal Notes
+                        <div className="bg-white p-4 rounded border border-gray-200 shadow-sm space-y-3">
+                            <h3 className="text-[10px] font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-1.5 mb-2 flex items-center gap-1.5">
+                                <StickyNote size={12}/> Internal Notes
                             </h3>
-                            <textarea className={`${inputClass} h-24 resize-none`} 
-                                placeholder="E.g. VIP, prefers window seat, allergic to shrimp..."
-                                value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} />
+                            <textarea className={`${inputClass} h-16 resize-none`} placeholder="E.g. VIP, prefers window seat..." value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} />
                         </div>
-
                     </form>
                 </div>
 
-                {/* Modal Footer */}
-                <div className="p-6 bg-white border-t border-gray-100 flex justify-end gap-3">
-                    <button onClick={closeModal} className="px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-md transition-colors">
+                <div className="p-4 bg-white border-t border-gray-100 flex justify-end gap-2">
+                    <button onClick={closeModal} className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded transition-colors">
                         Cancel
                     </button>
-                    <button form="contactForm" type="submit" disabled={isSubmitting} className="bg-gold-600 text-white px-8 py-2.5 font-bold uppercase tracking-widest text-xs rounded-md shadow-md hover:bg-gold-700 transition-colors disabled:opacity-50">
+                    <button form="contactForm" type="submit" disabled={isSubmitting} className="bg-gold-600 text-white px-6 py-2 font-bold uppercase tracking-widest text-xs rounded shadow-sm hover:bg-gold-700 transition-colors disabled:opacity-50">
                         {isSubmitting ? 'Saving...' : 'Save Profile'}
                     </button>
                 </div>
