@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
 
 const ReservationForm = ({ 
     selectedRoom, // Passed from visual grid (Customer Mode)

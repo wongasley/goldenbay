@@ -5,7 +5,7 @@ import { Search, X } from 'lucide-react'; // <-- Added Lucide icons for search
 import logo from '../../../assets/images/goldenbaylogo.svg'; 
 import heroimage from '../../../assets/images/heroimage.webp'; 
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
 
 const MenuPage = () => {
   const [menuData, setMenuData] = useState([]);

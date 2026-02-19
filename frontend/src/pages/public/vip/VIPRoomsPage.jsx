@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { Users, Mic2, Tv, Armchair, Star } from 'lucide-react'; 
 import heroimage from '../../../assets/images/heroimage4.webp'; // Using same hero as Menu for consistency
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
 
 const VIPRoomsPage = () => {
   const [rooms, setRooms] = useState([]);
