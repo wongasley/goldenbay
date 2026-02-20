@@ -16,6 +16,7 @@ const NewsPage = lazy(() => import('./pages/public/marketing/NewsPage'));
 const SinglePostPage = lazy(() => import('./pages/public/marketing/SinglePostPage'));
 const EventInquiriesPage = lazy(() => import('./pages/public/events/EventInquiriesPage'));
 const VIPRoomsPage = lazy(() => import('./pages/public/vip/VIPRoomsPage'));
+const NotFoundPage = lazy(() => import('./pages/public/NotFoundPage'));
 
 // --- LAZY LOAD ADMIN PAGES ---
 const LoginPage = lazy(() => import('./pages/admin/auth/LoginPage')); 
@@ -70,6 +71,7 @@ function App() {
             <Route path="/promotions" element={<><Navbar /><NewsPage /><Footer /></>} />
             <Route path="/vip-rooms" element={<><Navbar /><VIPRoomsPage /><Footer /></>} />
             <Route path="/contact" element={<><Navbar /><ContactPage /><Footer /></>} />
+            <Route path="*" element={<><Navbar /><NotFoundPage /><Footer /></>} />
             
             <Route path="/login" element={<LoginPage />} />
 

@@ -89,7 +89,7 @@ const MenuPage = () => {
     >
         <div className="aspect-[4/3] overflow-hidden relative bg-gray-50 border-b border-gray-100">
             {item.image ? (
-                <img src={`${BACKEND_URL}${item.image}`} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={item.name} />
+                <img src={`${BACKEND_URL}${item.image}`} loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 bg-gray-100" alt={item.name} />
             ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center opacity-10">
                     <img src={logo} className="h-20 w-auto grayscale" alt="placeholder" />
@@ -241,11 +241,7 @@ const MenuPage = () => {
                     {/* Image Area */}
                     <div className="aspect-[4/3] overflow-hidden relative bg-gray-50 border-b border-gray-100">
                       {item.image ? (
-                        <img 
-                          src={item.image.startsWith('http') ? item.image : `${BACKEND_URL}${item.image}`} 
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
-                          alt={item.name} 
-                        />
+                        <img src={item.image.startsWith('http') ? item.image : `${BACKEND_URL}${item.image}`} loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 bg-gray-100" alt={item.name} />
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center opacity-10">
                            <img src={logo} className="h-20 w-auto grayscale" alt="placeholder" />
