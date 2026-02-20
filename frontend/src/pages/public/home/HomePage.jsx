@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import logo from '../../../assets/images/goldenbaylogo2.svg';
 // 1. IMPORT A POSTER IMAGE (This loads instantly while video buffers)
-import posterImg from '../../../assets/images/golden_bay_cover.webp'; 
 
 const HomePage = () => {
   const containerVariants = {
@@ -62,7 +61,6 @@ const HomePage = () => {
         muted
         playsInline
         preload="auto"
-        poster={posterImg}
         className="absolute z-0 w-auto min-w-full min-h-full max-w-none object-cover pointer-events-none transition-opacity duration-1000"
       >
         <source src="/videos/hero-background.mp4" type="video/mp4" />

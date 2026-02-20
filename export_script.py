@@ -102,6 +102,7 @@ FILES_TO_READ = [
     'frontend/public/sitemap.xml',
     'frontend/public/robots.txt',
     'frontend/src/pages/public/contact/ContactPage.jsx',
+    'frontend/src/components/layout/ScrollToTop.jsx',
     
 ]
 
