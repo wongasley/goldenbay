@@ -34,21 +34,21 @@ const ContactPage = () => {
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="flex flex-col justify-center space-y-12">
           
           <div>
-            <h2 className="text-3xl font-serif text-gray-900 mb-6">Get in Touch</h2>
-            <p className="text-gray-500 text-sm leading-relaxed">
+            <h2 className="text-4xl font-serif text-gray-900 mb-6">Get in Touch</h2>
+            <p className="text-gray-500 text-base md:text-lg leading-relaxed">
               Whether you have a question about our menu, need assistance finding us, or wish to inquire about corporate partnerships, our team is at your service.
             </p>
           </div>
 
-          <div className="space-y-8">
+          <div className="space-y-10">
             {/* Address */}
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-gold-50 text-gold-600 flex items-center justify-center rounded-full shrink-0">
-                <MapPin size={18} />
+            <div className="flex items-start gap-5">
+              <div className="w-12 h-12 bg-gold-50 text-gold-600 flex items-center justify-center rounded-full shrink-0">
+                <MapPin size={22} />
               </div>
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-widest text-gray-900 mb-1">Address</h4>
-                <p className="text-gray-500 text-sm leading-relaxed">
+                <h4 className="text-sm font-bold uppercase tracking-widest text-gray-900 mb-2">Address</h4>
+                <p className="text-gray-500 text-base md:text-lg leading-relaxed">
                   Lot 3&4 Block A2, CBP, <br />
                   Diosdado Macapagal Blvd, <br />
                   Pasay City, Metro Manila, Philippines
@@ -57,37 +57,37 @@ const ContactPage = () => {
             </div>
 
             {/* Phone */}
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-gold-50 text-gold-600 flex items-center justify-center rounded-full shrink-0">
-                <Phone size={18} />
+            <div className="flex items-start gap-5">
+              <div className="w-12 h-12 bg-gold-50 text-gold-600 flex items-center justify-center rounded-full shrink-0">
+                <Phone size={22} />
               </div>
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-widest text-gray-900 mb-1">Reservations & Inquiries</h4>
-                <p className="text-gray-500 text-sm leading-relaxed">(02) 8804-0332</p>
-                <p className="text-gray-500 text-sm leading-relaxed">+63 917 580 7166 (Viber / WhatsApp)</p>
+                <h4 className="text-sm font-bold uppercase tracking-widest text-gray-900 mb-2">Reservations & Inquiries</h4>
+                <p className="text-gray-500 text-base md:text-lg leading-relaxed">(02) 8804-0332</p>
+                <p className="text-gray-500 text-base md:text-lg leading-relaxed">+63 917 580 7166 (Viber / WhatsApp)</p>
               </div>
             </div>
 
             {/* Email */}
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-gold-50 text-gold-600 flex items-center justify-center rounded-full shrink-0">
-                <Mail size={18} />
+            <div className="flex items-start gap-5">
+              <div className="w-12 h-12 bg-gold-50 text-gold-600 flex items-center justify-center rounded-full shrink-0">
+                <Mail size={22} />
               </div>
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-widest text-gray-900 mb-1">Email</h4>
-                <p className="text-gray-500 text-sm leading-relaxed">goldenbay.marketing@gmail.com</p>
+                <h4 className="text-sm font-bold uppercase tracking-widest text-gray-900 mb-2">Email</h4>
+                <p className="text-gray-500 text-base md:text-lg leading-relaxed">goldenbay.marketing@gmail.com</p>
               </div>
             </div>
 
             {/* Hours */}
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-gold-50 text-gold-600 flex items-center justify-center rounded-full shrink-0">
-                <Clock size={18} />
+            <div className="flex items-start gap-5">
+              <div className="w-12 h-12 bg-gold-50 text-gold-600 flex items-center justify-center rounded-full shrink-0">
+                <Clock size={22} />
               </div>
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-widest text-gray-900 mb-1">Operating Hours</h4>
-                <p className="text-gray-500 text-sm leading-relaxed"><span className="font-medium text-gray-700">Lunch:</span> 11:00 AM – 2:30 PM</p>
-                <p className="text-gray-500 text-sm leading-relaxed"><span className="font-medium text-gray-700">Dinner:</span> 5:00 PM – 9:30 PM</p>
+                <h4 className="text-sm font-bold uppercase tracking-widest text-gray-900 mb-2">Operating Hours</h4>
+                <p className="text-gray-500 text-base md:text-lg leading-relaxed"><span className="font-medium text-gray-700">Lunch:</span> 11:00 AM – 2:30 PM</p>
+                <p className="text-gray-500 text-base md:text-lg leading-relaxed"><span className="font-medium text-gray-700">Dinner:</span> 5:00 PM – 9:30 PM</p>
               </div>
             </div>
           </div>
