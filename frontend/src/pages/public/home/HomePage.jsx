@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import logo from '../../../assets/images/goldenbaylogo2.svg';
-// 1. IMPORT A POSTER IMAGE (This loads instantly while video buffers)
 
 const HomePage = () => {
   const containerVariants = {
@@ -54,7 +53,7 @@ const HomePage = () => {
         </script>
       </Helmet>
 
-      {/* 2. UPDATE VIDEO TAG: Add 'poster' and 'preload="auto"' */}
+      {/* UPDATE VIDEO TAG: Removed 'poster' attribute */}
       <video
         autoPlay
         loop
