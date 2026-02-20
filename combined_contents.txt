@@ -1898,7 +1898,7 @@ import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css'; 
 import { format } from 'date-fns';
 import { Users, CheckCircle, MessageSquare } from 'lucide-react';
-import wechatQr from '../../../assets/images/goldenbaylogo.svg'; 
+import wechatQr from '../../../assets/images/qrcode.svg'; 
 import heroimage from '../../../assets/images/heroimage4.webp'; // Banner Image
 import { Link } from 'react-router-dom';
 
@@ -5996,7 +5996,7 @@ import { Phone, Mail, MessageSquare, MonitorPlay, Users, Building, ChevronDown, 
 // Images
 import heroimage from '../../../assets/images/heroimage3.webp'; 
 import diningImg from '../../../assets/images/dining_area.webp';
-import wechatQr from '../../../assets/images/goldenbaylogo.svg'; 
+import wechatQr from '../../../assets/images/qrcode.svg'; 
 
 const EventInquiriesPage = () => {
   const [showWeChat, setShowWeChat] = useState(false);
@@ -6274,4 +6274,4 @@ Disallow: /staff/
 Disallow: /login/
 Allow: /
 
-Sitemap: https://goldenbay.com.ph/sitemap.xml
+Sitemap: https://goldenbay.com.ph/sitemap.xmla

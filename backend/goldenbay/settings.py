@@ -191,6 +191,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:5173",  # <--- ADD THIS (Vite's default port)
     "http://127.0.0.1:5173",
+    "https://goldenbay.com.ph",  # Production domain
+    "https://www.goldenbay.com.ph", 
 ]
 
 CORS_ALLOW_CREDENTIALS = True
