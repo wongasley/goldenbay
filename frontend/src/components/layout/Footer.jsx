@@ -43,9 +43,9 @@ const Footer = () => {
                 <div className="flex flex-col md:items-end space-y-2 text-gray-400 text-sm font-light tracking-wide">
                   <a href="tel:+63288040332" className="hover:text-white transition-colors">+63 (02) 8804-0332</a>
                   <a href="tel:+639175807166" className="hover:text-white transition-colors">+63 917 580 7166</a>
-                  <a href="mailto:marketing@goldenbay.com.ph" className="hover:text-white transition-colors">marketing@goldenbay.com.ph</a>
+                  <a href="mailto:goldenbay.marketing@gmail.com" className="hover:text-white transition-colors">goldenbay.marketing@gmail.com</a>
                 </div>
-             </div>
+              </div>
 
              <div className="space-y-4">
                 <h4 className="font-serif text-xl text-gold-500">Hours</h4>

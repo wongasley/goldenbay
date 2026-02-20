@@ -70,10 +70,19 @@ def send_notifications_task(reservation):
             subject=f'New Booking Request: {reservation.customer_name}',
             message=admin_plain,
             from_email=settings.EMAIL_HOST_USER,
-            recipient_list=['marketing@goldenbay.com.ph'], 
+            recipient_list=['goldenbay.marketing@gmail.com'],  # <--- UPDATED HERE
             html_message=admin_html,
             fail_silently=False,
         )
+
+        admin_numbers_env = os.getenv('ADMIN_PHONE_NUMBERS')
+        if admin_numbers_env:
+            admin_numbers = [num.strip() for num in admin_numbers_env.split(',') if num.strip()]
+            admin_sms_body = f"New Booking: {reservation.customer_name} ({reservation.pax} pax) for {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')}. Area: {area_name}. Check Dashboard."
+            
+            for num in admin_numbers:
+                # We send them individually to ensure Semaphore handles each correctly
+                send_sms(num, admin_sms_body)
 
         # 2. NOTIFY THE CUSTOMER
         if reservation.customer_email and '@' in reservation.customer_email:
@@ -186,7 +195,7 @@ def send_admin_update_notifications(reservation, new_status):
              elif new_status == 'CANCELLED':
                  sms_body = f"Hi {reservation.customer_name}, your reservation request has been cancelled. Please call (02) 8804-0332 to reschedule. - GOLDENBAY"
                  send_sms(reservation.customer_contact, sms_body)
-                 
+
     except Exception as e:
         print(f"⚠️ Notification Error for ID {reservation.id}: {e}")
 
