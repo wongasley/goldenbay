@@ -129,32 +129,32 @@ const PhoneBookPage = () => {
     <div className="space-y-4">
       
       {/* 1. COMPACT HEADER */}
-      <div className="flex justify-between items-end border-b border-gray-200 pb-3">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-gray-200 pb-3">
         <div>
             <h1 className="text-xl font-bold text-gray-900 font-serif">Clientele</h1>
             <p className="text-gray-500 text-xs">Manage customer profiles and contact details.</p>
         </div>
-        <div className="flex gap-2">
-             <div className="relative">
+        <div className="flex flex-wrap gap-2 w-full md:w-auto">
+             <div className="relative flex-grow md:flex-grow-0">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                 <input 
                     type="text" 
                     placeholder="Search name or phone..." 
-                    className="pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded text-xs outline-none focus:border-gold-500 w-56 shadow-sm"
+                    className="pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded text-xs outline-none focus:border-gold-500 w-full md:w-56 shadow-sm"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                 />
             </div>
             <button 
                 onClick={() => setSortAsc(!sortAsc)} 
-                className="bg-white border border-gray-200 px-2 py-1.5 rounded hover:bg-gray-50 text-gray-600 shadow-sm"
+                className="bg-white border border-gray-200 px-3 py-1.5 rounded hover:bg-gray-50 text-gray-600 shadow-sm shrink-0"
                 title={sortAsc ? "Sort Z-A" : "Sort A-Z"}
             >
                 <ArrowUpDown size={14}/>
             </button>
             <button 
                 onClick={openCreate} 
-                className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-all flex items-center gap-1.5"
+                className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-all flex items-center gap-1.5 shrink-0 ml-auto md:ml-0"
             >
                <Plus size={14} /> Add New
             </button>

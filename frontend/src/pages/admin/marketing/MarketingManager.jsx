@@ -48,7 +48,7 @@ const MarketingManager = () => {
 
       {/* 2. COMPACT TABLE */}
       <div className="bg-white border border-gray-200 rounded overflow-hidden shadow-sm">
-        <table className="w-full text-left">
+        <table className="w-full text-left min-w-[600px]">
             <thead className="bg-gray-50 border-b border-gray-200 text-gray-400 uppercase tracking-widest text-[10px] font-bold">
                 <tr>
                     <th className="px-4 py-2.5">Title</th>

@@ -235,6 +235,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from marketing.views import dynamic_sitemap
 
 class ThrottledTokenObtainPairView(TokenObtainPairView):
     throttle_scope = 'burst'
@@ -244,6 +245,7 @@ urlpatterns = [
     path('api/menu/', include('menu.urls')),         # <--- We will enable these soon
     path('api/reservations/', include('reservations.urls')), 
     path('api/marketing/', include('marketing.urls')),
+    path('api/sitemap.xml', dynamic_sitemap, name='dynamic_sitemap'),
     # path('api/events/', include('events.urls')), 
     path('api/token/', ThrottledTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
@@ -1076,6 +1078,7 @@ urlpatterns = [
 ]
 
 from rest_framework import generics
+from django.http import HttpResponse
 from .models import Post
 from .serializers import PostSerializer
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -1111,6 +1114,48 @@ class AdminPostDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
     lookup_field = 'id'
     parser_classes = [MultiPartParser, FormParser]
+
+def dynamic_sitemap(request):
+    """Generates an XML sitemap on the fly including all active posts"""
+    posts = Post.objects.filter(is_active=True).order_by('-created_at')
+    
+    # 1. Your static React routes
+    static_pages = [
+        ('/', '1.0', 'weekly'),
+        ('/menu', '0.9', 'weekly'),
+        ('/reservations', '0.8', 'monthly'),
+        ('/events', '0.8', 'monthly'),
+        ('/vip-rooms', '0.8', 'monthly'),
+        ('/contact', '0.8', 'monthly'), # Added your new Contact page!
+        ('/news', '0.7', 'daily'),
+        ('/about', '0.6', 'yearly'),
+    ]
+    
+    base_url = "https://goldenbay.com.ph"
+    
+    xml = ['<?xml version="1.0" encoding="UTF-8"?>']
+    xml.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+    
+    # Add Static Pages
+    for path, priority, changefreq in static_pages:
+        xml.append('  <url>')
+        xml.append(f'    <loc>{base_url}{path}</loc>')
+        xml.append(f'    <changefreq>{changefreq}</changefreq>')
+        xml.append(f'    <priority>{priority}</priority>')
+        xml.append('  </url>')
+        
+    # Add Dynamic Blog/Promo Posts
+    for post in posts:
+        xml.append('  <url>')
+        xml.append(f'    <loc>{base_url}/news/{post.slug}</loc>')
+        xml.append(f'    <lastmod>{post.created_at.strftime("%Y-%m-%d")}</lastmod>')
+        xml.append('    <changefreq>weekly</changefreq>')
+        xml.append('    <priority>0.7</priority>')
+        xml.append('  </url>')
+        
+    xml.append('</urlset>')
+    
+    return HttpResponse('\n'.join(xml), content_type='application/xml')
 
 from django.contrib import admin
 
@@ -1369,64 +1414,152 @@ export default {
   ],
 }
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Menu, X } from 'lucide-react';
 import logo from '../../assets/images/goldenbaylogo.svg';
 
 const Navbar = () => {
   const location = useLocation();
   const isHomePage = location.pathname === '/';
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+  }, [isMobileMenuOpen]);
+
+  const navLinks = [
+    { name: 'Menu', path: '/menu' },
+    { name: 'Events', path: '/events' },
+    { name: 'News & Promos', path: '/news' },
+    { name: 'Private Rooms', path: '/vip-rooms' },
+    { name: 'About Us', path: '/about' },
+    { name: 'Contact', path: '/contact' },
+  ];
 
   return (
-    <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-      // Home = Transparent (Dark overlay underneath)
-      // Others = White background with shadow
-      isHomePage 
-        ? 'bg-black/20 backdrop-blur-sm border-b border-white/5' 
-        : 'bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm'
-    }`}>
-      <div className="max-w-7xl mx-auto px-6 h-24 flex justify-between items-center">
-        
-        {/* LOGO */}
-        <Link to="/" className="flex items-center">
-            <img 
-                src={logo} 
-                alt="Golden Bay Logo" 
-                // On Home: Standard. On others: Might need filter if logo is white-only.
-                // Assuming logo is Gold, it works on both Black and White.
-                className="h-14 w-auto hover:opacity-80 transition-opacity" 
-            />
-        </Link>
+    <>
+      <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${
+        isHomePage && !isMobileMenuOpen
+          ? 'bg-black/20 backdrop-blur-sm border-b border-white/5' 
+          : 'bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm'
+      }`}>
+        <div className="max-w-7xl mx-auto px-6 h-24 flex justify-between items-center">
+          
+          {/* LOGO */}
+          <Link to="/" className="flex items-center z-50">
+              <img 
+                  src={logo} 
+                  alt="Golden Bay Logo" 
+                  className={`h-14 w-auto hover:opacity-80 transition-all duration-300 ${isMobileMenuOpen ? 'invert grayscale opacity-100' : ''}`} 
+              />
+          </Link>
 
-        {/* NAVIGATION LINKS */}
-        <div className={`hidden md:flex items-center space-x-12 text-xs uppercase tracking-[0.2em] font-light
-                        ${isHomePage ? 'text-gray-300' : 'text-gray-600'}`}>
-          <Link to="/menu" className="hover:text-gold-500 transition-colors">Menu</Link>
-          <Link to="/events" className="hover:text-gold-500 transition-colors">Events</Link>
-          <Link to="/news" className="hover:text-gold-500 transition-colors">News & Promos</Link>
-          <Link to="/about" className="hover:text-gold-500 transition-colors">About Us</Link>
-          <Link to="/vip-rooms" className="hover:text-gold-500 transition-colors">Private Rooms</Link> {/* Added */}
-          {/* Admin link hidden or kept subtle */}
-           {/* <Link to="/staff" className={`${isHomePage ? 'text-white/20' : 'text-gray-300'} hover:text-gold-500 transition-colors`}>Admin</Link> */}
-        </div>
+          {/* DESKTOP NAVIGATION */}
+          <div className={`hidden md:flex items-center space-x-10 text-xs uppercase tracking-[0.2em] font-light
+                          ${isHomePage ? 'text-gray-300' : 'text-gray-600'}`}>
+            {navLinks.map((link) => (
+              <Link key={link.name} to={link.path} className="hover:text-gold-500 transition-colors">
+                {link.name}
+              </Link>
+            ))}
+          </div>
 
-        {/* CTA BUTTON */}
-        <Link to="/reservations">
-          <motion.button 
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className={`text-[11px] font-bold uppercase tracking-widest px-8 py-3 rounded-sm transition-colors
-              ${isHomePage 
-                ? 'bg-gold-500 text-white hover:bg-white hover:text-black' 
-                : 'bg-gold-600 text-white hover:bg-black hover:text-white'
+          <div className="flex items-center gap-4 z-50">
+            {/* CTA BUTTON */}
+            <Link to="/reservations" className="hidden sm:block">
+              <motion.button 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className={`text-[11px] font-bold uppercase tracking-widest px-8 py-3 rounded-sm transition-colors
+                  ${isHomePage && !isMobileMenuOpen
+                    ? 'bg-gold-500 text-white hover:bg-white hover:text-black' 
+                    : 'bg-gold-600 text-white hover:bg-black hover:text-white'
+                  }`}
+              >
+                Book a Table
+              </motion.button>
+            </Link>
+
+            {/* MOBILE MENU TOGGLE */}
+            <button 
+              className={`md:hidden p-2 focus:outline-none transition-colors ${
+                isHomePage && !isMobileMenuOpen ? 'text-white' : 'text-gray-900'
               }`}
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            >
+              {isMobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* MOBILE FULLSCREEN MENU */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-40 bg-white pt-24 px-6 pb-6 flex flex-col justify-between md:hidden overflow-y-auto"
           >
-            Book a Table
-          </motion.button>
-        </Link>
-      </div>
-    </nav>
+            <div className="flex flex-col space-y-6 pt-10">
+              {navLinks.map((link, index) => (
+                <motion.div
+                  key={link.name}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.05 + 0.1 }}
+                >
+                  <Link 
+                    to={link.path} 
+                    className="block text-2xl font-serif text-gray-900 hover:text-gold-600 transition-colors pb-4 border-b border-gray-100"
+                  >
+                    {link.name}
+                  </Link>
+                </motion.div>
+              ))}
+              
+              {/* Mobile CTA (always visible on mobile) */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+                className="pt-6"
+              >
+                <Link to="/reservations" className="block w-full">
+                  <button className="w-full bg-gold-600 text-white font-bold py-4 text-sm uppercase tracking-widest rounded-sm hover:bg-black transition-colors">
+                    Book a Table
+                  </button>
+                </Link>
+              </motion.div>
+            </div>
+
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="mt-10 text-center text-xs text-gray-500 uppercase tracking-widest space-y-2"
+            >
+              <p>Lot 3&4 Block A2, Diosdado Macapagal Blvd</p>
+              <p>(02) 8804-0332</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 };
 
@@ -6319,7 +6452,7 @@ Disallow: /staff/
 Disallow: /login/
 Allow: /
 
-Sitemap: https://goldenbay.com.ph/sitemap.xml
+Sitemap: https://goldenbay.com.ph/api/sitemap.xml
 
 import React from 'react';
 import { motion } from 'framer-motion';
@@ -6419,7 +6552,7 @@ const ContactPage = () => {
         {/* RIGHT COLUMN: Google Map */}
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="w-full h-[500px] lg:h-full min-h-[500px] bg-gray-200 border border-gray-200 rounded-sm overflow-hidden shadow-lg p-2">
           <iframe 
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3861.884178667683!2d120.9859553!3d14.5429188!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397cb2475659837%3A0x6a2c2628fb656db0!2sGolden%20Bay%20Fresh%20Seafoods%20Restaurant!5e0!3m2!1sen!2sph!4v1700000000000!5m2!1sen!2sph" 
+            src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d3862.161342953903!2d120.9899011!3d14.5327621!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397c95666ea03b3%3A0xd54670ba0bd98353!2sGolden%20Bay%20Fresh%20Seafoods%20Restaurant!5e0!3m2!1sen!2sph!4v1771614810044!5m2!1sen!2sph" 
             width="100%" 
             height="100%" 
             style={{ border: 0 }} 
