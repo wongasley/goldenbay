@@ -1,10 +1,16 @@
 from rest_framework import generics
 from django.db.models import Prefetch
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from .models import Category, MenuItem
 from .serializers import CategorySerializer
 
 class MenuListView(generics.ListAPIView):
     serializer_class = CategorySerializer
+
+    @method_decorator(cache_page(60 * 15))
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
     
     def get_queryset(self):
         # 1. Create a query for Items that is sorted by 'code' (Ascending: A-Z, 0-9)

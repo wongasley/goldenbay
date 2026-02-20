@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, Phone, Mail, Trash2, ArrowUpDown, X, User, StickyNote } from 'lucide-react';
 import { FaWeixin, FaViber, FaWhatsapp, FaTelegram } from 'react-icons/fa';
 
-const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const PhoneBookPage = () => {
   const [customers, setCustomers] = useState([]);

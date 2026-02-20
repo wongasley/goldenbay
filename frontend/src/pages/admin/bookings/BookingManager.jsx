@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { Plus, Check, X, Phone } from 'lucide-react';
 import ReservationForm from '../../../components/reservations/ReservationForm';
 
-const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const BookingManager = () => {
   const [bookings, setBookings] = useState([]);

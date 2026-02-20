@@ -3,7 +3,7 @@ import { Users, Contact, Megaphone, AlertCircle, ArrowRight } from 'lucide-react
 import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const StatCard = ({ title, value, icon: Icon, colorClass, linkTo, subText }) => (
   <Link to={linkTo} className="group block h-full">

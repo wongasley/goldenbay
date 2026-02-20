@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import logo from '../../../assets/images/goldenbaylogo.svg';
 
 // --- ADDED DYNAMIC BACKEND URL ---
-const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');

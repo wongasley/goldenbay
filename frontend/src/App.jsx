@@ -1,31 +1,36 @@
-// src/App.jsx
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { HelmetProvider } from 'react-helmet-async';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
-import AdminLayout from './components/layout/AdminLayout'; // FIXED THIS LINE
-
-// Public Pages
-import HomePage from './pages/public/home/HomePage';
-import MenuPage from './pages/public/menu/MenuPage';
-import ReservationPage from './pages/public/reservations/ReservationPage';
-import AboutPage from './pages/public/about/AboutPage'; 
-import LoginPage from './pages/admin/auth/LoginPage'; // FIXED THIS LINE
-import NewsPage from './pages/public/marketing/NewsPage';
-import SinglePostPage from './pages/public/marketing/SinglePostPage';
-import EventInquiriesPage from './pages/public/events/EventInquiriesPage';
-
-// Admin Pages
-import AdminDashboardPage from './pages/admin/dashboard/AdminDashboardPage'; // FIXED THIS LINE
-import BookingManager from './pages/admin/bookings/BookingManager'; // FIXED THIS LINE
-import MarketingManager from './pages/admin/marketing/MarketingManager'; // FIXED THIS LINE
-import PostEditor from './pages/admin/marketing/PostEditor'; // FIXED THIS LINE
-import PhoneBookPage from './pages/admin/customers/PhoneBookPage'; // FIXED THIS LINE
-
 import ProtectedRoute from './components/layout/ProtectedRoute';
-import VIPRoomsPage from './pages/public/vip/VIPRoomsPage';
+
+// --- LAZY LOAD PUBLIC PAGES ---
+const HomePage = lazy(() => import('./pages/public/home/HomePage'));
+const MenuPage = lazy(() => import('./pages/public/menu/MenuPage'));
+const ReservationPage = lazy(() => import('./pages/public/reservations/ReservationPage'));
+const AboutPage = lazy(() => import('./pages/public/about/AboutPage')); 
+const NewsPage = lazy(() => import('./pages/public/marketing/NewsPage'));
+const SinglePostPage = lazy(() => import('./pages/public/marketing/SinglePostPage'));
+const EventInquiriesPage = lazy(() => import('./pages/public/events/EventInquiriesPage'));
+const VIPRoomsPage = lazy(() => import('./pages/public/vip/VIPRoomsPage'));
+
+// --- LAZY LOAD ADMIN PAGES ---
+const LoginPage = lazy(() => import('./pages/admin/auth/LoginPage')); 
+const AdminLayout = lazy(() => import('./components/layout/AdminLayout')); 
+const AdminDashboardPage = lazy(() => import('./pages/admin/dashboard/AdminDashboardPage')); 
+const BookingManager = lazy(() => import('./pages/admin/bookings/BookingManager')); 
+const MarketingManager = lazy(() => import('./pages/admin/marketing/MarketingManager')); 
+const PostEditor = lazy(() => import('./pages/admin/marketing/PostEditor')); 
+const PhoneBookPage = lazy(() => import('./pages/admin/customers/PhoneBookPage')); 
+
+// Premium Loading Fallback while splitting code
+const PageLoader = () => (
+  <div className="min-h-screen bg-cream-50 flex items-center justify-center text-gold-600 font-serif tracking-widest uppercase animate-pulse">
+    Loading Golden Bay...
+  </div>
+);
 
 function App() {
   return (
@@ -45,44 +50,39 @@ function App() {
               letterSpacing: '0.05em',
               fontFamily: 'Quicksand, sans-serif'
             },
-            success: {
-              iconTheme: { primary: '#D4AF37', secondary: '#0a0a0a' },
-            },
-            error: {
-              iconTheme: { primary: '#ef4444', secondary: '#ffffff' },
-            },
+            success: { iconTheme: { primary: '#D4AF37', secondary: '#0a0a0a' } },
+            error: { iconTheme: { primary: '#ef4444', secondary: '#ffffff' } },
           }}
         />
 
-        <Routes>
-          {/* --- PUBLIC ROUTES --- */}
-          <Route path="/" element={<><Navbar /><HomePage /></>} />
-          <Route path="/menu" element={<><Navbar /><MenuPage /><Footer /></>} />
-          <Route path="/reservations" element={<><Navbar /><ReservationPage /><Footer /></>} />
-          <Route path="/events" element={<><Navbar /><EventInquiriesPage /><Footer /></>} />
-          <Route path="/about" element={<><Navbar /><AboutPage /><Footer /></>} />
-          <Route path="/news" element={<><Navbar /><NewsPage /><Footer /></>} />
-          <Route path="/news/:slug" element={<><Navbar /><SinglePostPage /><Footer /></>} />
-          <Route path="/promotions" element={<><Navbar /><NewsPage /><Footer /></>} />
-          <Route path="/vip-rooms" element={<><Navbar /><VIPRoomsPage /><Footer /></>} />
-          
-          <Route path="/login" element={<LoginPage />} />
+        {/* Wrap all routes in Suspense for Lazy Loading */}
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            {/* --- PUBLIC ROUTES --- */}
+            <Route path="/" element={<><Navbar /><HomePage /></>} />
+            <Route path="/menu" element={<><Navbar /><MenuPage /><Footer /></>} />
+            <Route path="/reservations" element={<><Navbar /><ReservationPage /><Footer /></>} />
+            <Route path="/events" element={<><Navbar /><EventInquiriesPage /><Footer /></>} />
+            <Route path="/about" element={<><Navbar /><AboutPage /><Footer /></>} />
+            <Route path="/news" element={<><Navbar /><NewsPage /><Footer /></>} />
+            <Route path="/news/:slug" element={<><Navbar /><SinglePostPage /><Footer /></>} />
+            <Route path="/promotions" element={<><Navbar /><NewsPage /><Footer /></>} />
+            <Route path="/vip-rooms" element={<><Navbar /><VIPRoomsPage /><Footer /></>} />
+            
+            <Route path="/login" element={<LoginPage />} />
 
-          {/* --- ADMIN ROUTES (NESTED) - NOW ACCESSED VIA /staff --- */}
-          <Route path="/staff" element={
-            <ProtectedRoute>
-              <AdminLayout />
-            </ProtectedRoute>
-          }>
-            <Route index element={<AdminDashboardPage />} />
-            <Route path="bookings" element={<BookingManager />} />
-            <Route path="customers" element={<PhoneBookPage />} />
-            <Route path="marketing" element={<MarketingManager />} />
-            <Route path="marketing/create" element={<PostEditor />} />
-            <Route path="marketing/edit/:id" element={<PostEditor />} />
-          </Route>
-          
-        </Routes>
+            {/* --- ADMIN ROUTES --- */}
+            <Route path="/staff" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
+              <Route index element={<AdminDashboardPage />} />
+              <Route path="bookings" element={<BookingManager />} />
+              <Route path="customers" element={<PhoneBookPage />} />
+              <Route path="marketing" element={<MarketingManager />} />
+              <Route path="marketing/create" element={<PostEditor />} />
+              <Route path="marketing/edit/:id" element={<PostEditor />} />
+            </Route>
+            
+          </Routes>
+        </Suspense>
       </div>
     </Router>
     </HelmetProvider>

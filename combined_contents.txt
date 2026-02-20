@@ -209,6 +209,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:5173",  # <--- ADD THIS (Vite's default port)
     "http://127.0.0.1:5173",
+    "https://goldenbay.com.ph",  # Production domain
+    "https://www.goldenbay.com.ph", 
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -449,11 +451,17 @@ urlpatterns = [
 
 from rest_framework import generics
 from django.db.models import Prefetch
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from .models import Category, MenuItem
 from .serializers import CategorySerializer
 
 class MenuListView(generics.ListAPIView):
     serializer_class = CategorySerializer
+
+    @method_decorator(cache_page(60 * 15))
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
     
     def get_queryset(self):
         # 1. Create a query for Items that is sorted by 'code' (Ascending: A-Z, 0-9)
@@ -1102,34 +1110,39 @@ from django.shortcuts import render
 # Create your views here.
 
 
-// src/App.jsx
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { HelmetProvider } from 'react-helmet-async';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
-import AdminLayout from './components/layout/AdminLayout'; // FIXED THIS LINE
-
-// Public Pages
-import HomePage from './pages/public/home/HomePage';
-import MenuPage from './pages/public/menu/MenuPage';
-import ReservationPage from './pages/public/reservations/ReservationPage';
-import AboutPage from './pages/public/about/AboutPage'; 
-import LoginPage from './pages/admin/auth/LoginPage'; // FIXED THIS LINE
-import NewsPage from './pages/public/marketing/NewsPage';
-import SinglePostPage from './pages/public/marketing/SinglePostPage';
-import EventInquiriesPage from './pages/public/events/EventInquiriesPage';
-
-// Admin Pages
-import AdminDashboardPage from './pages/admin/dashboard/AdminDashboardPage'; // FIXED THIS LINE
-import BookingManager from './pages/admin/bookings/BookingManager'; // FIXED THIS LINE
-import MarketingManager from './pages/admin/marketing/MarketingManager'; // FIXED THIS LINE
-import PostEditor from './pages/admin/marketing/PostEditor'; // FIXED THIS LINE
-import PhoneBookPage from './pages/admin/customers/PhoneBookPage'; // FIXED THIS LINE
-
 import ProtectedRoute from './components/layout/ProtectedRoute';
-import VIPRoomsPage from './pages/public/vip/VIPRoomsPage';
+
+// --- LAZY LOAD PUBLIC PAGES ---
+const HomePage = lazy(() => import('./pages/public/home/HomePage'));
+const MenuPage = lazy(() => import('./pages/public/menu/MenuPage'));
+const ReservationPage = lazy(() => import('./pages/public/reservations/ReservationPage'));
+const AboutPage = lazy(() => import('./pages/public/about/AboutPage')); 
+const NewsPage = lazy(() => import('./pages/public/marketing/NewsPage'));
+const SinglePostPage = lazy(() => import('./pages/public/marketing/SinglePostPage'));
+const EventInquiriesPage = lazy(() => import('./pages/public/events/EventInquiriesPage'));
+const VIPRoomsPage = lazy(() => import('./pages/public/vip/VIPRoomsPage'));
+
+// --- LAZY LOAD ADMIN PAGES ---
+const LoginPage = lazy(() => import('./pages/admin/auth/LoginPage')); 
+const AdminLayout = lazy(() => import('./components/layout/AdminLayout')); 
+const AdminDashboardPage = lazy(() => import('./pages/admin/dashboard/AdminDashboardPage')); 
+const BookingManager = lazy(() => import('./pages/admin/bookings/BookingManager')); 
+const MarketingManager = lazy(() => import('./pages/admin/marketing/MarketingManager')); 
+const PostEditor = lazy(() => import('./pages/admin/marketing/PostEditor')); 
+const PhoneBookPage = lazy(() => import('./pages/admin/customers/PhoneBookPage')); 
+
+// Premium Loading Fallback while splitting code
+const PageLoader = () => (
+  <div className="min-h-screen bg-cream-50 flex items-center justify-center text-gold-600 font-serif tracking-widest uppercase animate-pulse">
+    Loading Golden Bay...
+  </div>
+);
 
 function App() {
   return (
@@ -1149,44 +1162,39 @@ function App() {
               letterSpacing: '0.05em',
               fontFamily: 'Quicksand, sans-serif'
             },
-            success: {
-              iconTheme: { primary: '#D4AF37', secondary: '#0a0a0a' },
-            },
-            error: {
-              iconTheme: { primary: '#ef4444', secondary: '#ffffff' },
-            },
+            success: { iconTheme: { primary: '#D4AF37', secondary: '#0a0a0a' } },
+            error: { iconTheme: { primary: '#ef4444', secondary: '#ffffff' } },
           }}
         />
 
-        <Routes>
-          {/* --- PUBLIC ROUTES --- */}
-          <Route path="/" element={<><Navbar /><HomePage /></>} />
-          <Route path="/menu" element={<><Navbar /><MenuPage /><Footer /></>} />
-          <Route path="/reservations" element={<><Navbar /><ReservationPage /><Footer /></>} />
-          <Route path="/events" element={<><Navbar /><EventInquiriesPage /><Footer /></>} />
-          <Route path="/about" element={<><Navbar /><AboutPage /><Footer /></>} />
-          <Route path="/news" element={<><Navbar /><NewsPage /><Footer /></>} />
-          <Route path="/news/:slug" element={<><Navbar /><SinglePostPage /><Footer /></>} />
-          <Route path="/promotions" element={<><Navbar /><NewsPage /><Footer /></>} />
-          <Route path="/vip-rooms" element={<><Navbar /><VIPRoomsPage /><Footer /></>} />
-          
-          <Route path="/login" element={<LoginPage />} />
+        {/* Wrap all routes in Suspense for Lazy Loading */}
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            {/* --- PUBLIC ROUTES --- */}
+            <Route path="/" element={<><Navbar /><HomePage /></>} />
+            <Route path="/menu" element={<><Navbar /><MenuPage /><Footer /></>} />
+            <Route path="/reservations" element={<><Navbar /><ReservationPage /><Footer /></>} />
+            <Route path="/events" element={<><Navbar /><EventInquiriesPage /><Footer /></>} />
+            <Route path="/about" element={<><Navbar /><AboutPage /><Footer /></>} />
+            <Route path="/news" element={<><Navbar /><NewsPage /><Footer /></>} />
+            <Route path="/news/:slug" element={<><Navbar /><SinglePostPage /><Footer /></>} />
+            <Route path="/promotions" element={<><Navbar /><NewsPage /><Footer /></>} />
+            <Route path="/vip-rooms" element={<><Navbar /><VIPRoomsPage /><Footer /></>} />
+            
+            <Route path="/login" element={<LoginPage />} />
 
-          {/* --- ADMIN ROUTES (NESTED) - NOW ACCESSED VIA /staff --- */}
-          <Route path="/staff" element={
-            <ProtectedRoute>
-              <AdminLayout />
-            </ProtectedRoute>
-          }>
-            <Route index element={<AdminDashboardPage />} />
-            <Route path="bookings" element={<BookingManager />} />
-            <Route path="customers" element={<PhoneBookPage />} />
-            <Route path="marketing" element={<MarketingManager />} />
-            <Route path="marketing/create" element={<PostEditor />} />
-            <Route path="marketing/edit/:id" element={<PostEditor />} />
-          </Route>
-          
-        </Routes>
+            {/* --- ADMIN ROUTES --- */}
+            <Route path="/staff" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
+              <Route index element={<AdminDashboardPage />} />
+              <Route path="bookings" element={<BookingManager />} />
+              <Route path="customers" element={<PhoneBookPage />} />
+              <Route path="marketing" element={<MarketingManager />} />
+              <Route path="marketing/create" element={<PostEditor />} />
+              <Route path="marketing/edit/:id" element={<PostEditor />} />
+            </Route>
+            
+          </Routes>
+        </Suspense>
       </div>
     </Router>
     </HelmetProvider>
@@ -1282,13 +1290,21 @@ h2 {
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Golden Bay | Luxury Seafood Dining</title>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RCENXX7WNK"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-RCENXX7WNK');
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
-
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -1395,7 +1411,7 @@ import { Users, Contact, Megaphone, AlertCircle, ArrowRight } from 'lucide-react
 import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const StatCard = ({ title, value, icon: Icon, colorClass, linkTo, subText }) => (
   <Link to={linkTo} className="group block h-full">
@@ -1602,7 +1618,7 @@ import { Search, X } from 'lucide-react'; // <-- Added Lucide icons for search
 import logo from '../../../assets/images/goldenbaylogo.svg'; 
 import heroimage from '../../../assets/images/heroimage.webp'; 
 
-const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const MenuPage = () => {
   const [menuData, setMenuData] = useState([]);
@@ -1902,7 +1918,7 @@ import wechatQr from '../../../assets/images/qrcode.svg';
 import heroimage from '../../../assets/images/heroimage4.webp'; // Banner Image
 import { Link } from 'react-router-dom';
 
-const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const ReservationPage = () => {
   // ... state ...
@@ -2230,7 +2246,7 @@ import toast from 'react-hot-toast';
 import { Plus, Check, X, Phone } from 'lucide-react';
 import ReservationForm from '../../../components/reservations/ReservationForm';
 
-const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const BookingManager = () => {
   const [bookings, setBookings] = useState([]);
@@ -2404,7 +2420,7 @@ import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
-const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const ReservationForm = ({ 
     selectedRoom, // Passed from visual grid (Customer Mode)
@@ -4139,7 +4155,7 @@ import { useNavigate } from 'react-router-dom';
 import logo from '../../../assets/images/goldenbaylogo.svg';
 
 // --- ADDED DYNAMIC BACKEND URL ---
-const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
@@ -4310,7 +4326,7 @@ import { Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import heroimage from '../../../assets/images/heroimage2.webp'; // Or a dedicated news banner
 
-const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const NewsPage = () => {
   const [posts, setPosts] = useState([]);
@@ -4449,7 +4465,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Calendar, ArrowLeft } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 
-const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const SinglePostPage = () => {
   const { slug } = useParams();
@@ -4540,7 +4556,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const MarketingManager = () => {
   const [posts, setPosts] = useState([]);
@@ -4642,7 +4658,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '../../../utils/axiosInstance';
 import { Save, X, Image as ImageIcon, Layout, Type } from 'lucide-react';
 
-const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const PostEditor = () => {
   const { id } = useParams();
@@ -5087,7 +5103,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, Phone, Mail, Trash2, ArrowUpDown, X, User, StickyNote } from 'lucide-react';
 import { FaWeixin, FaViber, FaWhatsapp, FaTelegram } from 'react-icons/fa';
 
-const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const PhoneBookPage = () => {
   const [customers, setCustomers] = useState([]);
@@ -5645,7 +5661,7 @@ import { Link } from 'react-router-dom';
 import { Users, Mic2, Tv, Armchair, Star } from 'lucide-react'; 
 import heroimage from '../../../assets/images/heroimage4.webp'; // Using same hero as Menu for consistency
 
-const BACKEND_URL = import.meta.env.PROD ? "https://goldenbay.com.ph" : "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const VIPRoomsPage = () => {
   const [rooms, setRooms] = useState([]);
@@ -6274,4 +6290,4 @@ Disallow: /staff/
 Disallow: /login/
 Allow: /
 
-Sitemap: https://goldenbay.com.ph/sitemap.xmla
+Sitemap: https://goldenbay.com.ph/sitemap.xml
