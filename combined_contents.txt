@@ -1683,7 +1683,10 @@ export default AdminDashboardPage;
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import logo from '../../../assets/images/goldenbaylogo2.svg';
+// 1. IMPORT A POSTER IMAGE (This loads instantly while video buffers)
+import posterImg from '../../../assets/images/golden_bay_cover.webp'; 
 
 const HomePage = () => {
   const containerVariants = {
@@ -1702,16 +1705,47 @@ const HomePage = () => {
   };
 
   return (
-    // FORCE DARK BACKGROUND
     <div className="relative flex flex-col items-center justify-center h-screen bg-black overflow-hidden">
       
-      {/* Background Video */}
+      <Helmet>
+        <title>Golden Bay | Premium Seafood & Chinese Restaurant in Pasay</title>
+        <meta name="description" content="Experience luxury Chinese dining and live seafood at Golden Bay Restaurant. Located at Diosdado Macapagal Blvd, Pasay City. Book your VIP room today!" />
+        <meta name="keywords" content="seafood restaurant pasay, chinese restaurant manila, VIP dining rooms manila, live seafood, dimsum, golden bay macapagal" />
+        
+        <script type="application/ld+json">
+          {`
+            {
+              "@context": "https://schema.org",
+              "@type": "Restaurant",
+              "name": "Golden Bay Fresh Seafood Restaurant",
+              "image": "https://goldenbay.com.ph/static/images/golden_bay_cover.webp",
+              "@id": "https://goldenbay.com.ph",
+              "url": "https://goldenbay.com.ph",
+              "telephone": "+63288040332",
+              "address": {
+                "@type": "PostalAddress",
+                "streetAddress": "Lot 3&4 Block A2, CBP, Diosdado Macapagal Blvd",
+                "addressLocality": "Pasay City",
+                "addressRegion": "Metro Manila",
+                "postalCode": "1300",
+                "addressCountry": "PH"
+              },
+              "servesCuisine": ["Chinese", "Seafood"],
+              "priceRange": "$$$"
+            }
+          `}
+        </script>
+      </Helmet>
+
+      {/* 2. UPDATE VIDEO TAG: Add 'poster' and 'preload="auto"' */}
       <video
         autoPlay
         loop
         muted
         playsInline
-        className="absolute z-0 w-auto min-w-full min-h-full max-w-none object-cover pointer-events-none"
+        preload="auto"
+        poster={posterImg}
+        className="absolute z-0 w-auto min-w-full min-h-full max-w-none object-cover pointer-events-none transition-opacity duration-1000"
       >
         <source src="/videos/hero-background.mp4" type="video/mp4" />
       </video>

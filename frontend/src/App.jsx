@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import ProtectedRoute from './components/layout/ProtectedRoute';
+import ScrollToTop from './components/layout/ScrollToTop';
 
 // --- LAZY LOAD PUBLIC PAGES ---
 const HomePage = lazy(() => import('./pages/public/home/HomePage'));
@@ -27,6 +28,7 @@ const MarketingManager = lazy(() => import('./pages/admin/marketing/MarketingMan
 const PostEditor = lazy(() => import('./pages/admin/marketing/PostEditor')); 
 const PhoneBookPage = lazy(() => import('./pages/admin/customers/PhoneBookPage')); 
 
+
 // Premium Loading Fallback while splitting code
 const PageLoader = () => (
   <div className="min-h-screen bg-cream-50 flex items-center justify-center text-gold-600 font-serif tracking-widest uppercase animate-pulse">
@@ -38,6 +40,7 @@ function App() {
   return (
     <HelmetProvider>
     <Router>
+      <ScrollToTop />
       <div className="w-full min-h-screen font-sans bg-gray-50 text-gray-900">
         
         <Toaster 
