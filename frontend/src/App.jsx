@@ -11,6 +11,7 @@ const HomePage = lazy(() => import('./pages/public/home/HomePage'));
 const MenuPage = lazy(() => import('./pages/public/menu/MenuPage'));
 const ReservationPage = lazy(() => import('./pages/public/reservations/ReservationPage'));
 const AboutPage = lazy(() => import('./pages/public/about/AboutPage')); 
+const ContactPage = lazy(() => import('./pages/public/contact/ContactPage'));
 const NewsPage = lazy(() => import('./pages/public/marketing/NewsPage'));
 const SinglePostPage = lazy(() => import('./pages/public/marketing/SinglePostPage'));
 const EventInquiriesPage = lazy(() => import('./pages/public/events/EventInquiriesPage'));
@@ -68,6 +69,7 @@ function App() {
             <Route path="/news/:slug" element={<><Navbar /><SinglePostPage /><Footer /></>} />
             <Route path="/promotions" element={<><Navbar /><NewsPage /><Footer /></>} />
             <Route path="/vip-rooms" element={<><Navbar /><VIPRoomsPage /><Footer /></>} />
+            <Route path="/contact" element={<><Navbar /><ContactPage /><Footer /></>} />
             
             <Route path="/login" element={<LoginPage />} />
 
