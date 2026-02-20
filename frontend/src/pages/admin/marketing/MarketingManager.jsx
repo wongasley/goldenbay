@@ -46,9 +46,11 @@ const MarketingManager = () => {
         </Link>
       </div>
 
-      {/* 2. COMPACT TABLE */}
-      <div className="bg-white border border-gray-200 rounded overflow-hidden shadow-sm">
-        <table className="w-full text-left min-w-[600px]">
+      {/* 2. RESPONSIVE DATA DISPLAY */}
+      
+      {/* --- DESKTOP VIEW (TABLE) --- */}
+      <div className="hidden md:block bg-white border border-gray-200 rounded overflow-hidden shadow-sm">
+        <table className="w-full text-left">
             <thead className="bg-gray-50 border-b border-gray-200 text-gray-400 uppercase tracking-widest text-[10px] font-bold">
                 <tr>
                     <th className="px-4 py-2.5">Title</th>
@@ -90,6 +92,46 @@ const MarketingManager = () => {
                 )}
             </tbody>
         </table>
+      </div>
+
+      {/* --- MOBILE VIEW (CARDS) --- */}
+      <div className="md:hidden flex flex-col gap-3">
+          {loading ? (
+              <div className="p-8 text-center text-gray-400 animate-pulse text-xs">Loading posts...</div>
+          ) : posts.length === 0 ? (
+              <div className="p-8 text-center text-gray-400 bg-white border border-gray-200 rounded text-xs">No posts found.</div>
+          ) : (
+              posts.map(post => (
+                  <div key={post.id} className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm flex flex-col gap-3">
+                      <div className="flex justify-between items-start gap-4">
+                          <h3 className="font-bold text-gray-900 text-base leading-snug">{post.title}</h3>
+                          {post.is_active ? (
+                              <span className="shrink-0 text-green-600 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 mt-1">
+                                  <span className="w-2 h-2 bg-green-500 rounded-full"></span> Live
+                              </span> 
+                          ) : (
+                              <span className="shrink-0 text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-1">Draft</span>
+                          )}
+                      </div>
+                      
+                      <div className="flex items-center justify-between mt-2 pt-3 border-t border-gray-100">
+                          <span className={`px-2 py-1 rounded text-[9px] font-bold uppercase tracking-widest border
+                                  ${post.type === 'PROMO' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                              {post.type === 'PROMO' ? 'Promotion' : 'News'}
+                          </span>
+                          
+                          <div className="flex justify-end gap-2">
+                              <Link to={`/staff/marketing/edit/${post.id}`} className="bg-gray-50 border border-gray-200 p-2.5 rounded-md text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+                                  <Edit2 size={16} />
+                              </Link>
+                              <button onClick={() => handleDelete(post.id)} className="bg-gray-50 border border-gray-200 p-2.5 rounded-md text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors">
+                                  <Trash2 size={16} />
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+              ))
+          )}
       </div>
     </div>
   );

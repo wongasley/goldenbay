@@ -161,13 +161,13 @@ const PhoneBookPage = () => {
         </div>
       </div>
 
-      {/* 2. COMPACT DENSE LIST */}
+      {/* 2. RESPONSIVE LIST / CARDS */}
       {loading ? (
           <div className="p-8 text-center text-gray-400 animate-pulse text-xs">Loading contacts...</div>
       ) : (
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-3">
             {filtered.length === 0 ? (
-                <div className="text-center py-10 text-gray-400 text-xs">
+                <div className="text-center py-10 bg-white border border-gray-200 rounded text-gray-400 text-xs">
                     No customers found matching your criteria.
                 </div>
             ) : (
@@ -175,48 +175,42 @@ const PhoneBookPage = () => {
                     <div 
                         key={c.id} 
                         onClick={() => openEdit(c)}
-                        className="bg-white px-4 py-2.5 rounded border border-gray-200 shadow-sm hover:bg-gold-50 hover:border-gold-300 transition-all group cursor-pointer flex items-center justify-between"
+                        className="bg-white p-4 md:px-6 rounded-lg border border-gray-200 shadow-sm hover:border-gold-400 transition-all group cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4"
                     >
-                        {/* Name & Badge */}
-                        <div className="flex items-center gap-3 w-1/3">
-                            <div className="w-7 h-7 rounded bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-xs flex-shrink-0">
+                        {/* Avatar & Info Container */}
+                        <div className="flex items-start md:items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-gold-50 border border-gold-100 flex items-center justify-center text-gold-600 font-bold text-lg shrink-0">
                                 {c.name.charAt(0).toUpperCase()}
                             </div>
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <h3 className="font-bold text-sm text-gray-900 line-clamp-1">{c.name}</h3>
+                            
+                            <div className="flex flex-col gap-1 text-left">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h3 className="font-bold text-gray-900 text-base">{c.name}</h3>
                                     {c.notes && c.notes.toLowerCase().includes('vip') && (
-                                        <span className="bg-gold-100 text-gold-700 text-[9px] font-bold px-1.5 py-0.5 rounded border border-gold-200">VIP</span>
+                                        <span className="bg-gold-100 text-gold-700 text-[10px] font-bold px-2 py-0.5 rounded border border-gold-200 uppercase tracking-widest">VIP</span>
                                     )}
                                 </div>
-                                <p className="text-[10px] text-gray-400 font-medium">Added: {new Date(c.created_at).toLocaleDateString()}</p>
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs text-gray-500 font-mono">
+                                    <span className="flex items-center gap-1.5"><Phone size={12} className="text-gray-400"/> {c.phone}</span>
+                                    {c.email && <span className="flex items-center gap-1.5"><Mail size={12} className="text-gray-400"/> <span className="truncate max-w-[150px] sm:max-w-none">{c.email}</span></span>}
+                                </div>
                             </div>
                         </div>
 
-                        {/* Phone */}
-                        <div className="w-1/5 flex items-center gap-2 text-xs font-medium text-gray-600 font-mono">
-                            <Phone size={12} className="text-gray-400"/> {c.phone}
-                        </div>
-
-                        {/* Email */}
-                        <div className="w-1/4 flex items-center gap-2 text-xs text-gray-500 truncate">
-                            {c.email ? <><Mail size={12} className="text-gray-400"/> {c.email}</> : <span className="text-gray-300 italic">- No Email -</span>}
-                        </div>
-
-                        {/* Actions & Socials */}
-                        <div className="flex items-center justify-end gap-4 w-auto">
-                            <div className="flex gap-1.5">
-                                {c.wechat && <FaWeixin className="text-green-600" size={14} title="WeChat"/>}
-                                {c.viber && <FaViber className="text-purple-600" size={14} title="Viber"/>}
-                                {c.whatsapp && <FaWhatsapp className="text-green-500" size={14} title="WhatsApp"/>}
-                                {c.telegram && <FaTelegram className="text-blue-500" size={14} title="Telegram"/>}
+                        {/* Actions & Socials (Moves to bottom on mobile, right on desktop) */}
+                        <div className="flex items-center justify-between md:justify-end gap-6 pt-3 md:pt-0 border-t md:border-t-0 border-gray-100 w-full md:w-auto">
+                            <div className="flex gap-2">
+                                {c.wechat && <FaWeixin className="text-green-600 bg-green-50 p-1.5 rounded-full" size={26} title="WeChat"/>}
+                                {c.viber && <FaViber className="text-purple-600 bg-purple-50 p-1.5 rounded-full" size={26} title="Viber"/>}
+                                {c.whatsapp && <FaWhatsapp className="text-green-500 bg-green-50 p-1.5 rounded-full" size={26} title="WhatsApp"/>}
+                                {c.telegram && <FaTelegram className="text-blue-500 bg-blue-50 p-1.5 rounded-full" size={26} title="Telegram"/>}
                             </div>
                             <button 
                                 onClick={(e) => handleDelete(c.id, e)} 
-                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                className="p-2 bg-gray-50 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors md:opacity-0 group-hover:opacity-100"
                                 title="Delete Client"
                             >
-                                <Trash2 size={14}/>
+                                <Trash2 size={16}/>
                             </button>
                         </div>
                     </div>

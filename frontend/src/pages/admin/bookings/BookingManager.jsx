@@ -8,6 +8,7 @@ const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.
 const BookingManager = () => {
   const [bookings, setBookings] = useState([]);
   const [filter, setFilter] = useState('ALL'); 
+  const [dateFilter, setDateFilter] = useState('');
   const [showManualForm, setShowManualForm] = useState(false);
 
   const fetchBookings = async () => {
@@ -58,7 +59,11 @@ const BookingManager = () => {
     });
   };
 
-  const filteredBookings = bookings.filter(b => filter === 'ALL' ? true : b.status === filter);
+  const filteredBookings = bookings.filter(b => {
+      const matchesStatus = filter === 'ALL' ? true : b.status === filter;
+      const matchesDate = dateFilter === '' ? true : b.date === dateFilter;
+      return matchesStatus && matchesDate;
+  });
   const isStale = (bookingDate, status) => {
     if (status !== 'PENDING') return false;
     const diffInHours = (new Date() - new Date(bookingDate)) / 1000 / 60 / 60;
@@ -83,23 +88,41 @@ const BookingManager = () => {
       </div>
 
       {/* 2. FILTERS */}
-      <div className="flex gap-1.5">
-        {['ALL', 'PENDING', 'CONFIRMED', 'CANCELLED'].map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded transition-all border ${
-              filter === f ? 'bg-gray-900 text-white border-gray-900 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50 hover:text-gray-900'
-            }`}
-          >
-            {f}
-          </button>
-        ))}
+      <div className="flex flex-col sm:flex-row justify-between gap-4">
+          <div className="flex flex-wrap gap-1.5">
+            {['ALL', 'PENDING', 'CONFIRMED', 'CANCELLED'].map(f => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded transition-all border ${
+                  filter === f ? 'bg-gray-900 text-white border-gray-900 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+          
+          {/* NEW DATE FILTER */}
+          <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Date:</span>
+              <input 
+                  type="date" 
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="text-xs border border-gray-200 rounded p-1.5 outline-none focus:border-gold-500 text-gray-700"
+              />
+              {dateFilter && (
+                  <button onClick={() => setDateFilter('')} className="text-[10px] text-gray-400 hover:text-red-500 font-bold uppercase">Clear</button>
+              )}
+          </div>
       </div>
 
-      {/* 3. COMPACT TABLE */}
-      <div className="bg-white border border-gray-200 rounded overflow-hidden shadow-sm">
-        <table className="w-full text-left min-w-[600px]"> {/* ADD min-w-[600px] HERE */}
+      {/* 3. RESPONSIVE DATA DISPLAY */}
+      
+      {/* --- DESKTOP VIEW (TABLE) --- */}
+      <div className="hidden md:block bg-white border border-gray-200 rounded overflow-hidden shadow-sm">
+        <table className="w-full text-left">
           <thead className="bg-gray-50 border-b border-gray-200 text-gray-400 uppercase tracking-widest text-[10px] font-bold">
             <tr>
               <th className="px-4 py-2.5">ID</th>
@@ -157,6 +180,60 @@ const BookingManager = () => {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* --- MOBILE VIEW (CARDS) --- */}
+      <div className="md:hidden flex flex-col gap-4">
+        {filteredBookings.length === 0 ? (
+            <div className="p-8 text-center text-gray-400 bg-white border border-gray-200 rounded">No bookings found.</div>
+        ) : (
+            filteredBookings.map((b) => (
+                <div key={b.id} className={`bg-white border rounded-lg p-5 shadow-sm relative overflow-hidden ${isStale(b.created_at, b.status) ? 'border-red-300' : 'border-gray-200'}`}>
+                    {/* Left Red Indicator for Stale Bookings */}
+                    {isStale(b.created_at, b.status) && <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>}
+                    
+                    <div className="flex justify-between items-start mb-3">
+                        <div>
+                            <h3 className="font-bold text-gray-900 text-lg">{b.customer_name}</h3>
+                            <span className="text-xs text-gray-500 font-mono flex items-center gap-1.5 mt-1"><Phone size={12}/> {b.customer_contact}</span>
+                        </div>
+                        <span className={`px-2 py-1 rounded text-[9px] font-bold uppercase tracking-widest border inline-block ${
+                            b.status === 'PENDING' ? 'text-yellow-700 bg-yellow-50 border-yellow-200' :
+                            b.status === 'CONFIRMED' ? 'text-green-700 bg-green-50 border-green-200' :
+                            'text-red-700 bg-red-50 border-red-200'
+                        }`}>
+                            {b.status}
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 my-4 text-sm bg-gray-50 p-3 rounded border border-gray-100">
+                        <div>
+                            <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Date & Time</p>
+                            <p className="font-bold text-gray-900">{b.date}</p>
+                            <p className="text-xs text-gray-600">{b.time} ({b.session})</p>
+                        </div>
+                        <div>
+                            <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Details</p>
+                            <p className="font-bold text-gray-900 line-clamp-1">{b.room_name || 'Main Hall'}</p>
+                            <p className="text-xs text-gray-600">{b.pax} Guests</p>
+                        </div>
+                    </div>
+
+                    {b.status !== 'CANCELLED' && (
+                        <div className="flex gap-2 mt-4">
+                            {b.status === 'PENDING' && (
+                                <button onClick={() => updateStatus(b.id, 'CONFIRMED')} className="flex-1 bg-green-600 text-white py-3 rounded-md text-xs font-bold uppercase tracking-widest hover:bg-green-700 flex justify-center items-center gap-2 shadow-sm transition-colors">
+                                    <Check size={16} /> Confirm
+                                </button>
+                            )}
+                            <button onClick={() => updateStatus(b.id, 'CANCELLED')} className="flex-1 bg-red-50 text-red-700 py-3 rounded-md text-xs font-bold uppercase tracking-widest border border-red-200 hover:bg-red-100 flex justify-center items-center gap-2 transition-colors">
+                                <X size={16} /> Cancel
+                            </button>
+                        </div>
+                    )}
+                </div>
+            ))
+        )}
       </div>
 
       {showManualForm && (
