@@ -101,6 +101,7 @@ FILES_TO_READ = [
     'frontend/src/pages/public/events/EventInquiriesPage.jsx',
     'frontend/public/sitemap.xml',
     'frontend/public/robots.txt',
+    'frontend/src/pages/public/contact/ContactPage.jsx',
     
 ]
 

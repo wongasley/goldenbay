@@ -1,4 +1,5 @@
 from rest_framework import generics
+from django.http import HttpResponse
 from .models import Post
 from .serializers import PostSerializer
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -34,3 +35,45 @@ class AdminPostDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
     lookup_field = 'id'
     parser_classes = [MultiPartParser, FormParser]
+
+def dynamic_sitemap(request):
+    """Generates an XML sitemap on the fly including all active posts"""
+    posts = Post.objects.filter(is_active=True).order_by('-created_at')
+    
+    # 1. Your static React routes
+    static_pages = [
+        ('/', '1.0', 'weekly'),
+        ('/menu', '0.9', 'weekly'),
+        ('/reservations', '0.8', 'monthly'),
+        ('/events', '0.8', 'monthly'),
+        ('/vip-rooms', '0.8', 'monthly'),
+        ('/contact', '0.8', 'monthly'), # Added your new Contact page!
+        ('/news', '0.7', 'daily'),
+        ('/about', '0.6', 'yearly'),
+    ]
+    
+    base_url = "https://goldenbay.com.ph"
+    
+    xml = ['<?xml version="1.0" encoding="UTF-8"?>']
+    xml.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+    
+    # Add Static Pages
+    for path, priority, changefreq in static_pages:
+        xml.append('  <url>')
+        xml.append(f'    <loc>{base_url}{path}</loc>')
+        xml.append(f'    <changefreq>{changefreq}</changefreq>')
+        xml.append(f'    <priority>{priority}</priority>')
+        xml.append('  </url>')
+        
+    # Add Dynamic Blog/Promo Posts
+    for post in posts:
+        xml.append('  <url>')
+        xml.append(f'    <loc>{base_url}/news/{post.slug}</loc>')
+        xml.append(f'    <lastmod>{post.created_at.strftime("%Y-%m-%d")}</lastmod>')
+        xml.append('    <changefreq>weekly</changefreq>')
+        xml.append('    <priority>0.7</priority>')
+        xml.append('  </url>')
+        
+    xml.append('</urlset>')
+    
+    return HttpResponse('\n'.join(xml), content_type='application/xml')

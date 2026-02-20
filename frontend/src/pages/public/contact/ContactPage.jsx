@@ -96,7 +96,7 @@ const ContactPage = () => {
         {/* RIGHT COLUMN: Google Map */}
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="w-full h-[500px] lg:h-full min-h-[500px] bg-gray-200 border border-gray-200 rounded-sm overflow-hidden shadow-lg p-2">
           <iframe 
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3861.884178667683!2d120.9859553!3d14.5429188!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397cb2475659837%3A0x6a2c2628fb656db0!2sGolden%20Bay%20Fresh%20Seafoods%20Restaurant!5e0!3m2!1sen!2sph!4v1700000000000!5m2!1sen!2sph" 
+            src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d3862.161342953903!2d120.9899011!3d14.5327621!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397c95666ea03b3%3A0xd54670ba0bd98353!2sGolden%20Bay%20Fresh%20Seafoods%20Restaurant!5e0!3m2!1sen!2sph!4v1771614810044!5m2!1sen!2sph" 
             width="100%" 
             height="100%" 
             style={{ border: 0 }} 
