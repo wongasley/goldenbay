@@ -97,6 +97,12 @@ def send_notifications_task(reservation):
                 html_message=customer_html,
                 fail_silently=False,
             )
+
+        contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
+        if len(contact_digits) >= 10:
+             sms_body = f"Hi {reservation.customer_name}, we received your booking request for {reservation.pax} pax on {reservation.date.strftime('%b %d')}. Our team is reviewing availability and will confirm shortly. - GOLDENBAY"
+             send_sms(reservation.customer_contact, sms_body)
+
     except Exception as e:
         # If email fails, print to server logs but don't break the customer's screen
         print(f"SMTP Email Error: {e}")
@@ -172,6 +178,15 @@ def send_admin_update_notifications(reservation, new_status):
                 html_message=html_message
             )
             
+        contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
+        if len(contact_digits) >= 10:
+             if new_status == 'CONFIRMED':
+                 sms_body = f"Great news, {reservation.customer_name}! Your table for {reservation.pax} on {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')} is CONFIRMED. See you soon! - GOLDENBAY"
+                 send_sms(reservation.customer_contact, sms_body)
+             elif new_status == 'CANCELLED':
+                 sms_body = f"Hi {reservation.customer_name}, your reservation request has been cancelled. Please call (02) 8804-0332 to reschedule. - GOLDENBAY"
+                 send_sms(reservation.customer_contact, sms_body)
+                 
     except Exception as e:
         print(f"⚠️ Notification Error for ID {reservation.id}: {e}")
 
