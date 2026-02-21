@@ -166,7 +166,7 @@ const ReservationPage = () => {
         </div>
         <div className="relative z-10 text-center">
           <Link to="/" className="text-xs tracking-[0.4em] uppercase mb-6 text-white hover:text-gold-400 transition-colors block">← Back to Experience</Link>
-          <h1 className="text-5xl md:text-5xl font-serif tracking-widest uppercase text-white drop-shadow-md">Reservations</h1>
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif tracking-widest uppercase text-white drop-shadow-md">Reservations</h1>
           <div className="h-[1px] w-24 bg-gold-400 mt-8 mx-auto"></div>
         </div>
       </div>

@@ -1,12 +1,12 @@
 import React, { Suspense, lazy } from 'react';
 import { HelmetProvider } from 'react-helmet-async';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import ScrollToTop from './components/layout/ScrollToTop';
-import FloatingWidget from './components/layout/FloatingWidget';
+import FloatingWidget from './components/layout/FloatingWidget'; 
 
 // --- LAZY LOAD PUBLIC PAGES ---
 const HomePage = lazy(() => import('./pages/public/home/HomePage'));
@@ -29,7 +29,6 @@ const MarketingManager = lazy(() => import('./pages/admin/marketing/MarketingMan
 const PostEditor = lazy(() => import('./pages/admin/marketing/PostEditor')); 
 const PhoneBookPage = lazy(() => import('./pages/admin/customers/PhoneBookPage')); 
 
-
 // Premium Loading Fallback while splitting code
 const PageLoader = () => (
   <div className="min-h-screen bg-cream-50 flex items-center justify-center text-gold-600 font-serif tracking-widest uppercase animate-pulse">
@@ -42,7 +41,7 @@ function App() {
     <HelmetProvider>
     <Router>
       <ScrollToTop />
-      <div className="w-full min-h-screen font-sans bg-gray-50 text-gray-900">
+      <div className="w-full min-h-screen font-sans bg-gray-50 text-gray-900 relative">
         
         <Toaster 
           position="top-center"
@@ -91,7 +90,10 @@ function App() {
             
           </Routes>
         </Suspense>
+
+        {/* Widget Component (Old manual widget was removed from here) */}
         <FloatingWidget />
+
       </div>
     </Router>
     </HelmetProvider>
