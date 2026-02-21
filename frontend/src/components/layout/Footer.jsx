@@ -15,12 +15,20 @@ const Footer = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-20">
           
-          <div className="md:col-span-5 space-y-8">
-             <img src={logo} alt="Golden Bay Logo" className="h-20 w-auto opacity-90" />
-             <div className={`space-y-2 text-gray-400 text-sm font-light tracking-wide leading-relaxed ${getFontClass()}`}>
-               <p className="uppercase tracking-widest text-gold-500 text-xs font-bold mb-4">Golden Bay Fresh Seafood Restaurant</p>
-               <p>{t('footer.address')}</p>
-             </div>
+          <div className="md:col-span-5 space-y-6"> {/* Increased spacing between logo and text */}
+            <img src={logo} alt="Golden Bay Logo" className="h-16 w-auto opacity-90" />
+            
+            <div className={`space-y-4 text-gray-400 text-sm font-light tracking-wide leading-relaxed ${getFontClass()}`}>
+              <p className="uppercase tracking-[0.2em] text-gold-500 text-[11px] font-bold">
+                Golden Bay Fresh Seafood Restaurant
+              </p>
+              
+              {/* Split the address for better visual hierarchy */}
+              <div className="max-w-xs space-y-1 opacity-80">
+                <p>Lot 3&4 Block A2, Diosdado Macapagal Blvd,</p>
+                <p>CBP, Pasay City, Metro Manila</p>
+              </div>
+            </div>
           </div>
 
           <div className="md:col-span-3">
