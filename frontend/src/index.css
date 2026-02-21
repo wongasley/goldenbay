@@ -51,6 +51,21 @@
   font-style: normal;
 }
 
+/* Traditional Chinese Fonts */
+@font-face {
+  font-family: 'Noto Serif TC';
+  src: url('./assets/fonts/NotoSerifTC-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Noto Serif TC';
+  src: url('./assets/fonts/NotoSerifTC-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+}
+
 /* 3. Global Styles */
 @tailwind base;
 @tailwind components;

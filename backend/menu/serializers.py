@@ -4,7 +4,7 @@ from .models import Category, MenuItem, MenuItemPrice, CookingMethod
 class CookingMethodSerializer(serializers.ModelSerializer):
     class Meta:
         model = CookingMethod
-        fields = ['id', 'name', 'name_zh']
+        fields = ['id', 'name', 'name_zh', 'name_zh_hant', 'name_ja', 'name_ko']
 
 class MenuItemPriceSerializer(serializers.ModelSerializer):
     class Meta:
@@ -18,7 +18,7 @@ class MenuItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MenuItem
-        fields = ['id', 'code', 'name', 'name_zh', 'description', 'image', 'is_available', 'prices', 'cooking_methods']
+        fields = ['id', 'code', 'name', 'name_zh', 'name_zh_hant', 'name_ja', 'name_ko', 'description', 'image', 'is_available', 'prices', 'cooking_methods']
 
     def get_image(self, obj):
         if obj.image:
@@ -30,4 +30,4 @@ class CategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category
-        fields = ['id', 'name', 'name_zh', 'items']
+        fields = ['id', 'name', 'name_zh', 'name_zh_hant', 'name_ja', 'name_ko', 'items']

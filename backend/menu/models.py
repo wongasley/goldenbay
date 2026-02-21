@@ -2,7 +2,10 @@ from django.db import models
 
 class Category(models.Model):
     name = models.CharField(max_length=100)
-    name_zh = models.CharField(max_length=100, blank=True, null=True, verbose_name="Chinese Name")
+    name_zh = models.CharField(max_length=100, blank=True, null=True, verbose_name="Simplified Chinese")
+    name_zh_hant = models.CharField(max_length=100, blank=True, null=True, verbose_name="Traditional Chinese")
+    name_ja = models.CharField(max_length=100, blank=True, null=True, verbose_name="Japanese")
+    name_ko = models.CharField(max_length=100, blank=True, null=True, verbose_name="Korean")
     order = models.IntegerField(default=0)
 
     class Meta:
@@ -15,6 +18,9 @@ class Category(models.Model):
 class CookingMethod(models.Model):
     name = models.CharField(max_length=100)
     name_zh = models.CharField(max_length=100, blank=True, null=True)
+    name_zh_hant = models.CharField(max_length=100, blank=True, null=True)
+    name_ja = models.CharField(max_length=100, blank=True, null=True)
+    name_ko = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -22,8 +28,14 @@ class CookingMethod(models.Model):
 class MenuItem(models.Model):
     category = models.ForeignKey(Category, related_name='items', on_delete=models.CASCADE)
     code = models.CharField(max_length=20, blank=True, null=True, help_text="e.g., BA01")
+    
+    # Translations
     name = models.CharField(max_length=200)
-    name_zh = models.CharField(max_length=200, blank=True, null=True, verbose_name="Chinese Name")
+    name_zh = models.CharField(max_length=200, blank=True, null=True, verbose_name="Simplified Chinese")
+    name_zh_hant = models.CharField(max_length=200, blank=True, null=True, verbose_name="Traditional Chinese")
+    name_ja = models.CharField(max_length=200, blank=True, null=True, verbose_name="Japanese")
+    name_ko = models.CharField(max_length=200, blank=True, null=True, verbose_name="Korean")
+    
     description = models.TextField(blank=True, null=True)
     image = models.ImageField(upload_to='menu_items/', blank=True, null=True)
     is_available = models.BooleanField(default=True)

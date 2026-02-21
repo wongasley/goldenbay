@@ -26,7 +26,10 @@ export default {
         sans: ['Quicksand', 'sans-serif'],
         serif: ['Playfair Display', 'serif'],
         erupha: ['"The Erupha"', 'serif'],
-        chinese: ['"Noto Serif SC"', 'sans-serif'],
+        chinese: ['"Noto Serif SC"', 'sans-serif'], // Simplified
+        chinese_traditional: ['"Noto Serif TC"', 'sans-serif'], // Traditional
+        japanese: ['"Noto Serif JP"', 'serif'], // Fallback to system serif
+        korean: ['"Noto Serif KR"', 'serif'], // Fallback to system serif
         },
     },
   },
