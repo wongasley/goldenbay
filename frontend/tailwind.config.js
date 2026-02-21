@@ -28,8 +28,8 @@ export default {
         erupha: ['"The Erupha"', 'serif'],
         chinese: ['"Noto Serif SC"', 'sans-serif'], // Simplified
         chinese_traditional: ['"Noto Serif TC"', 'sans-serif'], // Traditional
-        japanese: ['"Noto Serif JP"', 'serif'], // Fallback to system serif
-        korean: ['"Noto Serif KR"', 'serif'], // Fallback to system serif
+        japanese: ['"Noto Sans JP"', 'sans-serif'], // Updated!
+        korean: ['"Noto Sans KR"', 'sans-serif'], // Updated!
         },
     },
   },
