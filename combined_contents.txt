@@ -1421,14 +1421,30 @@ h2 {
 
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <meta name="theme-color" content="#0a0a0a" /> <script async src="https://www.googletagmanager.com/gtag/js?id=G-RCENXX7WNK"></script>
+    <meta name="theme-color" content="#0a0a0a" /> 
+    
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RCENXX7WNK"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
       gtag('config', 'G-RCENXX7WNK');
     </script>
-  </head>
+
+    <script>
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', 'YOUR_PIXEL_ID_HERE'); // We will replace this with your actual ID later if needed, but the structure is ready
+      fbq('track', 'PageView');
+    </script>
+    <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=YOUR_PIXEL_ID_HERE&ev=PageView&noscript=1" /></noscript>
+    </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
@@ -2228,6 +2244,17 @@ const ReservationPage = () => {
     }
   }, [selectedRoom]);
 
+  useEffect(() => {
+    if (submitStatus === 'success') {
+      if (window.fbq) {
+        window.fbq('track', 'Schedule', {
+          content_category: bookingType, // 'VIP' or 'HALL'
+          num_items: formData.pax // Track how many people they booked for
+        });
+      }
+    }
+  }, [submitStatus, bookingType, formData.pax]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -2286,7 +2313,7 @@ const ReservationPage = () => {
       </div>
     );
   }
-
+  
   if (submitStatus === 'success') {
       return (
           <div className="min-h-screen bg-cream-50 flex flex-col items-center justify-center text-gray-900 text-center p-8 pt-24">

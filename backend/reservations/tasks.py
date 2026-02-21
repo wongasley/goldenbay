@@ -35,7 +35,7 @@ def send_new_booking_notifications(reservation_id):
             subject=f'New Booking Request: {reservation.customer_name}',
             message=admin_plain,
             from_email=settings.EMAIL_HOST_USER,
-            recipient_list=['goldenbay.marketing@gmail.com'], 
+            recipient_list=['marketing@goldenbay.com.ph'], 
             html_message=admin_html,
             fail_silently=False,
         )

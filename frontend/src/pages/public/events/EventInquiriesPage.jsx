@@ -124,13 +124,13 @@ const EventInquiriesPage = () => {
                 </a>
 
                 {/* Email */}
-                <a href="mailto:goldenbay.marketing@gmail.com" className="group flex items-center gap-6 p-5 rounded-sm border border-gray-200 hover:border-gold-400 hover:shadow-md transition-all bg-gray-50 hover:bg-white">
+                <a href="mailto:marketing@goldenbay.com.ph" className="group flex items-center gap-6 p-5 rounded-sm border border-gray-200 hover:border-gold-400 hover:shadow-md transition-all bg-gray-50 hover:bg-white">
                   <div className="text-gold-600 group-hover:scale-110 transition-transform">
                     <Mail size={24} />
                   </div>
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Email Inquiries</p>
-                    <p className="text-sm font-medium text-gray-900">goldenbay.marketing@gmail.com</p>
+                    <p className="text-sm font-medium text-gray-900">marketing@goldenbay.com.ph</p>
                   </div>
                 </a>
 
