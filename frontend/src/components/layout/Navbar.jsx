@@ -26,12 +26,12 @@ const Navbar = () => {
   }, [isMobileMenuOpen]);
 
   const navLinks = [
-    { name: 'Menu', path: '/menu' },
-    { name: 'Events', path: '/events' },
-    { name: 'News & Promos', path: '/news' },
-    { name: 'Private Rooms', path: '/vip-rooms' },
-    { name: 'About Us', path: '/about' },
-    { name: 'Contact', path: '/contact' },
+    { name: t('nav.menu'), path: '/menu' },
+    { name: t('nav.events'), path: '/events' },
+    { name: t('nav.news'), path: '/news' },
+    { name: t('nav.rooms'), path: '/vip-rooms' },
+    { name: t('nav.about'), path: '/about' },
+    { name: t('nav.contact'), path: '/contact' },
   ];
 
   return (

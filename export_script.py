@@ -108,7 +108,7 @@ FILES_TO_READ = [
     'frontend/src/components/layout/ScrollToTop.jsx',
     'frontend/src/components/layout/FloatingWidget.jsx',
     'frontend/src/context/LanguageContext.jsx',
-    'frontend/src/utils/translations.js',
+    'frontend/src/utils/translations.jsx',
 
 ]
 
