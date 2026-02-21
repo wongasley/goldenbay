@@ -24,12 +24,12 @@ export default {
       },
       fontFamily: {
         sans: ['Quicksand', 'sans-serif'],
-        erupha: ['"TheErupha"', 'serif'],
-        chinese: ['"Noto Serif SC"', 'sans-serif'], 
-        chinese_traditional: ['"Noto Serif TC"', 'sans-serif'], 
-        japanese: ['"Noto Serif JP"', 'sans-serif'], 
-        korean: ['"Noto Serif KR"', 'sans-serif'],
-        },
+        serif: ['TheErupha', 'serif'], // <-- Removed inner double quotes
+        chinese: ['Noto Serif SC', 'sans-serif'], 
+        chinese_traditional: ['Noto Serif TC', 'sans-serif'], 
+        japanese: ['Noto Serif JP', 'sans-serif'], 
+        korean: ['Noto Serif KR', 'sans-serif'],
+      },
     },
   },
   plugins: [

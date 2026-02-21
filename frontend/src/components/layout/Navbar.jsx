@@ -37,7 +37,7 @@ const Navbar = () => {
   return (
     <header className="fixed top-0 w-full z-50 flex flex-col">
       {/* 1. Language Bar */}
-      <div className="w-full bg-black text-gray-400 py-1.5 px-6 flex justify-end items-center gap-3 text-[9px] md:text-[10px] uppercase tracking-widest relative z-[60]">
+      <div className="w-full bg-black text-gray-400 py-1.5 px-6 flex justify-end items-center gap-3 text-[12px] md:text-[14px] uppercase tracking-widest relative z-[60]">
           <Globe size={12} className="text-gold-500" />
           <button onClick={() => setLanguage('en')} className={`transition-colors ${language === 'en' ? 'text-gold-500 font-bold' : 'hover:text-white'}`}>EN</button>
           <span>|</span>
