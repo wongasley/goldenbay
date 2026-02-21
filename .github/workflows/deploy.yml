@@ -27,6 +27,7 @@ jobs:
           
           # 2. Pull Latest Code (Will now abort if git fails)
           git checkout main
+          git reset --hard HEAD
           git pull origin main
           
           # 3. Rebuild Frontend (Happens first so backend can collect the new files)
