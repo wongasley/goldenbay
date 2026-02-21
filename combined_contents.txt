@@ -1283,6 +1283,7 @@ import Footer from './components/layout/Footer';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import ScrollToTop from './components/layout/ScrollToTop';
 import FloatingWidget from './components/layout/FloatingWidget'; 
+import { LanguageProvider } from './context/LanguageContext';
 
 // --- LAZY LOAD PUBLIC PAGES ---
 const HomePage = lazy(() => import('./pages/public/home/HomePage'));
