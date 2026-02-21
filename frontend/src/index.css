@@ -16,7 +16,7 @@
 /* 2. Register Local Playfair Display (Replacing the @import) */
 /* This points to the files in your 'static' folder screenshot */
 @font-face {
-  font-family: 'TheErupha';
+  font-family: 'The Erupha';
   src: url('./assets/fonts/TheErupha.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
