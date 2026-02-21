@@ -30,12 +30,12 @@ jobs:
           git reset --hard HEAD
           git pull origin main
           
-          # 3. Rebuild Frontend (Happens first so backend can collect the new files)
+          # 3. Rebuild Frontend
           echo "🎨 Building Frontend..."
           cd frontend
           npm install --legacy-peer-deps
           npm install react-is --save --legacy-peer-deps
-          npm install react-helmet-async --save
+          npm install react-helmet-async --save --legacy-peer-deps
           npm run build
           
           # 4. Update Backend
