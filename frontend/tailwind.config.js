@@ -26,10 +26,10 @@ export default {
         sans: ['Quicksand', 'sans-serif'],
         serif: ['Playfair Display', 'serif'],
         erupha: ['"The Erupha"', 'serif'],
-        chinese: ['"Noto Serif SC"', 'sans-serif'], // Simplified
-        chinese_traditional: ['"Noto Serif TC"', 'sans-serif'], // Traditional
-        japanese: ['"Noto Sans JP"', 'sans-serif'], // Updated!
-        korean: ['"Noto Sans KR"', 'sans-serif'], // Updated!
+        chinese: ['"Noto Serif SC"', 'sans-serif'], 
+        chinese_traditional: ['"Noto Serif TC"', 'sans-serif'], 
+        japanese: ['"Noto Sans JP"', 'sans-serif'], 
+        korean: ['"Noto Sans KR"', 'sans-serif'],
         },
     },
   },
