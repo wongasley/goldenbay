@@ -74,6 +74,17 @@ const ReservationPage = () => {
     }
   }, [selectedRoom]);
 
+  useEffect(() => {
+    if (submitStatus === 'success') {
+      if (window.fbq) {
+        window.fbq('track', 'Schedule', {
+          content_category: bookingType, // 'VIP' or 'HALL'
+          num_items: formData.pax // Track how many people they booked for
+        });
+      }
+    }
+  }, [submitStatus, bookingType, formData.pax]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -132,7 +143,7 @@ const ReservationPage = () => {
       </div>
     );
   }
-
+  
   if (submitStatus === 'success') {
       return (
           <div className="min-h-screen bg-cream-50 flex flex-col items-center justify-center text-gray-900 text-center p-8 pt-24">
