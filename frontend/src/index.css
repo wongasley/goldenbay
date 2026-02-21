@@ -16,18 +16,26 @@
 /* 2. Register Local Playfair Display (Replacing the @import) */
 /* This points to the files in your 'static' folder screenshot */
 @font-face {
-  font-family: 'TheErupha';
-  src: local('TheErupha'), url('./assets/fonts/TheErupha.otf') format('opentype');
+  font-family: 'Playfair Display';
+  src: local('Playfair Display'), url('./assets/fonts/PlayfairDisplay-Regular.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: 'TheErupha';
-  src: local('TheErupha'), url('./assets/fonts/TheErupha.otf') format('opentype');
+  font-family: 'Playfair Display';
+  src: local('Playfair Display'), url('./assets/fonts/PlayfairDisplay-Bold.ttf') format('truetype');
   font-weight: 700;
   font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Playfair Display';
+  src: local('Playfair Display'), url('./assets/fonts/PlayfairDisplay-Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
   font-display: swap;
 }
 
@@ -123,8 +131,8 @@ body {
 
 /* 4. Heading Specifics */
 h1, h2, h3, h4 {
-  font-family: 'TheErupha', serif;
-  font-weight: normal; /* Let the font breathe naturally, we can use Tailwind classes if we need it bolder */
+  font-family: 'Playfair Display', serif;
+  font-weight: normal; 
 }
 
 h2 {
