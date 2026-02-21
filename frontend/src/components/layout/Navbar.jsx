@@ -35,8 +35,9 @@ const Navbar = () => {
   ];
 
   return (
-    <>
-      <div className="w-full bg-black text-gray-400 py-1.5 px-6 flex justify-end items-center gap-3 text-[9px] md:text-[10px] uppercase tracking-widest z-[60] relative">
+    <header className="fixed top-0 w-full z-50 flex flex-col">
+      {/* 1. Language Bar */}
+      <div className="w-full bg-black text-gray-400 py-1.5 px-6 flex justify-end items-center gap-3 text-[9px] md:text-[10px] uppercase tracking-widest relative z-[60]">
           <Globe size={12} className="text-gold-500" />
           <button onClick={() => setLanguage('en')} className={`transition-colors ${language === 'en' ? 'text-gold-500 font-bold' : 'hover:text-white'}`}>EN</button>
           <span>|</span>
@@ -49,7 +50,8 @@ const Navbar = () => {
           <button onClick={() => setLanguage('ko')} className={`transition-colors ${language === 'ko' ? 'text-gold-500 font-bold' : 'hover:text-white'}`}>KO</button>
       </div>
 
-      <nav className={`fixed top-7 w-full z-50 transition-all duration-300 ${
+      {/* 2. Main Navigation (Removed top-7, it now naturally flows under the language bar) */}
+      <nav className={`w-full transition-all duration-300 ${
         isHomePage && !isMobileMenuOpen
           ? 'bg-black/20 backdrop-blur-sm border-b border-white/5' 
           : 'bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm'
@@ -139,7 +141,7 @@ const Navbar = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </header>
   );
 };
 

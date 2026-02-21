@@ -1,4 +1,3 @@
-# backend/reservations/tasks.py
 from celery import shared_task
 from django.core.mail import send_mail
 from django.conf import settings
@@ -73,7 +72,8 @@ def send_new_booking_notifications(reservation_id):
 
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
         if len(contact_digits) >= 10:
-             sms_body = f"Hi {reservation.customer_name}, we received your booking request for {reservation.pax} pax on {reservation.date.strftime('%b %d')}. Our team is reviewing availability and will confirm shortly. - GOLDENBAY"
+             # UPDATED SMS TEXT HERE
+             sms_body = f"Hi {reservation.customer_name}, we received your booking request for {reservation.pax} pax on {reservation.date.strftime('%b %d')}. Our team is reviewing availability and will confirm during operating hours. - GOLDENBAY"
              send_sms(reservation.customer_contact, sms_body)
 
     except Exception as e:

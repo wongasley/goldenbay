@@ -932,7 +932,6 @@ def send_sms(to_number, body):
     except Exception as e:
         print(f"❌ SMS Network Error: {e}")
 
-# backend/reservations/tasks.py
 from celery import shared_task
 from django.core.mail import send_mail
 from django.conf import settings
@@ -1007,7 +1006,8 @@ def send_new_booking_notifications(reservation_id):
 
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
         if len(contact_digits) >= 10:
-             sms_body = f"Hi {reservation.customer_name}, we received your booking request for {reservation.pax} pax on {reservation.date.strftime('%b %d')}. Our team is reviewing availability and will confirm shortly. - GOLDENBAY"
+             # UPDATED SMS TEXT HERE
+             sms_body = f"Hi {reservation.customer_name}, we received your booking request for {reservation.pax} pax on {reservation.date.strftime('%b %d')}. Our team is reviewing availability and will confirm during operating hours. - GOLDENBAY"
              send_sms(reservation.customer_contact, sms_body)
 
     except Exception as e:
@@ -1588,7 +1588,7 @@ export default {
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Globe } from 'lucide-react';
 import logo from '../../assets/images/goldenbaylogo.svg';
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -6580,6 +6580,56 @@ export const LanguageProvider = ({ children }) => {
 
 export const useLanguage = () => useContext(LanguageContext);
 
+import React, { createContext, useState, useContext, useEffect } from 'react';
+
+const LanguageContext = createContext();
+
+export const LanguageProvider = ({ children }) => {
+    // Load saved language or default to English
+    const [language, setLanguage] = useState(() => localStorage.getItem('siteLang') || 'en');
+
+    useEffect(() => {
+        localStorage.setItem('siteLang', language);
+    }, [language]);
+
+    // Simple nested key translator: t('nav.menu')
+    const t = (key) => {
+        const keys = key.split('.');
+        let result = translations[language];
+        for (const k of keys) {
+            if (!result || result[k] === undefined) return key; // Fallback to key name if missing
+            result = result[k];
+        }
+        return result;
+    };
+
+    // Font dynamic class
+    const getFontClass = () => {
+        switch(language) {
+            case 'zh': return 'font-chinese';
+            case 'zh_hant': return 'font-chinese_traditional';
+            case 'ja': return 'font-japanese';
+            case 'ko': return 'font-korean';
+            default: return 'font-serif';
+        }
+    };
+
+    // Helper to extract translated data from API models
+    const getLocData = (obj, fieldName) => {
+        if (!obj) return "";
+        if (language === 'en') return obj[fieldName];
+        return obj[`${fieldName}_${language}`] || obj[fieldName];
+    };
+
+    return (
+        <LanguageContext.Provider value={{ language, setLanguage, t, getFontClass, getLocData }}>
+            {children}
+        </LanguageContext.Provider>
+    );
+};
+
+export const useLanguage = () => useContext(LanguageContext);
+
 export const translations = {
     en: {
         nav: { menu: "Menu", events: "Events", news: "News & Promos", rooms: "Private Rooms", about: "About Us", contact: "Contact", book: "Book a Table" },
@@ -6591,7 +6641,7 @@ export const translations = {
         vip: { title: "Private Dining", roomType1: "Exclusive Room", roomType2: "Dining Hall", noImage: "No Image", pax: "PAX", seatsLeft: "Seats Left:", maxCap: "Max Capacity:", booked: "Booked", full: "Full", stdSetup: "Standard Setup", ready: "Ready to reserve a private room?", book: "Book Reservation" },
         events: { title: "Event Inquiries", subtitle: "Celebrate With Us", desc: "Unrivaled scale and elegance. Let Golden Bay be the spectacular stage for your most significant milestones, from intimate gatherings to grand galas.", f1Title: "Grand Banquet Hall", f1Desc: "Our expansive, pillar-less Grand Banquet Hall is engineered to host spectacular, large-scale celebrations for up to 800 guests.", f2Title: "Versatile Spaces", f2Desc: "Host up to 200 guests in our converted Main Dining mini-banquet, or enjoy an exclusive gathering for 60 in our premier VIP Manila room.", f3Title: "Modern LED Visuals", f3Desc: "Newly installed, state-of-the-art LED walls provide stunning visual clarity for presentations and event ambiance.", connect: "Connect With Our Specialists", cDesc: "Due to the bespoke nature of customized events, we prefer to speak with you directly. Contact our dedicated event team to discuss availability, menus, and logistics.", direct: "Direct Line", emailInq: "Email Inquiries", instant: "Instant Messaging", via: "Connect via WeChat or Viber", faqTitle: "Event Details" },
         contact: { title: "Location & Contact", getTouch: "Get in Touch", cDesc: "Whether you have a question about our menu, need assistance finding us, or wish to inquire about corporate partnerships, our team is at your service.", addrLabel: "Address", resInq: "Reservations & Inquiries", emailLabel: "Email", hoursLabel: "Operating Hours" },
-        reservation: { title: "Reservations", details: "Details", selectPref: "Select your preferred date and experience.", bookWechat: "Book via WeChat", vipRooms: "VIP Private Rooms", alaCarte: "Ala Carte Dining", checking: "Checking availability...", confirmTitle: "Confirm Details", fName: "Full Name", fContact: "Contact / Viber", fEmail: "Email (Optional)", fGuests: "Number of Guests", fTime: "Arrival Time", selTime: "Select Preferred Time", fNotes: "Special Request / Menu Preferences", proc: "Processing Request...", reqRes: "Request Reservation", wechatTitle: "Book via WeChat", scan: "Scan this code to chat directly with our reservation specialist.", retWeb: "Return to Web Booking", reqPend: "Request Pending", rev: "We are reviewing your details", allow: "Please allow up to 30 minutes for confirmation.", retHome: "Return to Home" }
+        reservation: { title: "Reservations", details: "Details", selectPref: "Select your preferred date and experience.", bookWechat: "Book via WeChat", vipRooms: "VIP Private Rooms", alaCarte: "Ala Carte Dining", checking: "Checking availability...", confirmTitle: "Confirm Details", fName: "Full Name", fContact: "Contact / Viber", fEmail: "Email (Optional)", fGuests: "Number of Guests", fTime: "Arrival Time", selTime: "Select Preferred Time", fNotes: "Special Request / Menu Preferences", proc: "Processing Request...", reqRes: "Request Reservation", wechatTitle: "Book via WeChat", scan: "Scan this code to chat directly with our reservation specialist.", retWeb: "Return to Web Booking", reqPend: "Request Pending", rev: "We are reviewing your details", allow: "Please allow up to 30 minutes for confirmation during operating hours. Requests made after hours will be confirmed the following morning.", retHome: "Return to Home" }
     },
     zh: {
         nav: { menu: "菜单", events: "活动", news: "新闻与优惠", rooms: "贵宾包厢", about: "关于我们", contact: "联系我们", book: "预订餐桌" },
@@ -6603,7 +6653,7 @@ export const translations = {
         vip: { title: "尊享私宴", roomType1: "专属包厢", roomType2: "大厅散座", noImage: "暂无图片", pax: "人", seatsLeft: "剩余座位:", maxCap: "最大容纳:", booked: "已满", full: "客满", stdSetup: "标准配置", ready: "准备预订包厢吗？", book: "立即预订" },
         events: { title: "活动咨询", subtitle: "与我们共庆", desc: "无与伦比的规模与优雅。让金海湾成为您重要里程碑的壮丽舞台，无论是私密聚会还是盛大晚宴。", f1Title: "豪华宴会厅", f1Desc: "我们宽敞的无柱大宴会厅专为举办多达800人的盛大庆典而设计。", f2Title: "多功能空间", f2Desc: "主餐厅可转换为容纳200人的小型宴会厅，或在我们的顶级马尼拉贵宾室享受60人的专属聚会。", f3Title: "现代LED视觉设备", f3Desc: "全新安装的最先进LED屏幕，为演示和活动氛围提供令人惊叹的视觉清晰度。", connect: "联系我们的专家", cDesc: "由于定制活动的独特性，我们更倾向于与您直接沟通。请联系我们的专属活动团队，讨论场地、菜单和后勤事宜。", direct: "直线电话", emailInq: "邮件咨询", instant: "即时通讯", via: "通过微信或Viber联系", faqTitle: "活动详情" },
         contact: { title: "位置与联系方式", getTouch: "联系我们", cDesc: "无论您对菜单有疑问、需要寻路指引，还是希望咨询企业合作，我们的团队随时为您服务。", addrLabel: "地址", resInq: "预订与咨询", emailLabel: "电子邮件", hoursLabel: "营业时间" },
-        reservation: { title: "预订座位", details: "预订详情", selectPref: "选择您的首选日期和体验。", bookWechat: "通过微信预订", vipRooms: "贵宾包厢", alaCarte: "大厅散座", checking: "正在查询...", confirmTitle: "确认详情", fName: "全名", fContact: "联系电话 / Viber", fEmail: "电子邮件 (选填)", fGuests: "就餐人数", fTime: "预计到达时间", selTime: "选择时间", fNotes: "特殊要求 / 饮食偏好", proc: "处理中...", reqRes: "提交预订", wechatTitle: "微信预订", scan: "扫描此二维码，直接与我们的预订专员沟通。", retWeb: "返回网页预订", reqPend: "预订已提交", rev: "我们正在审核您的预订信息", allow: "请耐心等待最多30分钟的确认通知。", retHome: "返回首页" }
+        reservation: { title: "预订座位", details: "预订详情", selectPref: "选择您的首选日期和体验。", bookWechat: "通过微信预订", vipRooms: "贵宾包厢", alaCarte: "大厅散座", checking: "正在查询...", confirmTitle: "确认详情", fName: "全名", fContact: "联系电话 / Viber", fEmail: "电子邮件 (选填)", fGuests: "就餐人数", fTime: "预计到达时间", selTime: "选择时间", fNotes: "特殊要求 / 饮食偏好", proc: "处理中...", reqRes: "提交预订", wechatTitle: "微信预订", scan: "扫描此二维码，直接与我们的预订专员沟通。", retWeb: "返回网页预订", reqPend: "预订已提交", rev: "我们正在审核您的预订信息", allow: "营业时间内请预留最多30分钟以便我们确认。非营业时间的预订将在次日上午处理。", retHome: "返回首页" }
     },
     zh_hant: {
         nav: { menu: "菜單", events: "活動", news: "新聞與優惠", rooms: "貴賓包廂", about: "關於我們", contact: "聯繫我們", book: "預訂餐桌" },
@@ -6615,7 +6665,7 @@ export const translations = {
         vip: { title: "尊享私宴", roomType1: "專屬包廂", roomType2: "大廳散座", noImage: "暫無圖片", pax: "人", seatsLeft: "剩餘座位:", maxCap: "最大容納:", booked: "已滿", full: "客滿", stdSetup: "標準配置", ready: "準備預訂包廂嗎？", book: "立即預訂" },
         events: { title: "活動諮詢", subtitle: "與我們共慶", desc: "無與倫比的規模與優雅。讓金海灣成為您重要里程碑的壯麗舞台，無論是私密聚會還是盛大晚宴。", f1Title: "豪華宴會廳", f1Desc: "我們寬敞的無柱大宴會廳專為舉辦多達800人的盛大慶典而設計。", f2Title: "多功能空間", f2Desc: "主餐廳可轉換為容納200人的小型宴會廳，或在我們的頂級馬尼拉貴賓室享受60人的專屬聚會。", f3Title: "現代LED視覺設備", f3Desc: "全新安裝的最先進LED屏幕，為演示和活動氛圍提供令人驚嘆的視覺清晰度。", connect: "聯繫我們的專家", cDesc: "由於定制活動的獨特性，我們更傾向於與您直接溝通。請聯繫我們的專屬活動團隊，討論場地、菜單和後勤事宜。", direct: "直線電話", emailInq: "郵件諮詢", instant: "即時通訊", via: "通過微信或Viber聯繫", faqTitle: "活動詳情" },
         contact: { title: "位置與聯繫方式", getTouch: "聯繫我們", cDesc: "無論您對菜單有疑問、需要尋路指引，還是希望諮詢企業合作，我們的團隊隨時為您服務。", addrLabel: "地址", resInq: "預訂與諮詢", emailLabel: "電子郵件", hoursLabel: "營業時間" },
-        reservation: { title: "預訂座位", details: "預訂詳情", selectPref: "選擇您的首選日期和體驗。", bookWechat: "通過微信預訂", vipRooms: "貴賓包廂", alaCarte: "大廳散座", checking: "正在查詢...", confirmTitle: "確認詳情", fName: "全名", fContact: "聯繫電話 / Viber", fEmail: "電子郵件 (選填)", fGuests: "就餐人數", fTime: "預計到達時間", selTime: "選擇時間", fNotes: "特殊要求 / 飲食偏好", proc: "處理中...", reqRes: "提交預訂", wechatTitle: "微信預訂", scan: "掃描此二維碼，直接與我們的預訂專員溝通。", retWeb: "返回網頁預訂", reqPend: "預訂已提交", rev: "我們正在審核您的預訂信息", allow: "請耐心等待最多30分鐘的確認通知。", retHome: "返回首頁" }
+        reservation: { title: "預訂座位", details: "預訂詳情", selectPref: "選擇您的首選日期和體驗。", bookWechat: "通過微信預訂", vipRooms: "貴賓包廂", alaCarte: "大廳散座", checking: "正在查詢...", confirmTitle: "確認詳情", fName: "全名", fContact: "聯繫電話 / Viber", fEmail: "電子郵件 (選填)", fGuests: "就餐人數", fTime: "預計到達時間", selTime: "選擇時間", fNotes: "特殊要求 / 飲食偏好", proc: "處理中...", reqRes: "提交預訂", wechatTitle: "微信預訂", scan: "掃描此二維碼，直接與我們的預訂專員溝通。", retWeb: "返回網頁預訂", reqPend: "預訂已提交", rev: "我們正在審核您的預訂信息", allow: "營業時間內請預留最多30分鐘以便我們確認。非營業時間的預訂將在次日上午處理。", retHome: "返回首頁" }
     },
     ja: {
         nav: { menu: "メニュー", events: "イベント", news: "ニュース＆プロモ", rooms: "個室", about: "私たちについて", contact: "お問い合わせ", book: "予約する" },
@@ -6627,7 +6677,7 @@ export const translations = {
         vip: { title: "プライベートダイニング", roomType1: "個室", roomType2: "ダイニングホール", noImage: "画像なし", pax: "名様", seatsLeft: "残り席数:", maxCap: "最大定員:", booked: "予約済", full: "満席", stdSetup: "標準セットアップ", ready: "個室を予約する準備はできましたか？", book: "予約する" },
         events: { title: "イベントのお問い合わせ", subtitle: "私たちと一緒に祝う", desc: "比類のない規模と優雅さ。親密な集まりから壮大なガラまで、ゴールデンベイを最も重要なマイルストーンのための壮大なステージにしましょう。", f1Title: "グランドバンケットホール", f1Desc: "私たちの広々とした柱のないグランドバンケットホールは、最大800名様までの壮大な大規模なお祝いを主催するように設計されています。", f2Title: "多目的なスペース", f2Desc: "最大200名様までのメインダイニングをミニバンケットに変換したり、最高級のVIPマニラルームで60名様向けの特別な集まりをお楽しみください。", f3Title: "最新のLEDビジュアル", f3Desc: "新しく設置された最先端のLEDウォールは、プレゼンテーションやイベントの雰囲気に驚くほどの視覚的な明瞭さを提供します。", connect: "スペシャリストとつながる", cDesc: "カスタマイズされたイベントのオーダーメイドの性質上、直接お話しすることをお勧めします。空き状況、メニュー、ロジスティクスについては、専任のイベントチームにお問い合わせください。", direct: "直通ダイヤル", emailInq: "メールでのお問い合わせ", instant: "インスタントメッセージング", via: "WeChatまたはViber経由で接続", faqTitle: "イベントの詳細" },
         contact: { title: "場所と連絡先", getTouch: "お問い合わせ", cDesc: "メニューに関するご質問、道案内が必要な場合、または企業パートナーシップに関するお問い合わせなど、私たちのチームが対応いたします。", addrLabel: "住所", resInq: "予約と問い合わせ", emailLabel: "メール", hoursLabel: "営業時間" },
-        reservation: { title: "ご予約", details: "詳細", selectPref: "ご希望の日付と体験を選択してください。", bookWechat: "WeChatで予約", vipRooms: "VIP個室", alaCarte: "アラカルトダイニング", checking: "空き状況を確認中...", confirmTitle: "詳細を確認", fName: "フルネーム", fContact: "連絡先 / Viber", fEmail: "メールアドレス (任意)", fGuests: "ゲストの数", fTime: "到着時間", selTime: "希望の時間を選択", fNotes: "特別なご要望 / メニューの好み", proc: "リクエストを処理中...", reqRes: "予約をリクエストする", wechatTitle: "WeChatで予約", scan: "このコードをスキャンして、予約スペシャリストと直接チャットしてください。", retWeb: "Web予約に戻る", reqPend: "リクエスト保留中", rev: "詳細を確認しています", allow: "確認まで最大30分お待ちください。", retHome: "ホームに戻る" }
+        reservation: { title: "ご予約", details: "詳細", selectPref: "ご希望の日付と体験を選択してください。", bookWechat: "WeChatで予約", vipRooms: "VIP個室", alaCarte: "アラカルトダイニング", checking: "空き状況を確認中...", confirmTitle: "詳細を確認", fName: "フルネーム", fContact: "連絡先 / Viber", fEmail: "メールアドレス (任意)", fGuests: "ゲストの数", fTime: "到着時間", selTime: "希望の時間を選択", fNotes: "特別なご要望 / メニューの好み", proc: "リクエストを処理中...", reqRes: "予約をリクエストする", wechatTitle: "WeChatで予約", scan: "このコードをスキャンして、予約スペシャリストと直接チャットしてください。", retWeb: "Web予約に戻る", reqPend: "リクエスト保留中", rev: "詳細を確認しています", allow: "営業時間内のご予約は、確認まで最大30分ほどお待ちください。営業時間外のリクエストは翌朝処理されます。", retHome: "ホームに戻る" }
     },
     ko: {
         nav: { menu: "메뉴", events: "이벤트", news: "뉴스 및 프로모션", rooms: "프라이빗 룸", about: "소개", contact: "연락처", book: "테이블 예약" },
@@ -6639,6 +6689,6 @@ export const translations = {
         vip: { title: "프라이빗 다이닝", roomType1: "독점 룸", roomType2: "다이닝 홀", noImage: "이미지 없음", pax: "명", seatsLeft: "남은 좌석:", maxCap: "최대 수용 인원:", booked: "예약됨", full: "만석", stdSetup: "기본 설정", ready: "프라이빗 룸을 예약하시겠습니까?", book: "예약하기" },
         events: { title: "이벤트 문의", subtitle: "우리와 함께 축하하세요", desc: "타의 추종을 불허하는 규모와 우아함. 소규모 모임부터 성대한 갈라에 이르기까지, 골든 베이가 가장 중요한 이정표를 위한 장대한 무대가 되도록 하십시오.", f1Title: "그랜드 연회장", f1Desc: "기둥이 없는 넓은 그랜드 연회장은 최대 800명의 게스트를 수용할 수 있는 성대하고 대규모의 축하 행사를 주최하도록 설계되었습니다.", f2Title: "다목적 공간", f2Desc: "메인 다이닝 미니 연회장에서 최대 200명의 게스트를 수용하거나, 프리미어 VIP 마닐라 룸에서 60명을 위한 독점적인 모임을 즐기십시오.", f3Title: "최신 LED 비주얼", f3Desc: "새로 설치된 최첨단 LED 월은 프레젠테이션 및 이벤트 분위기를 위해 놀라운 시각적 선명도를 제공합니다.", connect: "전문가와 연결하기", cDesc: "맞춤형 이벤트의 특성상 직접 상담하는 것을 선호합니다. 전담 이벤트 팀에 연락하여 예약 가능 여부, 메뉴 및 세부 사항을 논의하십시오.", direct: "직통 전화", emailInq: "이메일 문의", instant: "인스턴트 메시징", via: "WeChat 또는 Viber를 통한 연결", faqTitle: "이벤트 세부 정보" },
         contact: { title: "위치 및 연락처", getTouch: "연락하기", cDesc: "메뉴에 대한 질문이 있거나, 길 안내가 필요하거나, 기업 파트너십에 대해 문의하고 싶으시다면 저희 팀이 도와드리겠습니다.", addrLabel: "주소", resInq: "예약 및 문의", emailLabel: "이메일", hoursLabel: "영업 시간" },
-        reservation: { title: "예약", details: "세부 정보", selectPref: "원하는 날짜와 경험을 선택하십시오.", bookWechat: "WeChat을 통한 예약", vipRooms: "VIP 프라이빗 룸", alaCarte: "알라카르트 다이닝", checking: "예약 가능 여부 확인 중...", confirmTitle: "세부 정보 확인", fName: "성명", fContact: "연락처 / Viber", fEmail: "이메일 (선택 사항)", fGuests: "게스트 수", fTime: "도착 시간", selTime: "원하는 시간 선택", fNotes: "특별 요청 / 메뉴 기본 설정", proc: "요청 처리 중...", reqRes: "예약 요청", wechatTitle: "WeChat을 통한 예약", scan: "이 코드를 스캔하여 예약 전문가와 직접 채팅하십시오.", retWeb: "웹 예약으로 돌아가기", reqPend: "요청 대기 중", rev: "세부 정보를 검토 중입니다", allow: "확인까지 최대 30분이 소요될 수 있습니다.", retHome: "홈으로 돌아가기" }
+        reservation: { title: "예약", details: "세부 정보", selectPref: "원하는 날짜와 경험을 선택하십시오.", bookWechat: "WeChat을 통한 예약", vipRooms: "VIP 프라이빗 룸", alaCarte: "알라카르트 다이닝", checking: "예약 가능 여부 확인 중...", confirmTitle: "세부 정보 확인", fName: "성명", fContact: "연락처 / Viber", fEmail: "이메일 (선택 사항)", fGuests: "게스트 수", fTime: "도착 시간", selTime: "원하는 시간 선택", fNotes: "특별 요청 / 메뉴 기본 설정", proc: "요청 처리 중...", reqRes: "예약 요청", wechatTitle: "WeChat을 통한 예약", scan: "이 코드를 스캔하여 예약 전문가와 직접 채팅하십시오.", retWeb: "웹 예약으로 돌아가기", reqPend: "요청 대기 중", rev: "세부 정보를 검토 중입니다", allow: "영업 시간 중 예약 확인에는 최대 30분이 소요됩니다. 영업 시간 외 요청은 다음 날 아침에 처리됩니다.", retHome: "홈으로 돌아가기" }
     }
 };

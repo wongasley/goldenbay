@@ -24,7 +24,6 @@ export default {
       },
       fontFamily: {
         sans: ['Quicksand', 'sans-serif'],
-        serif: ['Playfair Display', 'serif'],
         erupha: ['"The Erupha"', 'serif'],
         chinese: ['"Noto Serif SC"', 'sans-serif'], 
         chinese_traditional: ['"Noto Serif TC"', 'sans-serif'], 
