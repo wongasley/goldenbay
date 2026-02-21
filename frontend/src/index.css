@@ -68,30 +68,30 @@
 
 /* Japanese Fonts */
 @font-face {
-  font-family: 'Noto Sans JP';
-  src: url('./assets/fonts/NotoSansJP-Regular.ttf') format('truetype');
+  font-family: 'Noto Serif JP';
+  src: url('./assets/fonts/NotoSerifJP-Regular.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
 }
 
 @font-face {
-  font-family: 'Noto Sans JP';
-  src: url('./assets/fonts/NotoSansJP-Bold.ttf') format('truetype');
+  font-family: 'Noto Serif JP';
+  src: url('./assets/fonts/NotoSerifJP-Bold.ttf') format('truetype');
   font-weight: 700;
   font-style: normal;
 }
 
 /* Korean Fonts */
 @font-face {
-  font-family: 'Noto Sans KR';
-  src: url('./assets/fonts/NotoSansKR-Regular.ttf') format('truetype');
+  font-family: 'Noto Serif KR';
+  src: url('./assets/fonts/NotoSerifKR-Regular.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
 }
 
 @font-face {
-  font-family: 'Noto Sans KR';
-  src: url('./assets/fonts/NotoSansKR-Bold.ttf') format('truetype');
+  font-family: 'Noto Serif KR';
+  src: url('./assets/fonts/NotoSerifKR-Bold.ttf') format('truetype');
   font-weight: 700;
   font-style: normal;
 }
