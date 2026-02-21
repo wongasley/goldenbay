@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Phone, Mail, MessageSquare, MonitorPlay, Users, Building, ChevronDown, X } from 'lucide-react';
-import { useLanguage } from '../../../context/LanguageContext';
 
 // Images
 import heroimage from '../../../assets/images/heroimage3.webp'; 
