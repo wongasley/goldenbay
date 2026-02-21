@@ -16,9 +16,17 @@
 /* 2. Register Local Playfair Display (Replacing the @import) */
 /* This points to the files in your 'static' folder screenshot */
 @font-face {
-  font-family: 'The Erupha';
+  font-family: 'TheErupha';
   src: url('./assets/fonts/TheErupha.ttf') format('truetype');
-  font-weight: normal;
+  font-weight: 400; /* Normal weight */
+  font-style: normal;
+}
+
+/* Map the bold weight to the same file so Tailwind's font-bold doesn't break it */
+@font-face {
+  font-family: 'TheErupha';
+  src: url('./assets/fonts/TheErupha.ttf') format('truetype');
+  font-weight: 700; /* Bold weight */
   font-style: normal;
 }
 
@@ -115,10 +123,10 @@ body {
 /* 4. Heading Specifics */
 h1, h2, h3, h4 {
   font-family: 'TheErupha', serif;
-  font-weight: 700; /* This triggers the PlayfairDisplay-Bold.ttf file */
+  font-weight: normal; /* Let the font breathe naturally, we can use Tailwind classes if we need it bolder */
 }
 
 h2 {
-  font-size: 2.5rem; /* Adjust size as needed */
-  letter-spacing: -0.01em; /* Gives it that tight, high-end look */
+  font-size: 2.5rem;
+  letter-spacing: -0.01em;
 }
