@@ -7,6 +7,7 @@ import Footer from './components/layout/Footer';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import ScrollToTop from './components/layout/ScrollToTop';
 import FloatingWidget from './components/layout/FloatingWidget'; 
+import { LanguageProvider } from './context/LanguageContext';
 
 // --- LAZY LOAD PUBLIC PAGES ---
 const HomePage = lazy(() => import('./pages/public/home/HomePage'));
@@ -39,6 +40,7 @@ const PageLoader = () => (
 function App() {
   return (
     <HelmetProvider>
+      <LanguageProvider>
     <Router>
       <ScrollToTop />
       <div className="w-full min-h-screen font-sans bg-gray-50 text-gray-900 relative">
@@ -96,6 +98,7 @@ function App() {
 
       </div>
     </Router>
+    </LanguageProvider>
     </HelmetProvider>
   );
 }

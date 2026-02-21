@@ -3,12 +3,15 @@ import { motion } from 'framer-motion';
 import { Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import heroimage from '../../../assets/images/heroimage2.webp'; // Or a dedicated news banner
+import { useLanguage } from '../../../context/LanguageContext';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const NewsPage = () => {
   const [posts, setPosts] = useState([]);
   const [filter, setFilter] = useState('ALL');
+
+  const { t, getFontClass, getLocData } = useLanguage();
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -112,13 +115,13 @@ const NewsPage = () => {
                     </div>
 
                     <Link to={`/news/${post.slug}`} className="block mb-3">
-                        <h3 className="text-xl font-serif text-gray-900 group-hover:text-gold-600 transition-colors">
-                            {post.title}
+                        <h3 className={`text-xl font-serif text-gray-900 group-hover:text-gold-600 transition-colors ${getFontClass()}`}>
+                            {getLocData(post, 'title')}
                         </h3>
                     </Link>
 
-                    <p className="text-gray-600 text-sm leading-relaxed mb-6 flex-grow">
-                        {getExcerpt(post.content)}
+                    <p className={`text-gray-600 text-sm leading-relaxed mb-6 flex-grow ${getFontClass()}`}>
+                        {getExcerpt(getLocData(post, 'content'))}
                     </p>
 
                     <Link 

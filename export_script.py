@@ -107,7 +107,9 @@ FILES_TO_READ = [
     'frontend/src/pages/public/contact/ContactPage.jsx',
     'frontend/src/components/layout/ScrollToTop.jsx',
     'frontend/src/components/layout/FloatingWidget.jsx',
-    
+    'frontend/src/context/LanguageContext.jsx',
+    'frontend/src/utils/translations.js',
+
 ]
 
 # 2. Set the name for the final output text file.
