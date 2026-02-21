@@ -44,20 +44,19 @@ const EventInquiriesPage = () => {
     <div className="min-h-screen bg-cream-50 text-gray-900 font-sans">
       
       {/* --- HERO BANNER --- */}
-      <div className="relative h-[50vh] w-full flex items-center justify-center pt-24 bg-black">
-        <div className="absolute inset-0 opacity-50">
-          <img src={heroimage} className="w-full h-full object-cover" alt="Golden Bay Grand Events" />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-cream-50"></div>
+      <div className="relative h-[40vh] w-full flex items-center justify-center pt-24 bg-black">
+        <div className="absolute inset-0 opacity-60">
+          <img src={heroimage} className="w-full h-full object-cover" alt="Golden Bay Exterior" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-cream-50"></div>
         </div>
         <div className="relative z-10 text-center px-4">
-          <span className="text-gold-500 text-xs font-bold uppercase tracking-[0.3em] mb-4 block">Celebrate With Us</span>
-          <h1 className="text-4xl md:text-6xl font-serif tracking-widest text-white drop-shadow-lg mb-6">Event Inquiries</h1>
-          <p className="text-gray-300 max-w-2xl mx-auto text-sm md:text-base font-light leading-relaxed">
-            Unrivaled scale and elegance. Let Golden Bay be the spectacular stage for your most significant milestones, from intimate gatherings to grand galas.
-          </p>
+          <Link to="/" className={`text-[10px] md:text-xs tracking-[0.4em] uppercase mb-6 text-white hover:text-gold-400 transition-colors block ${getFontClass()}`}>{t('home.back')}</Link>
+          <h1 className={`text-3xl md:text-4xl font-serif tracking-widest uppercase text-white drop-shadow-md ${getFontClass()}`}>{t('contact.title')}</h1>
+          <div className="h-[1px] w-16 md:w-24 bg-gold-400 mt-6 md:mt-8 mx-auto"></div>
         </div>
       </div>
-
+      
+      
       {/* --- CORE FEATURES --- */}
       <div className="max-w-7xl mx-auto px-6 py-20">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
