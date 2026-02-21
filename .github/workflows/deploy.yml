@@ -34,8 +34,7 @@ jobs:
           echo "🎨 Building Frontend..."
           cd frontend
           npm install --legacy-peer-deps
-          npm install react-is --save --legacy-peer-deps
-          npm install react-helmet-async --save --legacy-peer-deps
+          npm install react-is react-helmet-async recharts react-calendar date-fns react-quill-new react-icons --save --legacy-peer-deps
           npm run build
           
           # 4. Update Backend
