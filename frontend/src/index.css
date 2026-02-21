@@ -16,24 +16,24 @@
 /* 2. Register Local Playfair Display (Replacing the @import) */
 /* This points to the files in your 'static' folder screenshot */
 @font-face {
-  font-family: 'Playfair Display';
-  src: local('Playfair Display'), url('./assets/fonts/PlayfairDisplay-Regular.ttf') format('truetype');
+  font-family: 'Lora';
+  src: local('Lora'), url('./assets/fonts/Lora-Regular.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: 'Playfair Display';
-  src: local('Playfair Display'), url('./assets/fonts/PlayfairDisplay-Bold.ttf') format('truetype');
+  font-family: 'Lora';
+  src: local('Lora'), url('./assets/fonts/Lora-Bold.ttf') format('truetype');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: 'Playfair Display';
-  src: local('Playfair Display'), url('./assets/fonts/PlayfairDisplay-Italic.ttf') format('truetype');
+  font-family: 'Lora';
+  src: local('Lora'), url('./assets/fonts/Lora-Italic.ttf') format('truetype');
   font-weight: 400;
   font-style: italic;
   font-display: swap;
@@ -131,7 +131,7 @@ body {
 
 /* 4. Heading Specifics */
 h1, h2, h3, h4 {
-  font-family: 'Playfair Display', serif;
+  font-family: 'Lora', serif;
   font-weight: normal; 
 }
 

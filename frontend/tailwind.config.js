@@ -24,7 +24,7 @@ export default {
       },
       fontFamily: {
         sans: ['Quicksand', 'sans-serif'],
-        serif: ['Playfair Display', 'serif'], // <-- Changed this line
+        serif: ['Lora', 'serif'], // <-- Changed this line
         chinese: ['Noto Serif SC', 'sans-serif'], 
         chinese_traditional: ['Noto Serif TC', 'sans-serif'], 
         japanese: ['Noto Serif JP', 'sans-serif'], 
