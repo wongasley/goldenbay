@@ -1399,10 +1399,27 @@ export default App;
 /* 2. Register Local Playfair Display (Replacing the @import) */
 /* This points to the files in your 'static' folder screenshot */
 @font-face {
-  font-family: 'TheErupha'; /* REMOVED THE SPACE HERE */
-  src: url('./assets/fonts/TheErupha.ttf') format('truetype');
-  font-weight: 700; /* Set this to 700 to match the heading specifics below */
+  font-family: 'Lora';
+  src: local('Lora'), url('./assets/fonts/Lora-Regular.ttf') format('truetype');
+  font-weight: 400;
   font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lora';
+  src: local('Lora'), url('./assets/fonts/Lora-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lora';
+  src: local('Lora'), url('./assets/fonts/Lora-Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
 }
 
 @font-face {
@@ -1497,13 +1514,13 @@ body {
 
 /* 4. Heading Specifics */
 h1, h2, h3, h4 {
-  font-family: 'TheErupha', serif;
-  font-weight: 700; /* This triggers the PlayfairDisplay-Bold.ttf file */
+  font-family: 'Lora', serif;
+  font-weight: normal; 
 }
 
 h2 {
-  font-size: 2.5rem; /* Adjust size as needed */
-  letter-spacing: -0.01em; /* Gives it that tight, high-end look */
+  font-size: 2.5rem;
+  letter-spacing: -0.01em;
 }
 
 <!doctype html>
@@ -1572,12 +1589,12 @@ export default {
       },
       fontFamily: {
         sans: ['Quicksand', 'sans-serif'],
-        erupha: ['"TheErupha"', 'serif'],
-        chinese: ['"Noto Serif SC"', 'sans-serif'], 
-        chinese_traditional: ['"Noto Serif TC"', 'sans-serif'], 
-        japanese: ['"Noto Serif JP"', 'sans-serif'], 
-        korean: ['"Noto Serif KR"', 'sans-serif'],
-        },
+        serif: ['Lora', 'serif'], // <-- Changed this line
+        chinese: ['Noto Serif SC', 'sans-serif'], 
+        chinese_traditional: ['Noto Serif TC', 'sans-serif'], 
+        japanese: ['Noto Serif JP', 'sans-serif'], 
+        korean: ['Noto Serif KR', 'sans-serif'],
+      },
     },
   },
   plugins: [
@@ -1624,7 +1641,7 @@ const Navbar = () => {
   return (
     <header className="fixed top-0 w-full z-50 flex flex-col">
       {/* 1. Language Bar */}
-      <div className="w-full bg-black text-gray-400 py-1.5 px-6 flex justify-end items-center gap-3 text-[9px] md:text-[10px] uppercase tracking-widest relative z-[60]">
+      <div className="w-full bg-black text-gray-400 py-1.5 px-6 flex justify-end items-center gap-3 text-[12px] md:text-[14px] uppercase tracking-widest relative z-[60]">
           <Globe size={12} className="text-gold-500" />
           <button onClick={() => setLanguage('en')} className={`transition-colors ${language === 'en' ? 'text-gold-500 font-bold' : 'hover:text-white'}`}>EN</button>
           <span>|</span>
@@ -1854,68 +1871,111 @@ const HomePage = () => {
   
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.4, delayChildren: 0.2 } },
+    visible: { 
+      opacity: 1, 
+      transition: { staggerChildren: 0.3, delayChildren: 0.2 } 
+    },
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 1, ease: "easeOut" } },
+    hidden: { opacity: 0, y: 30 },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      transition: { duration: 1.2, ease: [0.16, 1, 0.3, 1] } 
+    },
   };
 
   const footerVariants = {
     hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { delay: 1.6, duration: 1.2 } },
+    visible: { opacity: 1, transition: { delay: 1.5, duration: 1.5 } },
   };
 
   return (
-    <div className="relative flex flex-col items-center justify-center h-screen bg-black overflow-hidden">
+    <div className="relative flex flex-col items-center justify-center h-screen bg-black overflow-hidden font-sans">
       
       <Helmet>
-        <title>Golden Bay | Premium Seafood & Chinese Restaurant in Pasay</title>
+        <title>Golden Bay | Premium Seafood & Chinese Restaurant</title>
         <meta name="description" content="Experience luxury Chinese dining and live seafood at Golden Bay Restaurant. Located at Diosdado Macapagal Blvd, Pasay City. Book your VIP room today!" />
       </Helmet>
 
-      <video autoPlay loop muted playsInline preload="auto" className="absolute z-0 w-auto min-w-full min-h-full max-w-none object-cover pointer-events-none transition-opacity duration-1000">
+      {/* Background Video */}
+      <video 
+        autoPlay 
+        loop 
+        muted 
+        playsInline 
+        className="absolute inset-0 w-full h-full object-cover z-0 transition-opacity duration-1000"
+      >
         <source src="/videos/hero-background.mp4" type="video/mp4" />
       </video>
 
-      <div className="absolute z-10 inset-0 bg-black/50"></div>
-
-      <motion.div variants={containerVariants} initial="hidden" animate="visible" className="relative z-20 text-center flex flex-col items-center">
-        <motion.div variants={itemVariants}>
-          <Link to="/" className="mb-4 transition-transform duration-700 hover:scale-105 block">
-            <img src={logo} alt="Golden Bay Logo" className="h-64 md:h-[28rem] w-auto drop-shadow-[0_0_30px_rgba(212,175,55,0.3)]" />
+      {/* Overlays for better readability */}
+      <div className="absolute inset-0 z-10 bg-black/40"></div>
+      <div className="absolute inset-0 z-10 bg-gradient-to-t from-black via-black/20 to-black/60"></div>
+      
+      {/* Main Content */}
+      <motion.div 
+        variants={containerVariants} 
+        initial="hidden" 
+        animate="visible" 
+        className="relative z-20 flex flex-col items-center justify-center w-full max-w-4xl px-6 text-center"
+      >
+        <motion.div variants={itemVariants} className="mb-10 w-full flex justify-center">
+          <Link to="/menu" className="transition-transform duration-700 hover:scale-105 block group">
+            <img 
+              src={logo} 
+              alt="Golden Bay Logo" 
+              className="w-64 md:w-96 lg:w-[26rem] h-auto drop-shadow-[0_4px_20px_rgba(0,0,0,0.8)] filter brightness-110 contrast-125" 
+            />
           </Link>
         </motion.div>
 
         <motion.div variants={itemVariants}>
           <Link to="/menu">
-            <button className={`px-16 py-4 border border-gold-400 text-gold-400 hover:bg-gold-400 hover:text-black transition-all duration-500 tracking-[0.4em] text-sm rounded-md uppercase bg-black/20 backdrop-blur-sm ${getFontClass()}`}>
-              {t('home.enter')}
+            <button className={`
+              group relative overflow-hidden px-10 py-4 
+              border border-gold-400/50 text-gold-400 
+              transition-all duration-500 rounded-sm 
+              uppercase tracking-[0.3em] text-xs font-medium 
+              bg-black/30 backdrop-blur-md hover:border-gold-400 hover:text-white
+              shadow-[0_0_15px_rgba(212,175,55,0.1)] hover:shadow-[0_0_25px_rgba(212,175,55,0.3)]
+              ${getFontClass()}
+            `}>
+              <span className="relative z-10">{t('home.enter')}</span>
+              <div className="absolute inset-0 bg-gold-400/10 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
             </button>
           </Link>
         </motion.div>
       </motion.div>
 
-      <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black via-black/40 to-transparent z-10 pointer-events-none"></div>
+      {/* Bottom Gradient Fade */}
+      <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black to-transparent z-10 pointer-events-none"></div>
 
-      <motion.footer variants={footerVariants} initial="hidden" animate="visible" className={`absolute bottom-8 w-full z-20 px-12 flex flex-col md:flex-row items-center text-gold-400 text-xs tracking-[0.3em] uppercase font-light ${getFontClass()}`}>
-        <div className="md:w-1/3 mb-6 md:mb-0 order-2 md:order-1 text-center md:text-left opacity-70">
-          <p className="leading-relaxed">
+      {/* Footer / Links */}
+      <motion.footer 
+        variants={footerVariants} 
+        initial="hidden" 
+        animate="visible" 
+        className={`absolute bottom-6 w-full z-20 px-8 md:px-16 flex flex-col md:flex-row items-center justify-between text-gray-400 text-[10px] md:text-xs tracking-[0.2em] uppercase font-light gap-6 ${getFontClass()}`}
+      >
+        <div className="md:w-1/3 text-center md:text-left order-2 md:order-1 opacity-60">
+          <p className="leading-relaxed max-w-[250px] mx-auto md:mx-0">
             {t('home.loc')}
           </p>
         </div>
 
-        <div className="md:w-1/3 flex justify-center gap-8 mb-6 md:mb-0 order-1 md:order-2">
-          <a href="https://www.instagram.com/goldenbayseafoods/" target="_blank" rel="noopener noreferrer" className="hover:text-white hover:scale-110 transition-all duration-300">Instagram</a>
-          <Link to="/reservations" className="hover:text-white hover:scale-110 transition-all duration-300">{t('nav.rooms')}</Link>
-          <Link to="/contact" className="hover:text-white hover:scale-110 transition-all duration-300">{t('nav.contact')}</Link>
+        <div className="md:w-1/3 flex justify-center gap-8 order-1 md:order-2">
+          <a href="https://www.instagram.com/goldenbayseafoods/" target="_blank" rel="noopener noreferrer" className="hover:text-gold-400 hover:scale-105 transition-all duration-300">Instagram</a>
+          <Link to="/vip-rooms" className="hover:text-gold-400 hover:scale-105 transition-all duration-300">{t('nav.rooms')}</Link>
+          <Link to="/contact" className="hover:text-gold-400 hover:scale-105 transition-all duration-300">{t('nav.contact')}</Link>
         </div>
 
-        <div className="md:w-1/3 order-3 text-center md:text-right opacity-70">
-          <p>© {new Date().getFullYear()} Golden Bay Fresh Seafood</p>
+        <div className="md:w-1/3 text-center md:text-right order-3 opacity-60">
+          <p>© {new Date().getFullYear()} Golden Bay</p>
         </div>
       </motion.footer>
+      
     </div>
   );
 };
@@ -5250,12 +5310,20 @@ const Footer = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-20">
           
-          <div className="md:col-span-5 space-y-8">
-             <img src={logo} alt="Golden Bay Logo" className="h-20 w-auto opacity-90" />
-             <div className={`space-y-2 text-gray-400 text-sm font-light tracking-wide leading-relaxed ${getFontClass()}`}>
-               <p className="uppercase tracking-widest text-gold-500 text-xs font-bold mb-4">Golden Bay Fresh Seafood Restaurant</p>
-               <p>{t('footer.address')}</p>
-             </div>
+          <div className="md:col-span-5 space-y-6"> {/* Increased spacing between logo and text */}
+            <img src={logo} alt="Golden Bay Logo" className="h-16 w-auto opacity-90" />
+            
+            <div className={`space-y-4 text-gray-400 text-sm font-light tracking-wide leading-relaxed ${getFontClass()}`}>
+              <p className="uppercase tracking-[0.2em] text-gold-500 text-[11px] font-bold">
+                Golden Bay Fresh Seafood Restaurant
+              </p>
+              
+              {/* Split the address for better visual hierarchy */}
+              <div className="max-w-xs space-y-1 opacity-80">
+                <p>Lot 3&4 Block A2, Diosdado Macapagal Blvd,</p>
+                <p>CBP, Pasay City, Metro Manila</p>
+              </div>
+            </div>
           </div>
 
           <div className="md:col-span-3">
@@ -6229,7 +6297,10 @@ jobs:
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Phone, Mail, MessageSquare, MonitorPlay, Users, Building, ChevronDown, X } from 'lucide-react';
+import { 
+  Phone, Mail, MessageSquare, MonitorPlay, Users, 
+  Building, ChevronDown, X, Utensils, Music, Calendar 
+} from 'lucide-react';
 import { useLanguage } from '../../../context/LanguageContext';
 
 import heroimage from '../../../assets/images/heroimage3.webp'; 
@@ -6238,77 +6309,168 @@ import wechatQr from '../../../assets/images/qrcode.svg';
 
 const EventInquiriesPage = () => {
   const [showWeChat, setShowWeChat] = useState(false);
-  const [activeFaq, setActiveFaq] = useState(null);
   const { t, getFontClass } = useLanguage();
 
-  const toggleFaq = (index) => setActiveFaq(activeFaq === index ? null : index);
-  const fadeUp = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } } };
+  const fadeUp = { 
+    hidden: { opacity: 0, y: 20 }, 
+    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } } 
+  };
+
+  const eventTypes = [
+    { title: "Grand Weddings", icon: <Heart className="w-6 h-6 text-gold-600" /> },
+    { title: "Corporate Galas", icon: <Building className="w-6 h-6 text-gold-600" /> },
+    { title: "Debut & Birthdays", icon: <Star className="w-6 h-6 text-gold-600" /> },
+    { title: "Engagement Parties", icon: <Utensils className="w-6 h-6 text-gold-600" /> },
+  ];
 
   return (
-    <div className="min-h-screen bg-cream-50 text-gray-900 font-sans">
+    <div className="min-h-screen bg-cream-50 text-gray-900 font-sans selection:bg-gold-200">
       
-      <div className="relative h-[50vh] w-full flex items-center justify-center pt-24 bg-black">
+      {/* --- HERO SECTION --- */}
+      <div className="relative h-[60vh] w-full flex items-center justify-center pt-24 bg-black">
         <div className="absolute inset-0 opacity-50">
           <img src={heroimage} className="w-full h-full object-cover" alt="Golden Bay Grand Events" />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-cream-50"></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/20 to-cream-50"></div>
         </div>
-        <div className="relative z-10 text-center px-4">
-          <span className={`text-gold-500 text-xs font-bold uppercase tracking-[0.3em] mb-4 block ${getFontClass()}`}>{t('events.subtitle')}</span>
-          <h1 className={`text-4xl md:text-6xl font-serif tracking-widest text-white drop-shadow-lg mb-6 ${getFontClass()}`}>{t('events.title')}</h1>
-          <p className={`text-gray-300 max-w-2xl mx-auto text-sm md:text-base font-light leading-relaxed ${getFontClass()}`}>
+        <div className="relative z-10 text-center px-4 max-w-4xl">
+          <motion.span 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            className={`text-gold-500 text-xs font-bold uppercase tracking-[0.4em] mb-4 block ${getFontClass()}`}
+          >
+            {t('events.subtitle')}
+          </motion.span>
+          <motion.h1 
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            className={`text-5xl md:text-7xl font-serif tracking-tight text-white mb-6 ${getFontClass()}`}
+          >
+            {t('events.title')}
+          </motion.h1>
+          <motion.p 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
+            className={`text-gray-200 text-sm md:text-lg font-light leading-relaxed max-w-2xl mx-auto ${getFontClass()}`}
+          >
             {t('events.desc')}
-          </p>
+          </motion.p>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-20">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.1 }} className="space-y-4">
-            <div className="w-16 h-16 mx-auto bg-gold-50 text-gold-600 rounded-full flex items-center justify-center mb-6"><Users size={28} strokeWidth={1.5} /></div>
-            <h3 className={`text-xl font-serif text-gray-900 ${getFontClass()}`}>{t('events.f1Title')}</h3>
+      {/* --- KEY FEATURES SECTION --- */}
+      <div className="max-w-7xl mx-auto px-6 py-24">
+        <div className="text-center mb-16">
+          <h2 className={`text-3xl md:text-4xl font-serif mb-4 ${getFontClass()}`}>World-Class Amenities</h2>
+          <div className="w-20 h-px bg-gold-400 mx-auto"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-16 text-center">
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.1 }} className="group">
+            <div className="w-20 h-20 mx-auto bg-white border border-gold-100 text-gold-600 rounded-full flex items-center justify-center mb-8 shadow-sm group-hover:bg-gold-600 group-hover:text-white transition-all duration-500">
+              <Users size={32} strokeWidth={1} />
+            </div>
+            <h3 className={`text-xl font-serif mb-4 ${getFontClass()}`}>{t('events.f1Title')}</h3>
             <p className={`text-sm text-gray-500 leading-relaxed font-light px-4 ${getFontClass()}`}>{t('events.f1Desc')}</p>
           </motion.div>
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.2 }} className="space-y-4">
-            <div className="w-16 h-16 mx-auto bg-gold-50 text-gold-600 rounded-full flex items-center justify-center mb-6"><Building size={28} strokeWidth={1.5} /></div>
-            <h3 className={`text-xl font-serif text-gray-900 ${getFontClass()}`}>{t('events.f2Title')}</h3>
+
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.2 }} className="group">
+            <div className="w-20 h-20 mx-auto bg-white border border-gold-100 text-gold-600 rounded-full flex items-center justify-center mb-8 shadow-sm group-hover:bg-gold-600 group-hover:text-white transition-all duration-500">
+              <Building size={32} strokeWidth={1} />
+            </div>
+            <h3 className={`text-xl font-serif mb-4 ${getFontClass()}`}>{t('events.f2Title')}</h3>
             <p className={`text-sm text-gray-500 leading-relaxed font-light px-4 ${getFontClass()}`}>{t('events.f2Desc')}</p>
           </motion.div>
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.3 }} className="space-y-4">
-            <div className="w-16 h-16 mx-auto bg-gold-50 text-gold-600 rounded-full flex items-center justify-center mb-6"><MonitorPlay size={28} strokeWidth={1.5} /></div>
-            <h3 className={`text-xl font-serif text-gray-900 ${getFontClass()}`}>{t('events.f3Title')}</h3>
+
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.3 }} className="group">
+            <div className="w-20 h-20 mx-auto bg-white border border-gold-100 text-gold-600 rounded-full flex items-center justify-center mb-8 shadow-sm group-hover:bg-gold-600 group-hover:text-white transition-all duration-500">
+              <MonitorPlay size={32} strokeWidth={1} />
+            </div>
+            <h3 className={`text-xl font-serif mb-4 ${getFontClass()}`}>{t('events.f3Title')}</h3>
             <p className={`text-sm text-gray-500 leading-relaxed font-light px-4 ${getFontClass()}`}>{t('events.f3Desc')}</p>
           </motion.div>
         </div>
       </div>
 
+      {/* --- EVENT TYPES SECTION --- */}
+      <div className="bg-neutral-900 py-24 text-white">
+        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="lg:col-span-1">
+             <h2 className={`text-3xl font-serif text-gold-500 mb-4 ${getFontClass()}`}>Milestones We Host</h2>
+             <p className="text-gray-400 text-sm font-light">Tailored catering and dedicated coordination for every occasion.</p>
+          </div>
+          {["Weddings", "Conferences", "Debuts", "Corporate Events"].map((item, i) => (
+            <div key={i} className="border-l border-white/10 pl-6 py-2">
+              <span className="text-gold-500 text-xs font-bold block mb-2">0{i+1}</span>
+              <h4 className="text-xl font-serif tracking-wide">{item}</h4>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* --- CAPACITY TABLE SECTION --- */}
+      <div className="max-w-5xl mx-auto px-6 py-24">
+        <div className="bg-white p-8 md:p-12 border border-gray-100 shadow-xl rounded-sm">
+          <h2 className={`text-2xl font-serif text-center mb-10 ${getFontClass()}`}>Venue Specifications</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="border-b border-gray-100 text-gold-600 uppercase text-[10px] tracking-widest font-bold">
+                <tr>
+                  <th className="pb-4">Function Space</th>
+                  <th className="pb-4">Banquet (Pax)</th>
+                  <th className="pb-4">Cocktail (Pax)</th>
+                  <th className="pb-4">Amenities</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 text-gray-600">
+                <tr className="hover:bg-cream-50 transition-colors">
+                  <td className="py-5 font-medium text-gray-900">Grand Banquet Hall</td>
+                  <td className="py-5">800</td>
+                  <td className="py-5">1,200</td>
+                  <td className="py-5 text-xs">Stage, LED Wall, Full Audio</td>
+                </tr>
+                <tr className="hover:bg-cream-50 transition-colors">
+                  <td className="py-5 font-medium text-gray-900">Main Dining (Mini-Banquet)</td>
+                  <td className="py-5">200</td>
+                  <td className="py-5">350</td>
+                  <td className="py-5 text-xs">Standard AV, Buffet Area</td>
+                </tr>
+                <tr className="hover:bg-cream-50 transition-colors">
+                  <td className="py-5 font-medium text-gray-900">VIP Manila Room</td>
+                  <td className="py-5">60</td>
+                  <td className="py-5">80</td>
+                  <td className="py-5 text-xs">Private Restroom, KTV</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* --- CONTACT SPLIT SECTION --- */}
       <div className="bg-white border-y border-gray-100">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2">
-          <div className="relative h-96 lg:h-auto overflow-hidden">
+          <div className="relative h-[500px] lg:h-auto overflow-hidden">
             <img src={diningImg} alt="Event Setup" className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute inset-0 bg-black/10"></div>
           </div>
-          <div className="p-12 lg:p-24 flex flex-col justify-center">
+          <div className="p-12 lg:p-24 flex flex-col justify-center bg-cream-50/50">
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}>
-              <h2 className={`text-3xl md:text-4xl font-serif text-gray-900 mb-6 ${getFontClass()}`}>{t('events.connect')}</h2>
-              <p className={`text-gray-500 text-sm leading-loose mb-10 ${getFontClass()}`}>{t('events.cDesc')}</p>
+              <h2 className={`text-3xl md:text-5xl font-serif text-gray-900 mb-6 ${getFontClass()}`}>{t('events.connect')}</h2>
+              <p className={`text-gray-500 text-sm leading-loose mb-10 font-light max-w-md ${getFontClass()}`}>{t('events.cDesc')}</p>
 
               <div className="space-y-4">
-                <a href="tel:+63288040332" className="group flex items-center gap-6 p-5 rounded-sm border border-gray-200 hover:border-gold-400 hover:shadow-md transition-all bg-gray-50 hover:bg-white">
-                  <div className="text-gold-600 group-hover:scale-110 transition-transform"><Phone size={24} /></div>
+                <a href="tel:+63288040332" className="group flex items-center gap-6 p-6 rounded-sm border border-gray-200 hover:border-gold-400 hover:shadow-lg transition-all bg-white">
+                  <div className="w-12 h-12 bg-gold-50 flex items-center justify-center rounded-full text-gold-600 group-hover:bg-gold-600 group-hover:text-white transition-all duration-300"><Phone size={20} /></div>
                   <div>
                     <p className={`text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1 ${getFontClass()}`}>{t('events.direct')}</p>
-                    <p className="text-lg font-serif text-gray-900">(02) 8804-0332</p>
+                    <p className="text-xl font-serif text-gray-900">(02) 8804-0332</p>
                   </div>
                 </a>
-                <a href="mailto:marketing@goldenbay.com.ph" className="group flex items-center gap-6 p-5 rounded-sm border border-gray-200 hover:border-gold-400 hover:shadow-md transition-all bg-gray-50 hover:bg-white">
-                  <div className="text-gold-600 group-hover:scale-110 transition-transform"><Mail size={24} /></div>
+                <a href="mailto:marketing@goldenbay.com.ph" className="group flex items-center gap-6 p-6 rounded-sm border border-gray-200 hover:border-gold-400 hover:shadow-lg transition-all bg-white">
+                  <div className="w-12 h-12 bg-gold-50 flex items-center justify-center rounded-full text-gold-600 group-hover:bg-gold-600 group-hover:text-white transition-all duration-300"><Mail size={20} /></div>
                   <div>
                     <p className={`text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1 ${getFontClass()}`}>{t('events.emailInq')}</p>
                     <p className="text-sm font-medium text-gray-900">marketing@goldenbay.com.ph</p>
                   </div>
                 </a>
-                <button onClick={() => setShowWeChat(true)} className="w-full group flex items-center gap-6 p-5 rounded-sm border border-gray-200 hover:border-green-400 hover:shadow-md transition-all bg-gray-50 hover:bg-white text-left">
-                  <div className="text-green-600 group-hover:scale-110 transition-transform"><MessageSquare size={24} /></div>
+                <button onClick={() => setShowWeChat(true)} className="w-full group flex items-center gap-6 p-6 rounded-sm border border-gray-200 hover:border-green-400 hover:shadow-lg transition-all bg-white text-left">
+                  <div className="w-12 h-12 bg-green-50 flex items-center justify-center rounded-full text-green-600 group-hover:bg-green-600 group-hover:text-white transition-all duration-300"><MessageSquare size={20} /></div>
                   <div>
                     <p className={`text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1 ${getFontClass()}`}>{t('events.instant')}</p>
                     <p className={`text-sm font-medium text-gray-900 ${getFontClass()}`}>{t('events.via')}</p>
@@ -6320,17 +6482,27 @@ const EventInquiriesPage = () => {
         </div>
       </div>
 
+      {/* --- WECHAT MODAL --- */}
       <AnimatePresence>
         {showWeChat && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowWeChat(false)}>
-            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-white p-10 rounded-sm shadow-2xl max-w-sm w-full text-center relative border-t-4 border-green-500" onClick={(e) => e.stopPropagation()}>
-              <button onClick={() => setShowWeChat(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-900 transition-colors"><X size={24} /></button>
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4" 
+            onClick={() => setShowWeChat(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} 
+              className="bg-white p-10 rounded-sm shadow-2xl max-w-sm w-full text-center relative border-t-4 border-green-500" 
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button onClick={() => setShowWeChat(false)} className="absolute top-4 right-4 text-gray-300 hover:text-gray-900 transition-colors"><X size={24} /></button>
               <h3 className={`text-2xl font-serif text-gray-900 mb-2 ${getFontClass()}`}>WeChat / Viber</h3>
-              <div className="bg-gray-50 p-4 rounded-lg inline-block border border-gray-200 mb-8 mt-4">
+              <div className="bg-gray-50 p-4 rounded-lg inline-block border border-gray-100 mb-8 mt-4">
                 <img src={wechatQr} alt="Golden Bay WeChat QR" className="w-48 h-48 object-contain opacity-80" />
               </div>
-              <div className="space-y-2 pt-6 border-t border-gray-100">
-                <p className="text-xl font-bold text-gray-900 tracking-wider">+63 917 580 7166</p>
+              <div className="space-y-2 pt-6 border-t border-gray-100 text-center">
+                <p className="text-sm text-gray-400 uppercase tracking-widest mb-1">Direct Event Mobile</p>
+                <p className="text-2xl font-bold text-gray-900 tracking-wider">+63 917 580 7166</p>
               </div>
             </motion.div>
           </motion.div>
@@ -6638,7 +6810,7 @@ export const translations = {
     en: {
         nav: { menu: "Menu", events: "Events", news: "News & Promos", rooms: "Private Rooms", about: "About Us", contact: "Contact", book: "Book a Table" },
         footer: { explore: "Explore", contact: "Contact", hours: "Hours", lunch: "Lunch", dinner: "Dinner", address: "Lot 3&4 Block A2, Diosdado Macapagal Blvd, CBP, Pasay City, Metro Manila", rights: "Golden Bay Restaurant. All Rights Reserved." },
-        home: { back: "← Back to Experience", enter: "Enter Experience" },
+        home: { back: "← Back to Experience", enter: "Enter Experience", loc: "Lot 3&4 Block A2, Diosdado Macapagal Blvd, CBP, Pasay City, Metro Manila" },
         marketing: { all: "All Updates", promo: "Promotions", blog: "Events & Stories", readMore: "Read More", limited: "Limited Offer", event: "Event", back: "← Back to News" },
         menu: { title: "Our Menu", search: "Search by name, code, or ingredient...", all: "All", empty: "No dishes found matching", clear: "Clear Search", liveCatch: "Live Catch", seasonal: "Seasonal Price", styles: "Available Cooking Styles", standard: "Standard", market: "Market Price" },
         about: { title: "Our Story", since: "Since 2009", p1: "Golden Bay Fresh Seafoods Restaurant is a landmark culinary destination in Pasay City, dedicated to the art of fine Chinese dining.", p2: "We blend traditional techniques with modern innovation to provide an unparalleled experience centered around the freshest seafood delights. Every dish tells a story of heritage, quality, and passion.", vision: "Our Vision", vDesc: "To be the premier destination for seafood lovers, celebrating the bounty of the sea through innovative dishes and memorable experiences.", mission: "Our Mission", mDesc: "To deliver excellence in every aspect—from sourcing sustainable ingredients to providing attentive, personalized service that exceeds expectations.", values: "Core Values", val1: "Excellence", val1d: "Perfection in every detail.", val2: "Integrity", val2d: "Honest sourcing & standards.", val3: "Sustainability", val3d: "Stewards of the sea.", val4: "Innovation", val4d: "Redefining tradition.", val5: "Hospitality", val5d: "Every guest is royalty.", services: "Services", sTitle: "World-Class Experiences", sDesc: "From intimate gatherings to grand celebrations, we offer versatile spaces and services tailored to your needs.", s1: "Signature Seafood Menu", s2: "Private VIP Rooms", s3: "Grand Event Spaces", s4: "Premium Delivery", bookEvent: "Book Your Event" },
@@ -6650,7 +6822,7 @@ export const translations = {
     zh: {
         nav: { menu: "菜单", events: "活动", news: "新闻与优惠", rooms: "贵宾包厢", about: "关于我们", contact: "联系我们", book: "预订餐桌" },
         footer: { explore: "探索", contact: "联系", hours: "营业时间", lunch: "午餐", dinner: "晚餐", address: "帕赛市 Diosdado Macapagal 大道", rights: "金海湾海鲜酒家。保留所有权利。" },
-        home: { back: "← 返回体验", enter: "开启体验" },
+        home: { back: "← 返回体验", enter: "开启体验", loc: "帕赛市 Diosdado Macapagal 大道" },
         marketing: { all: "全部动态", promo: "优惠促销", blog: "活动与故事", readMore: "阅读更多", limited: "限时优惠", event: "活动", back: "← 返回新闻" },
         menu: { title: "我们的菜单", search: "按名称、代码或成分搜索...", all: "全部", empty: "未找到匹配的菜品", clear: "清除搜索", liveCatch: "生猛海鲜", seasonal: "时价", styles: "可选烹饪方式", standard: "标准", market: "时价" },
         about: { title: "品牌故事", since: "始于 2009", p1: "金海湾海鲜大酒楼是帕赛市地标性的美食胜地，致力于提供高级中式餐饮的艺术体验。", p2: "我们将传统技艺与现代创新相结合，围绕最新鲜的海鲜美味提供无与伦比的体验。每一道菜都讲述着传承、品质与激情的故事。", vision: "我们的愿景", vDesc: "成为海鲜爱好者的首选目的地，通过创新菜肴和难忘体验庆祝海洋的馈赠。", mission: "我们的使命", mDesc: "在每个环节提供卓越体验——从采购可持续食材到提供超越期望的贴心个性化服务。", values: "核心价值观", val1: "卓越", val1d: "细节尽善尽美。", val2: "诚信", val2d: "诚信采购与高标准。", val3: "可持续", val3d: "海洋的守护者。", val4: "创新", val4d: "重新定义传统。", val5: "好客", val5d: "宾至如归。", services: "服务", sTitle: "世界级的体验", sDesc: "从私人聚会到盛大庆典，我们提供多功能空间和量身定制的服务。", s1: "招牌海鲜菜单", s2: "贵宾专属包厢", s3: "盛大宴会空间", s4: "尊享外送服务", bookEvent: "预订您的活动" },
@@ -6662,7 +6834,7 @@ export const translations = {
     zh_hant: {
         nav: { menu: "菜單", events: "活動", news: "新聞與優惠", rooms: "貴賓包廂", about: "關於我們", contact: "聯繫我們", book: "預訂餐桌" },
         footer: { explore: "探索", contact: "聯繫", hours: "營業時間", lunch: "午餐", dinner: "晚餐", address: "帕賽市 Diosdado Macapagal 大道", rights: "金海灣海鮮酒家。保留所有權利。" },
-        home: { back: "← 返回體驗", enter: "開啟體驗" },
+        home: { back: "← 返回體驗", enter: "開啟體驗", loc: "帕賽市 Diosdado Macapagal 大道" },
         marketing: { all: "全部動態", promo: "優惠促銷", blog: "活動與故事", readMore: "閱讀更多", limited: "限時優惠", event: "活動", back: "← 返回新聞" },
         menu: { title: "我們的菜單", search: "按名稱、代碼或成分搜索...", all: "全部", empty: "未找到匹配的菜品", clear: "清除搜索", liveCatch: "生猛海鮮", seasonal: "時價", styles: "可選烹飪方式", standard: "標準", market: "時價" },
         about: { title: "品牌故事", since: "始於 2009", p1: "金海灣海鮮大酒樓是帕賽市地標性的美食勝地，致力於提供高級中式餐飲的藝術體驗。", p2: "我們將傳統技藝與現代創新相結合，圍繞最新鮮的海鮮美味提供無與倫比的體驗。每一道菜都講述著傳承、品質與激情的故事。", vision: "我們的願景", vDesc: "成為海鮮愛好者的首選目的地，通過創新菜餚和難忘體驗慶祝海洋的饋贈。", mission: "我們的使命", mDesc: "在每個環節提供卓越體驗——從採購可持續食材到提供超越期望的貼心個性化服務。", values: "核心價值觀", val1: "卓越", val1d: "細節盡善盡美。", val2: "誠信", val2d: "誠信採購與高標準。", val3: "可持續", val3d: "海洋的守護者。", val4: "創新", val4d: "重新定義傳統。", val5: "好客", val5d: "賓至如歸。", services: "服務", sTitle: "世界級的體驗", sDesc: "從私人聚會到盛大慶典，我們提供多功能空間和量身定制的服務。", s1: "招牌海鮮菜單", s2: "貴賓專屬包廂", s3: "盛大宴會空間", s4: "尊享外送服務", bookEvent: "預訂您的活動" },
@@ -6674,19 +6846,19 @@ export const translations = {
     ja: {
         nav: { menu: "メニュー", events: "イベント", news: "ニュース＆プロモ", rooms: "個室", about: "私たちについて", contact: "お問い合わせ", book: "予約する" },
         footer: { explore: "探索", contact: "連絡先", hours: "営業時間", lunch: "ランチ", dinner: "ディナー", address: "パサイ市 ディオスダド・マカパガル大通り", rights: "ゴールデンベイ レストラン。全著作権所有。" },
-        home: { back: "← 体験に戻る", enter: "体験を始める" },
+        home: { back: "← 体験に戻る", enter: "体験を始める", loc: "パサイ市 ディオスダド・マカパガル大通り" },
         marketing: { all: "すべての更新", promo: "プロモーション", blog: "イベントとストーリー", readMore: "続きを読む", limited: "限定オファー", event: "イベント", back: "← ニュースに戻る" },
         menu: { title: "メニュー", search: "名前、コード、または材料で検索...", all: "すべて", empty: "料理が見つかりません", clear: "検索をクリア", liveCatch: "活魚", seasonal: "時価", styles: "調理方法", standard: "標準", market: "時価" },
         about: { title: "私たちの物語", since: "2009年以来", p1: "ゴールデンベイ・フレッシュシーフード・レストランは、パサイ市にある高級中華料理のアートに捧げられた画期的な目的地です。", p2: "私たちは伝統的な技術と革新を融合させ、最も新鮮なシーフードを中心に比類のない体験を提供します。すべての料理には伝統、品質、そして情熱の物語があります。", vision: "私たちのビジョン", vDesc: "シーフード愛好家のための最高の目的地となり、革新的な料理と思い出に残る体験を通じて海の恵みを祝福すること。", mission: "私たちの使命", mDesc: "持続可能な食材の調達から、期待を超えるパーソナライズされたサービスの提供まで、すべての面で卓越性を提供すること。", values: "コアバリュー", val1: "卓越性", val1d: "細部に至るまでの完璧さ。", val2: "誠実さ", val2d: "正直な調達と基準。", val3: "持続可能性", val3d: "海の管理者。", val4: "革新", val4d: "伝統の再定義。", val5: "おもてなし", val5d: "すべてのお客様を王族のように。", services: "サービス", sTitle: "世界クラスの体験", sDesc: "親密な集まりから壮大な祝賀会まで、お客様のニーズに合わせた多目的な空間とサービスを提供します。", s1: "シグネチャーシーフードメニュー", s2: "プライベートVIPルーム", s3: "壮大なイベントスペース", s4: "プレミアムデリバリー", bookEvent: "イベントを予約する" },
         vip: { title: "プライベートダイニング", roomType1: "個室", roomType2: "ダイニングホール", noImage: "画像なし", pax: "名様", seatsLeft: "残り席数:", maxCap: "最大定員:", booked: "予約済", full: "満席", stdSetup: "標準セットアップ", ready: "個室を予約する準備はできましたか？", book: "予約する" },
         events: { title: "イベントのお問い合わせ", subtitle: "私たちと一緒に祝う", desc: "比類のない規模と優雅さ。親密な集まりから壮大なガラまで、ゴールデンベイを最も重要なマイルストーンのための壮大なステージにしましょう。", f1Title: "グランドバンケットホール", f1Desc: "私たちの広々とした柱のないグランドバンケットホールは、最大800名様までの壮大な大規模なお祝いを主催するように設計されています。", f2Title: "多目的なスペース", f2Desc: "最大200名様までのメインダイニングをミニバンケットに変換したり、最高級のVIPマニラルームで60名様向けの特別な集まりをお楽しみください。", f3Title: "最新のLEDビジュアル", f3Desc: "新しく設置された最先端のLEDウォールは、プレゼンテーションやイベントの雰囲気に驚くほどの視覚的な明瞭さを提供します。", connect: "スペシャリストとつながる", cDesc: "カスタマイズされたイベントのオーダーメイドの性質上、直接お話しすることをお勧めします。空き状況、メニュー、ロジスティクスについては、専任のイベントチームにお問い合わせください。", direct: "直通ダイヤル", emailInq: "メールでのお問い合わせ", instant: "インスタントメッセージング", via: "WeChatまたはViber経由で接続", faqTitle: "イベントの詳細" },
         contact: { title: "場所と連絡先", getTouch: "お問い合わせ", cDesc: "メニューに関するご質問、道案内が必要な場合、または企業パートナーシップに関するお問い合わせなど、私たちのチームが対応いたします。", addrLabel: "住所", resInq: "予約と問い合わせ", emailLabel: "メール", hoursLabel: "営業時間" },
-        reservation: { title: "ご予約", details: "詳細", selectPref: "ご希望の日付と体験を選択してください。", bookWechat: "WeChatで予約", vipRooms: "VIP個室", alaCarte: "アラカルトダイニング", checking: "空き状況を確認中...", confirmTitle: "詳細を確認", fName: "フルネーム", fContact: "連絡先 / Viber", fEmail: "メールアドレス (任意)", fGuests: "ゲストの数", fTime: "到着時間", selTime: "希望の時間を選択", fNotes: "特別なご要望 / メニューの好み", proc: "リクエストを処理中...", reqRes: "予約をリクエストする", wechatTitle: "WeChatで予約", scan: "このコードをスキャンして、予約スペシャリストと直接チャットしてください。", retWeb: "Web予約に戻る", reqPend: "リクエスト保留中", rev: "詳細を確認しています", allow: "営業時間内のご予約は、確認まで最大30分ほどお待ちください。営業時間外のリクエストは翌朝処理されます。", retHome: "ホームに戻る" }
+        reservation: { title: "ご予約", details: "詳細", selectPref: "ご希望の日付と体験を選択してください。", bookWechat: "WeChatで予約", vipRooms: "VIP個室", alaCarte: "アラカルトダイニング", checking: "空き状況を確認中...", confirmTitle: "詳細を確認", fName: "フルネーム", fContact: "連絡先 / Viber", fEmail: "メールアドレス (任意)", fGuests: "ゲストの数", fTime: "到着時間", selTime: "希望の時間を選択", fNotes: "特別なご要望 / メニューの好み", proc: "リクエストを処理中...", reqRes: "予約をリクエストする", wechatTitle: "WeChatで予約", scan: "このコードをス캔して、予約スペシャリストと直接チャットしてください。", retWeb: "Web予約に戻る", reqPend: "リクエスト保留中", rev: "詳細を確認しています", allow: "営業時間内のご予約は、確認まで最大30分ほどお待ちください。営業時間外のリクエストは翌朝処理されます。", retHome: "ホームに戻る" }
     },
     ko: {
         nav: { menu: "메뉴", events: "이벤트", news: "뉴스 및 프로모션", rooms: "프라이빗 룸", about: "소개", contact: "연락처", book: "테이블 예약" },
         footer: { explore: "둘러보기", contact: "연락처", hours: "영업 시간", lunch: "점심", dinner: "저녁", address: "파사이 시티, 디오스다도 마카파갈 대로", rights: "골든 베이 레스토랑. 모든 권리 보유." },
-        home: { back: "← 체험으로 돌아가기", enter: "체험 시작" },
+        home: { back: "← 체험으로 돌아가기", enter: "체험 시작", loc: "파사이 시티, 디오스다도 마카파갈 대로" },
         marketing: { all: "모든 소식", promo: "프로모션", blog: "이벤트 및 스토리", readMore: "더 보기", limited: "한정 혜택", event: "이벤트", back: "← 뉴스로 돌아가기" },
         menu: { title: "메뉴", search: "이름, 코드 또는 재료로 검색...", all: "전체", empty: "일치하는 요리를 찾을 수 없습니다", clear: "검색 지우기", liveCatch: "활어", seasonal: "시가", styles: "조리 방식", standard: "기본", market: "시가" },
         about: { title: "우리의 이야기", since: "2009년 설립", p1: "골든 베이 프레시 씨푸드 레스토랑은 파사이 시티의 랜드마크이자 고급 중식 다이닝의 예술을 선보이는 곳입니다.", p2: "우리는 전통적인 기술과 현대적인 혁신을 결합하여 가장 신선한 해산물을 중심으로 타의 추종을 불허하는 경험을 제공합니다. 모든 요리에는 전통, 품질 및 열정의 이야기가 담겨 있습니다.", vision: "우리의 비전", vDesc: "혁신적인 요리와 기억에 남는 경험을 통해 바다의 풍요로움을 축하하는 해산물 애호가들을 위한 최고의 목적지가 되는 것.", mission: "우리의 사명", mDesc: "지속 가능한 식재료 조달부터 기대를 뛰어넘는 세심하고 맞춤화된 서비스 제공에 이르기까지 모든 면에서 탁월함을 제공합니다.", values: "핵심 가치", val1: "탁월함", val1d: "모든 디테일의 완벽함.", val2: "무결성", val2d: "정직한 조달 및 표준.", val3: "지속 가능성", val3d: "바다의 관리자.", val4: "혁신", val4d: "전통의 재정의.", val5: "환대", val5d: "모든 고객을 왕족처럼.", services: "서비스", sTitle: "세계적인 수준의 경험", sDesc: "소규모 모임부터 성대한 축하 행사까지, 고객의 요구에 맞춘 다목적 공간과 서비스를 제공합니다.", s1: "시그니처 해산물 메뉴", s2: "프라이빗 VIP 룸", s3: "그랜드 이벤트 공간", s4: "프리미엄 배달", bookEvent: "이벤트 예약하기" },
