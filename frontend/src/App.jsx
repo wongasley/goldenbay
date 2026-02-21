@@ -6,6 +6,7 @@ import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import ScrollToTop from './components/layout/ScrollToTop';
+import FloatingWidget from './components/layout/FloatingWidget';
 
 // --- LAZY LOAD PUBLIC PAGES ---
 const HomePage = lazy(() => import('./pages/public/home/HomePage'));
@@ -90,12 +91,8 @@ function App() {
             
           </Routes>
         </Suspense>
+        <FloatingWidget />
       </div>
-      <div className="md:hidden fixed bottom-6 right-6 z-40">
-            <Link to="/reservations" className="flex items-center justify-center w-14 h-14 bg-gold-600 text-white rounded-full shadow-[0_8px_30px_rgba(212,175,55,0.4)] hover:scale-105 active:scale-95 transition-all">
-               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinelinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 14h6"></path><path d="M9 10h6"></path><path d="M9 18h6"></path></svg>
-            </Link>
-        </div>
     </Router>
     </HelmetProvider>
   );

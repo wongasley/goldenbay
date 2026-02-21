@@ -229,6 +229,13 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 
+# ────────────────────────────────────────────────────────
+# 🧵 CELERY SETTINGS
+# ────────────────────────────────────────────────────────
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
 
 from django.contrib import admin
 from django.urls import path, include
@@ -272,6 +279,28 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'goldenbay.settings')
 
 application = get_wsgi_application()
 
+
+# backend/goldenbay/celery.py
+import os
+from celery import Celery
+
+# Set the default Django settings module for the 'celery' program.
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'goldenbay.settings')
+
+app = Celery('goldenbay')
+
+# Using a string here means the worker doesn't have to serialize
+# the configuration object to child processes.
+# - namespace='CELERY' means all celery-related configuration keys
+#   should have a `CELERY_` prefix.
+app.config_from_object('django.conf:settings', namespace='CELERY')
+
+# Load task modules from all registered Django apps.
+app.autodiscover_tasks()
+
+@app.task(bind=True, ignore_result=True)
+def debug_task(self):
+    print(f'Request: {self.request!r}')
 
 from django.contrib import admin
 
@@ -727,6 +756,8 @@ urlpatterns = [
     path('rooms/', VIPRoomListView.as_view(), name='vip_room_list'),
 ]
 
+# backend/reservations/views.py
+
 import requests
 import os
 from django.db import transaction
@@ -743,6 +774,7 @@ from django.conf import settings
 from .utils import send_sms
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
+from .tasks import send_new_booking_notifications, send_status_update_notifications
 
 class AvailableRoomsView(APIView):
     def get(self, request):
@@ -776,75 +808,6 @@ class AvailableRoomsView(APIView):
 
         return Response(results)
 
-def send_notifications_task(reservation):
-    """ SYNCHRONOUS: Fired when a NEW booking is created """
-    try:
-        area_name = reservation.dining_area.name if reservation.dining_area else "Main Dining Hall"
-        
-        # 1. NOTIFY THE RESTAURANT ADMINS
-        admin_context = {
-            'name': reservation.customer_name,
-            'contact': reservation.customer_contact,
-            'date': reservation.date.strftime('%B %d, %Y'),
-            'time': reservation.time.strftime('%I:%M %p'),
-            'pax': reservation.pax,
-            'area': area_name,
-            'notes': reservation.special_request or 'None',
-            'id': reservation.id
-        }
-        admin_html = render_to_string('emails/admin_notification.html', admin_context)
-        admin_plain = strip_tags(admin_html)
-        
-        send_mail(
-            subject=f'New Booking Request: {reservation.customer_name}',
-            message=admin_plain,
-            from_email=settings.EMAIL_HOST_USER,
-            recipient_list=['goldenbay.marketing@gmail.com'],  # <--- UPDATED HERE
-            html_message=admin_html,
-            fail_silently=False,
-        )
-
-        admin_numbers_env = os.getenv('ADMIN_PHONE_NUMBERS')
-        if admin_numbers_env:
-            admin_numbers = [num.strip() for num in admin_numbers_env.split(',') if num.strip()]
-            admin_sms_body = f"New Booking: {reservation.customer_name} ({reservation.pax} pax) for {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')}. Area: {area_name}. Check Dashboard."
-            
-            for num in admin_numbers:
-                # We send them individually to ensure Semaphore handles each correctly
-                send_sms(num, admin_sms_body)
-
-        # 2. NOTIFY THE CUSTOMER
-        if reservation.customer_email and '@' in reservation.customer_email:
-            customer_context = {
-                'name': reservation.customer_name,
-                'status': 'PENDING',
-                'date': reservation.date.strftime('%B %d, %Y'),
-                'time': reservation.time.strftime('%I:%M %p'),
-                'pax': reservation.pax,
-                'area': area_name,
-                'id': reservation.id
-            }
-            customer_html = render_to_string('emails/confirmation.html', customer_context)
-            customer_plain = strip_tags(customer_html)
-            
-            send_mail(
-                subject='Reservation Request Received - Golden Bay',
-                message=customer_plain,
-                from_email=settings.EMAIL_HOST_USER,
-                recipient_list=[reservation.customer_email],
-                html_message=customer_html,
-                fail_silently=False,
-            )
-
-        contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
-        if len(contact_digits) >= 10:
-             sms_body = f"Hi {reservation.customer_name}, we received your booking request for {reservation.pax} pax on {reservation.date.strftime('%b %d')}. Our team is reviewing availability and will confirm shortly. - GOLDENBAY"
-             send_sms(reservation.customer_contact, sms_body)
-
-    except Exception as e:
-        # If email fails, print to server logs but don't break the customer's screen
-        print(f"SMTP Email Error: {e}")
-
 class ReservationCreateView(generics.CreateAPIView):
     queryset = Reservation.objects.all()
     serializer_class = ReservationSerializer
@@ -853,8 +816,8 @@ class ReservationCreateView(generics.CreateAPIView):
     def perform_create(self, serializer):
         # 1. Save data to DB first
         reservation = serializer.save()
-        # 2. Fire notifications directly (no thread)
-        send_notifications_task(reservation)
+        # 2. Fire notifications ASYNCHRONOUSLY using Celery (.delay)
+        send_new_booking_notifications.delay(reservation.id)
 
 class DashboardStatsView(APIView):
     def get(self, request):
@@ -888,46 +851,6 @@ class AdminReservationListView(generics.ListCreateAPIView):
     serializer_class = ReservationSerializer
     permission_classes = [IsAuthenticated] 
 
-def send_admin_update_notifications(reservation, new_status):
-    """ SYNCHRONOUS: Fired when an ADMIN confirms or cancels a booking """
-    try:
-        area_name = reservation.dining_area.name if reservation.dining_area else "Main Dining Hall"
-        
-        # 1. SEND HTML EMAIL (If email exists)
-        if reservation.customer_email and '@' in reservation.customer_email and new_status in ['CONFIRMED', 'CANCELLED']:
-            context = {
-                'name': reservation.customer_name,
-                'status': new_status,
-                'date': reservation.date.strftime('%B %d, %Y'),
-                'time': reservation.time.strftime('%I:%M %p'),
-                'pax': reservation.pax,
-                'area': area_name,
-                'id': reservation.id
-            }
-            html_message = render_to_string('emails/confirmation.html', context)
-            plain_message = strip_tags(html_message)
-
-            send_mail(
-                subject=f'Reservation {new_status.capitalize()} - Golden Bay',
-                message=plain_message,
-                from_email=settings.EMAIL_HOST_USER,
-                recipient_list=[reservation.customer_email],
-                fail_silently=False,
-                html_message=html_message
-            )
-            
-        contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
-        if len(contact_digits) >= 10:
-             if new_status == 'CONFIRMED':
-                 sms_body = f"Great news, {reservation.customer_name}! Your table for {reservation.pax} on {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')} is CONFIRMED. See you soon! - GOLDENBAY"
-                 send_sms(reservation.customer_contact, sms_body)
-             elif new_status == 'CANCELLED':
-                 sms_body = f"Hi {reservation.customer_name}, your reservation request has been cancelled. Please call (02) 8804-0332 to reschedule. - GOLDENBAY"
-                 send_sms(reservation.customer_contact, sms_body)
-
-    except Exception as e:
-        print(f"⚠️ Notification Error for ID {reservation.id}: {e}")
-
 class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
     queryset = Reservation.objects.all()
     serializer_class = ReservationSerializer
@@ -938,8 +861,11 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
         if response.status_code == 200:
             reservation = self.get_object()
             new_status = request.data.get('status')
-            # Trigger synchronously
-            send_admin_update_notifications(reservation, new_status)
+            
+            # Fire notifications ASYNCHRONOUSLY using Celery (.delay)
+            if new_status in ['CONFIRMED', 'CANCELLED']:
+                send_status_update_notifications.delay(reservation.id, new_status)
+                
         return response
     
 class CustomerListView(generics.ListCreateAPIView):
@@ -993,6 +919,129 @@ def send_sms(to_number, body):
         return result
     except Exception as e:
         print(f"❌ SMS Network Error: {e}")
+
+# backend/reservations/tasks.py
+from celery import shared_task
+from django.core.mail import send_mail
+from django.conf import settings
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+import os
+from .utils import send_sms
+# IMPORTANT: We pass IDs instead of full Model Objects to Celery tasks
+from .models import Reservation 
+
+@shared_task
+def send_new_booking_notifications(reservation_id):
+    """ ASYNCHRONOUS: Fired by Celery when a NEW booking is created """
+    try:
+        # Fetch the reservation inside the task
+        reservation = Reservation.objects.get(id=reservation_id)
+        area_name = reservation.dining_area.name if reservation.dining_area else "Main Dining Hall"
+        
+        # 1. NOTIFY THE RESTAURANT ADMINS
+        admin_context = {
+            'name': reservation.customer_name,
+            'contact': reservation.customer_contact,
+            'date': reservation.date.strftime('%B %d, %Y'),
+            'time': reservation.time.strftime('%I:%M %p'),
+            'pax': reservation.pax,
+            'area': area_name,
+            'notes': reservation.special_request or 'None',
+            'id': reservation.id
+        }
+        admin_html = render_to_string('emails/admin_notification.html', admin_context)
+        admin_plain = strip_tags(admin_html)
+        
+        send_mail(
+            subject=f'New Booking Request: {reservation.customer_name}',
+            message=admin_plain,
+            from_email=settings.EMAIL_HOST_USER,
+            recipient_list=['goldenbay.marketing@gmail.com'], 
+            html_message=admin_html,
+            fail_silently=False,
+        )
+
+        admin_numbers_env = os.getenv('ADMIN_PHONE_NUMBERS')
+        if admin_numbers_env:
+            admin_numbers = [num.strip() for num in admin_numbers_env.split(',') if num.strip()]
+            admin_sms_body = f"New Booking: {reservation.customer_name} ({reservation.pax} pax) for {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')}. Area: {area_name}. Check Dashboard."
+            
+            for num in admin_numbers:
+                send_sms(num, admin_sms_body)
+
+        # 2. NOTIFY THE CUSTOMER
+        if reservation.customer_email and '@' in reservation.customer_email:
+            customer_context = {
+                'name': reservation.customer_name,
+                'status': 'PENDING',
+                'date': reservation.date.strftime('%B %d, %Y'),
+                'time': reservation.time.strftime('%I:%M %p'),
+                'pax': reservation.pax,
+                'area': area_name,
+                'id': reservation.id
+            }
+            customer_html = render_to_string('emails/confirmation.html', customer_context)
+            customer_plain = strip_tags(customer_html)
+            
+            send_mail(
+                subject='Reservation Request Received - Golden Bay',
+                message=customer_plain,
+                from_email=settings.EMAIL_HOST_USER,
+                recipient_list=[reservation.customer_email],
+                html_message=customer_html,
+                fail_silently=False,
+            )
+
+        contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
+        if len(contact_digits) >= 10:
+             sms_body = f"Hi {reservation.customer_name}, we received your booking request for {reservation.pax} pax on {reservation.date.strftime('%b %d')}. Our team is reviewing availability and will confirm shortly. - GOLDENBAY"
+             send_sms(reservation.customer_contact, sms_body)
+
+    except Exception as e:
+        print(f"Celery Task Error (New Booking): {e}")
+
+@shared_task
+def send_status_update_notifications(reservation_id, new_status):
+    """ ASYNCHRONOUS: Fired by Celery when an ADMIN confirms or cancels a booking """
+    try:
+        reservation = Reservation.objects.get(id=reservation_id)
+        area_name = reservation.dining_area.name if reservation.dining_area else "Main Dining Hall"
+        
+        # 1. SEND HTML EMAIL (If email exists)
+        if reservation.customer_email and '@' in reservation.customer_email and new_status in ['CONFIRMED', 'CANCELLED']:
+            context = {
+                'name': reservation.customer_name,
+                'status': new_status,
+                'date': reservation.date.strftime('%B %d, %Y'),
+                'time': reservation.time.strftime('%I:%M %p'),
+                'pax': reservation.pax,
+                'area': area_name,
+                'id': reservation.id
+            }
+            html_message = render_to_string('emails/confirmation.html', context)
+            plain_message = strip_tags(html_message)
+
+            send_mail(
+                subject=f'Reservation {new_status.capitalize()} - Golden Bay',
+                message=plain_message,
+                from_email=settings.EMAIL_HOST_USER,
+                recipient_list=[reservation.customer_email],
+                fail_silently=False,
+                html_message=html_message
+            )
+            
+        contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
+        if len(contact_digits) >= 10:
+             if new_status == 'CONFIRMED':
+                 sms_body = f"Great news, {reservation.customer_name}! Your table for {reservation.pax} on {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')} is CONFIRMED. See you soon! - GOLDENBAY"
+                 send_sms(reservation.customer_contact, sms_body)
+             elif new_status == 'CANCELLED':
+                 sms_body = f"Hi {reservation.customer_name}, your reservation request has been cancelled. Please call (02) 8804-0332 to reschedule. - GOLDENBAY"
+                 send_sms(reservation.customer_contact, sms_body)
+
+    except Exception as e:
+        print(f"Celery Task Error (Status Update): {e}")
 
 from django.contrib import admin
 from .models import Post
@@ -3332,12 +3381,12 @@ class Command(BaseCommand):
             "Barbecue, Appetizer / 烧烤卤味": [
                 {"code": "BA01", "en": "Roasted Cold Cuts Combination", "zh": "锦绣烧味拼盘", "prices": {"S": 750, "M": 1500, "L": 2250}},
                 {"code": "BA02", "en": "Crispy Roasted Pork Belly (Lechon Macau)", "zh": "金牌烧腩仔", "prices": {"S": 680, "M": 1360, "L": 2040}},
-                {"code": "BA03", "en": "Honey Glazed BBQ Pork Asado", "zh": "蜜汁烤叉烧", "prices": {"S": 600, "M": 900, "L": 1200}},
+                {"code": "BA03", "en": "Honey Glazed BBQ Pork Asado", "zh": "蜜汁烤叉烧", "prices": {"S": 600, "M": 1200, "L": 1800}},
                 {"code": "BA04", "en": "Soy Chicken", "zh": "玫瑰豉油鸡", "prices": {"Half": 900, "Whole": 1800}},
                 {"code": "BA05", "en": "White Chicken (Hainanese Style)", "zh": "水晶白切鸡", "prices": {"Half": 900, "Whole": 1800}},
                 {"code": "BA06", "en": "Crispy Roasted Chicken", "zh": "南乳吊烧鸡", "prices": {"Half": 900, "Whole": 1800}},
-                {"code": "BA07", "en": "Crispy Fried Pigeon", "zh": "金牌烧乳鸽", "price": 750},
-                {"code": "BA08", "en": "Roasted Suckling Pig", "zh": "鸿运烤乳猪", "prices": {"Half": 4000, "Whole": 7500}},
+                {"code": "BA07", "en": "Crispy Fried Pigeon", "zh": "金牌烧乳鸽", "price": 850},
+                {"code": "BA08", "en": "Roasted Suckling Pig", "zh": "鸿运烤乳猪", "prices": {"Half": 5800, "Whole": 11000}},
                 {"code": "BA09", "en": "Roasted Goose", "zh": "金海湾烧鹅", "prices": {"Half": 3200, "Whole": 6000}},
                 {"code": "BA10", "en": "Peking Duck", "zh": "北京片皮鸭", "prices": {"Half": 1800, "Whole": 3500}},
                 {"code": "BA11", "en": "Roasted Rice Duck", "zh": "挂炉烧米鸭", "prices": {"Half": 1600, "Whole": 3000}},
@@ -3385,9 +3434,9 @@ class Command(BaseCommand):
                 {"code": "SP01", "en": "Hot Prawn Salad", "zh": "热沙律虾球", "prices": {"S": 1500, "M": 2250, "L": 3000}},
                 {"code": "SP02", "en": "Sautéed Prawns with Broccoli", "zh": "西兰花虾球", "prices": {"S": 1500, "M": 2250, "L": 3000}},
                 {"code": "SP03", "en": "Sautéed Prawns with Pomelo Sauce", "zh": "柚子明虾球", "prices": {"S": 1500, "M": 2250, "L": 3000}},
-                {"code": "SP04", "en": "Baked Prawns with Black & White Pepper", "zh": "黑白胡椒焗大虾", "prices": {"S": 1800, "M": 2700, "L": 3600}},
-                {"code": "SP05", "en": "Singaporean Cereal Prawns", "zh": "星洲麦片焗海虾", "prices": {"S": 1800, "M": 2700, "L": 3600}},
-                {"code": "SP06", "en": "Steamed Prawns with Garlic & Vermicelli", "zh": "蒜蓉粉丝蒸大虾", "prices": {"S": 1800, "M": 2700, "L": 3600}},
+                {"code": "SP04", "en": "Baked Prawns with Black & White Pepper", "zh": "黑白胡椒焗大虾", "prices": {"S": 1900, "M": 2850, "L": 3800}},
+                {"code": "SP05", "en": "Singaporean Cereal Prawns", "zh": "星洲麦片焗海虾", "prices": {"S": 1900, "M": 2850, "L": 3800}},
+                {"code": "SP06", "en": "Steamed Prawns with Garlic & Vermicelli", "zh": "蒜蓉粉丝蒸大虾", "prices": {"S": 1900, "M": 2850, "L": 3800}},
                 {"code": "SP07", "en": "Sautéed Prawns & Scallops with XO Sauce", "zh": "XO酱西芹炒虾球带子", "prices": {"S": 2000, "M": 3000, "L": 4000}},
                 {"code": "SP08", "en": "Fried Shrimp Balls with Lemon Sauce", "zh": "沙律柠檬酱炸虾球", "prices": {"S": 1500, "M": 2250, "L": 3000}},
             ],
@@ -3452,7 +3501,7 @@ class Command(BaseCommand):
                 {"code": "VE01", "en": "Sautéed Imported Vegetables with Garlic", "zh": "蒜茸炒入口时蔬", "price": "Seasonal Price"},
                 {"code": "VE02", "en": "Fried Pumpkin with Salted Egg", "zh": "黄金南瓜条", "prices": {"S": 500, "M": 750, "L": 1000}},
                 {"code": "VE03", "en": "Braised Broccoli with Black Mushroom", "zh": "香菇扒西兰花", "prices": {"S": 700, "M": 1050, "L": 1400}},
-                {"code": "VE04", "en": "Vegetables with 3 Kinds of Egg", "zh": "三皇蛋时蔬", "prices": {"S": 600, "M": 900, "L": 1200}},
+                {"code": "VE04", "en": "Vegetables with 3 Kinds of Egg", "zh": "三皇蛋时蔬", "prices": {"S": 700, "M": 1050, "L": 1400}},
                 {"code": "VE05", "en": "Assorted Vegetables with Fungus & Beancurd", "zh": "洪七公炒斋", "prices": {"S": 700, "M": 1050, "L": 1400}},
                 {"code": "VE06", "en": "Spicy Eggplant Claypot with Minced Pork", "zh": "鱼香茄子煲", "prices": {"S": 600, "M": 900, "L": 1200}},
                 {"code": "VE07", "en": "Dried Scallop with Golden Mushroom & Vegetables", "zh": "金瑶扒时蔬", "prices": {"S": 1000, "M": 1500, "L": 2000}},
@@ -3483,7 +3532,7 @@ class Command(BaseCommand):
                 {"code": "LS04", "en": "Mantis Shrimp (with Superior E-FU Noodles)", "zh": "海螳螂上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS05", "en": "Mantis Shrimp (Salt & Pepper)", "zh": "椒盐海螳螂", "price": "Seasonal Price"},
                 {"code": "LS06", "en": "Mantis Shrimp (Salted Egg Yolk)", "zh": "金沙海螳螂", "price": "Seasonal Price"},
-                {"code": "LS07", "en": "Mantis Shrimp (Typhoon Shelter Style)", "zh": "避风塘炒海螳螂", "price": "Seasonal Price"},
+                {"code": "LS07", "en": "Mantis Shrimp (Pei Fong Dong)", "zh": "避风塘炒海螳螂", "price": "Seasonal Price"},
                 {"code": "LS08", "en": "Mantis Shrimp (Stir-Fried Ginger Onion)", "zh": "姜葱炒海螳螂", "price": "Seasonal Price"},
                 {"code": "LS09", "en": "Mantis Shrimp (Steamed)", "zh": "清蒸海螳螂", "price": "Seasonal Price"},
                 {"code": "LS10", "en": "Live Suahe (Baked in Superior Stock)", "zh": "沙虾焗上汤", "price": "Seasonal Price"},
@@ -3492,7 +3541,7 @@ class Command(BaseCommand):
                 {"code": "LS13", "en": "Live Suahe (with Superior E-FU Noodles)", "zh": "沙虾上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS14", "en": "Live Suahe (Salt & Pepper)", "zh": "椒盐沙虾", "price": "Seasonal Price"},
                 {"code": "LS15", "en": "Live Suahe (Salted Egg Yolk)", "zh": "金沙沙虾", "price": "Seasonal Price"},
-                {"code": "LS16", "en": "Live Suahe (Typhoon Shelter Style)", "zh": "避风塘炒沙虾", "price": "Seasonal Price"},
+                {"code": "LS16", "en": "Live Suahe (Pei Fong Dong)", "zh": "避风塘炒沙虾", "price": "Seasonal Price"},
                 {"code": "LS17", "en": "Live Suahe (Stir-Fried Ginger Onion)", "zh": "姜葱炒沙虾", "price": "Seasonal Price"},
                 {"code": "LS18", "en": "Live Suahe (Steamed)", "zh": "清蒸沙虾", "price": "Seasonal Price"},
                 {"code": "LS19", "en": "Lobster (Baked in Superior Stock)", "zh": "龙虾焗上汤", "price": "Seasonal Price"},
@@ -3501,7 +3550,7 @@ class Command(BaseCommand):
                 {"code": "LS22", "en": "Lobster (with Superior E-FU Noodles)", "zh": "龙虾上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS23", "en": "Lobster (Salt & Pepper)", "zh": "椒盐龙虾", "price": "Seasonal Price"},
                 {"code": "LS24", "en": "Lobster (Salted Egg Yolk)", "zh": "金沙龙虾", "price": "Seasonal Price"},
-                {"code": "LS25", "en": "Lobster (Typhoon Shelter Style)", "zh": "避风塘炒龙虾", "price": "Seasonal Price"},
+                {"code": "LS25", "en": "Lobster (Pei Fong Dong)", "zh": "避风塘炒龙虾", "price": "Seasonal Price"},
                 {"code": "LS26", "en": "Lobster (Stir-Fried Ginger Onion)", "zh": "姜葱炒龙虾", "price": "Seasonal Price"},
                 {"code": "LS27", "en": "Lobster (Steamed)", "zh": "清蒸龙虾", "price": "Seasonal Price"},
                 {"code": "LS28", "en": "Lapu-Lapu (Baked in Superior Stock)", "zh": "石斑鱼焗上汤", "price": "Seasonal Price"},
@@ -3510,7 +3559,7 @@ class Command(BaseCommand):
                 {"code": "LS31", "en": "Lapu-Lapu (with Superior E-FU Noodles)", "zh": "石斑鱼上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS32", "en": "Lapu-Lapu (Salt & Pepper)", "zh": "椒盐石斑鱼", "price": "Seasonal Price"},
                 {"code": "LS33", "en": "Lapu-Lapu (Salted Egg Yolk)", "zh": "金沙石斑鱼", "price": "Seasonal Price"},
-                {"code": "LS34", "en": "Lapu-Lapu (Typhoon Shelter Style)", "zh": "避风塘炒石斑鱼", "price": "Seasonal Price"},
+                {"code": "LS34", "en": "Lapu-Lapu (Pei Fong Dong)", "zh": "避风塘炒石斑鱼", "price": "Seasonal Price"},
                 {"code": "LS35", "en": "Lapu-Lapu (Stir-Fried Ginger Onion)", "zh": "姜葱炒石斑鱼", "price": "Seasonal Price"},
                 {"code": "LS36", "en": "Lapu-Lapu (Steamed)", "zh": "清蒸石斑鱼", "price": "Seasonal Price"},
                 {"code": "LS37", "en": "Rock Lobster (Baked in Superior Stock)", "zh": "大龙虾焗上汤", "price": "Seasonal Price"},
@@ -3519,7 +3568,7 @@ class Command(BaseCommand):
                 {"code": "LS40", "en": "Rock Lobster (with Superior E-FU Noodles)", "zh": "大龙虾上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS41", "en": "Rock Lobster (Salt & Pepper)", "zh": "椒盐大龙虾", "price": "Seasonal Price"},
                 {"code": "LS42", "en": "Rock Lobster (Salted Egg Yolk)", "zh": "金沙大龙虾", "price": "Seasonal Price"},
-                {"code": "LS43", "en": "Rock Lobster (Typhoon Shelter Style)", "zh": "避风塘炒大龙虾", "price": "Seasonal Price"},
+                {"code": "LS43", "en": "Rock Lobster (Pei Fong Dong)", "zh": "避风塘炒大龙虾", "price": "Seasonal Price"},
                 {"code": "LS44", "en": "Rock Lobster (Stir-Fried Ginger Onion)", "zh": "姜葱炒大龙虾", "price": "Seasonal Price"},
                 {"code": "LS45", "en": "Rock Lobster (Steamed)", "zh": "清蒸大龙虾", "price": "Seasonal Price"},
                 {"code": "LS46", "en": "Mud Crab (Baked in Superior Stock)", "zh": "螃蟹焗上汤", "price": "Seasonal Price"},
@@ -3528,7 +3577,7 @@ class Command(BaseCommand):
                 {"code": "LS49", "en": "Mud Crab (with Superior E-FU Noodles)", "zh": "螃蟹上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS50", "en": "Mud Crab (Salt & Pepper)", "zh": "椒盐螃蟹", "price": "Seasonal Price"},
                 {"code": "LS51", "en": "Mud Crab (Salted Egg Yolk)", "zh": "金沙螃蟹", "price": "Seasonal Price"},
-                {"code": "LS52", "en": "Mud Crab (Typhoon Shelter Style)", "zh": "避风塘炒螃蟹", "price": "Seasonal Price"},
+                {"code": "LS52", "en": "Mud Crab (Pei Fong Dong)", "zh": "避风塘炒螃蟹", "price": "Seasonal Price"},
                 {"code": "LS53", "en": "Mud Crab (Stir-Fried Ginger Onion)", "zh": "姜葱炒螃蟹", "price": "Seasonal Price"},
                 {"code": "LS54", "en": "Mud Crab (Steamed)", "zh": "清蒸螃蟹", "price": "Seasonal Price"},
                 {"code": "LS55", "en": "Clams (Baked in Superior Stock)", "zh": "蛤蜊焗上汤", "price": "Seasonal Price"},
@@ -3537,7 +3586,7 @@ class Command(BaseCommand):
                 {"code": "LS58", "en": "Clams (with Superior E-FU Noodles)", "zh": "蛤蜊上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS59", "en": "Clams (Salt & Pepper)", "zh": "椒盐蛤蜊", "price": "Seasonal Price"},
                 {"code": "LS60", "en": "Clams (Salted Egg Yolk)", "zh": "金沙蛤蜊", "price": "Seasonal Price"},
-                {"code": "LS61", "en": "Clams (Typhoon Shelter Style)", "zh": "避风塘炒蛤蜊", "price": "Seasonal Price"},
+                {"code": "LS61", "en": "Clams (Pei Fong Dong)", "zh": "避风塘炒蛤蜊", "price": "Seasonal Price"},
                 {"code": "LS62", "en": "Clams (Stir-Fried Ginger Onion)", "zh": "姜葱炒蛤蜊", "price": "Seasonal Price"},
                 {"code": "LS63", "en": "Clams (Steamed)", "zh": "清蒸蛤蜊", "price": "Seasonal Price"},
                 {"code": "LS64", "en": "Nylon Clams (Baked in Superior Stock)", "zh": "蛤蜊焗上汤", "price": "Seasonal Price"},
@@ -3546,7 +3595,7 @@ class Command(BaseCommand):
                 {"code": "LS67", "en": "Nylon Clams (with Superior E-FU Noodles)", "zh": "蛤蜊上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS68", "en": "Nylon Clams (Salt & Pepper)", "zh": "椒盐蛤蜊", "price": "Seasonal Price"},
                 {"code": "LS69", "en": "Nylon Clams (Salted Egg Yolk)", "zh": "金沙蛤蜊", "price": "Seasonal Price"},
-                {"code": "LS70", "en": "Nylon Clams (Typhoon Shelter Style)", "zh": "避风塘炒蛤蜊", "price": "Seasonal Price"},
+                {"code": "LS70", "en": "Nylon Clams (Pei Fong Dong)", "zh": "避风塘炒蛤蜊", "price": "Seasonal Price"},
                 {"code": "LS71", "en": "Nylon Clams (Stir-Fried Ginger Onion)", "zh": "姜葱炒蛤蜊", "price": "Seasonal Price"},
                 {"code": "LS72", "en": "Nylon Clams (Steamed)", "zh": "清蒸蛤蜊", "price": "Seasonal Price"},
                 {"code": "LS73", "en": "Shark (Baked in Superior Stock)", "zh": "鲨鱼焗上汤", "price": "Seasonal Price"},
@@ -3555,7 +3604,7 @@ class Command(BaseCommand):
                 {"code": "LS76", "en": "Shark (with Superior E-FU Noodles)", "zh": "鲨鱼上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS77", "en": "Shark (Salt & Pepper)", "zh": "椒盐鲨鱼", "price": "Seasonal Price"},
                 {"code": "LS78", "en": "Shark (Salted Egg Yolk)", "zh": "金沙鲨鱼", "price": "Seasonal Price"},
-                {"code": "LS79", "en": "Shark (Typhoon Shelter Style)", "zh": "避风塘炒鲨鱼", "price": "Seasonal Price"},
+                {"code": "LS79", "en": "Shark (Pei Fong Dong)", "zh": "避风塘炒鲨鱼", "price": "Seasonal Price"},
                 {"code": "LS80", "en": "Shark (Stir-Fried Ginger Onion)", "zh": "姜葱炒鲨鱼", "price": "Seasonal Price"},
                 {"code": "LS81", "en": "Shark (Steamed)", "zh": "清蒸鲨鱼", "price": "Seasonal Price"},
             ],
@@ -4004,12 +4053,12 @@ class Command(BaseCommand):
             "Barbecue, Appetizer / 烧烤卤味": [
                 {"code": "BA01", "en": "Roasted Cold Cuts Combination", "zh": "锦绣烧味拼盘", "prices": {"S": 750, "M": 1500, "L": 2250}},
                 {"code": "BA02", "en": "Crispy Roasted Pork Belly (Lechon Macau)", "zh": "金牌烧腩仔", "prices": {"S": 680, "M": 1360, "L": 2040}},
-                {"code": "BA03", "en": "Honey Glazed BBQ Pork Asado", "zh": "蜜汁烤叉烧", "prices": {"S": 600, "M": 900, "L": 1200}},
+                {"code": "BA03", "en": "Honey Glazed BBQ Pork Asado", "zh": "蜜汁烤叉烧", "prices": {"S": 600, "M": 1200, "L": 1800}},
                 {"code": "BA04", "en": "Soy Chicken", "zh": "玫瑰豉油鸡", "prices": {"Half": 900, "Whole": 1800}},
                 {"code": "BA05", "en": "White Chicken (Hainanese Style)", "zh": "水晶白切鸡", "prices": {"Half": 900, "Whole": 1800}},
                 {"code": "BA06", "en": "Crispy Roasted Chicken", "zh": "南乳吊烧鸡", "prices": {"Half": 900, "Whole": 1800}},
-                {"code": "BA07", "en": "Crispy Fried Pigeon", "zh": "金牌烧乳鸽", "price": 750},
-                {"code": "BA08", "en": "Roasted Suckling Pig", "zh": "鸿运烤乳猪", "prices": {"Half": 4000, "Whole": 7500}},
+                {"code": "BA07", "en": "Crispy Fried Pigeon", "zh": "金牌烧乳鸽", "price": 850},
+                {"code": "BA08", "en": "Roasted Suckling Pig", "zh": "鸿运烤乳猪", "prices": {"Half": 5800, "Whole": 11000}},
                 {"code": "BA09", "en": "Roasted Goose", "zh": "金海湾烧鹅", "prices": {"Half": 3200, "Whole": 6000}},
                 {"code": "BA10", "en": "Peking Duck", "zh": "北京片皮鸭", "prices": {"Half": 1800, "Whole": 3500}},
                 {"code": "BA11", "en": "Roasted Rice Duck", "zh": "挂炉烧米鸭", "prices": {"Half": 1600, "Whole": 3000}},
@@ -4057,9 +4106,9 @@ class Command(BaseCommand):
                 {"code": "SP01", "en": "Hot Prawn Salad", "zh": "热沙律虾球", "prices": {"S": 1500, "M": 2250, "L": 3000}},
                 {"code": "SP02", "en": "Sautéed Prawns with Broccoli", "zh": "西兰花虾球", "prices": {"S": 1500, "M": 2250, "L": 3000}},
                 {"code": "SP03", "en": "Sautéed Prawns with Pomelo Sauce", "zh": "柚子明虾球", "prices": {"S": 1500, "M": 2250, "L": 3000}},
-                {"code": "SP04", "en": "Baked Prawns with Black & White Pepper", "zh": "黑白胡椒焗大虾", "prices": {"S": 1800, "M": 2700, "L": 3600}},
-                {"code": "SP05", "en": "Singaporean Cereal Prawns", "zh": "星洲麦片焗海虾", "prices": {"S": 1800, "M": 2700, "L": 3600}},
-                {"code": "SP06", "en": "Steamed Prawns with Garlic & Vermicelli", "zh": "蒜蓉粉丝蒸大虾", "prices": {"S": 1800, "M": 2700, "L": 3600}},
+                {"code": "SP04", "en": "Baked Prawns with Black & White Pepper", "zh": "黑白胡椒焗大虾", "prices": {"S": 1900, "M": 2850, "L": 3800}},
+                {"code": "SP05", "en": "Singaporean Cereal Prawns", "zh": "星洲麦片焗海虾", "prices": {"S": 1900, "M": 2850, "L": 3800}},
+                {"code": "SP06", "en": "Steamed Prawns with Garlic & Vermicelli", "zh": "蒜蓉粉丝蒸大虾", "prices": {"S": 1900, "M": 2850, "L": 3800}},
                 {"code": "SP07", "en": "Sautéed Prawns & Scallops with XO Sauce", "zh": "XO酱西芹炒虾球带子", "prices": {"S": 2000, "M": 3000, "L": 4000}},
                 {"code": "SP08", "en": "Fried Shrimp Balls with Lemon Sauce", "zh": "沙律柠檬酱炸虾球", "prices": {"S": 1500, "M": 2250, "L": 3000}},
             ],
@@ -4124,7 +4173,7 @@ class Command(BaseCommand):
                 {"code": "VE01", "en": "Sautéed Imported Vegetables with Garlic", "zh": "蒜茸炒入口时蔬", "price": "Seasonal Price"},
                 {"code": "VE02", "en": "Fried Pumpkin with Salted Egg", "zh": "黄金南瓜条", "prices": {"S": 500, "M": 750, "L": 1000}},
                 {"code": "VE03", "en": "Braised Broccoli with Black Mushroom", "zh": "香菇扒西兰花", "prices": {"S": 700, "M": 1050, "L": 1400}},
-                {"code": "VE04", "en": "Vegetables with 3 Kinds of Egg", "zh": "三皇蛋时蔬", "prices": {"S": 600, "M": 900, "L": 1200}},
+                {"code": "VE04", "en": "Vegetables with 3 Kinds of Egg", "zh": "三皇蛋时蔬", "prices": {"S": 700, "M": 1050, "L": 1400}},
                 {"code": "VE05", "en": "Assorted Vegetables with Fungus & Beancurd", "zh": "洪七公炒斋", "prices": {"S": 700, "M": 1050, "L": 1400}},
                 {"code": "VE06", "en": "Spicy Eggplant Claypot with Minced Pork", "zh": "鱼香茄子煲", "prices": {"S": 600, "M": 900, "L": 1200}},
                 {"code": "VE07", "en": "Dried Scallop with Golden Mushroom & Vegetables", "zh": "金瑶扒时蔬", "prices": {"S": 1000, "M": 1500, "L": 2000}},
@@ -4155,7 +4204,7 @@ class Command(BaseCommand):
                 {"code": "LS04", "en": "Mantis Shrimp (with Superior E-FU Noodles)", "zh": "海螳螂上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS05", "en": "Mantis Shrimp (Salt & Pepper)", "zh": "椒盐海螳螂", "price": "Seasonal Price"},
                 {"code": "LS06", "en": "Mantis Shrimp (Salted Egg Yolk)", "zh": "金沙海螳螂", "price": "Seasonal Price"},
-                {"code": "LS07", "en": "Mantis Shrimp (Typhoon Shelter Style)", "zh": "避风塘炒海螳螂", "price": "Seasonal Price"},
+                {"code": "LS07", "en": "Mantis Shrimp (Pei Fong Dong)", "zh": "避风塘炒海螳螂", "price": "Seasonal Price"},
                 {"code": "LS08", "en": "Mantis Shrimp (Stir-Fried Ginger Onion)", "zh": "姜葱炒海螳螂", "price": "Seasonal Price"},
                 {"code": "LS09", "en": "Mantis Shrimp (Steamed)", "zh": "清蒸海螳螂", "price": "Seasonal Price"},
                 {"code": "LS10", "en": "Live Suahe (Baked in Superior Stock)", "zh": "沙虾焗上汤", "price": "Seasonal Price"},
@@ -4164,7 +4213,7 @@ class Command(BaseCommand):
                 {"code": "LS13", "en": "Live Suahe (with Superior E-FU Noodles)", "zh": "沙虾上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS14", "en": "Live Suahe (Salt & Pepper)", "zh": "椒盐沙虾", "price": "Seasonal Price"},
                 {"code": "LS15", "en": "Live Suahe (Salted Egg Yolk)", "zh": "金沙沙虾", "price": "Seasonal Price"},
-                {"code": "LS16", "en": "Live Suahe (Typhoon Shelter Style)", "zh": "避风塘炒沙虾", "price": "Seasonal Price"},
+                {"code": "LS16", "en": "Live Suahe (Pei Fong Dong)", "zh": "避风塘炒沙虾", "price": "Seasonal Price"},
                 {"code": "LS17", "en": "Live Suahe (Stir-Fried Ginger Onion)", "zh": "姜葱炒沙虾", "price": "Seasonal Price"},
                 {"code": "LS18", "en": "Live Suahe (Steamed)", "zh": "清蒸沙虾", "price": "Seasonal Price"},
                 {"code": "LS19", "en": "Lobster (Baked in Superior Stock)", "zh": "龙虾焗上汤", "price": "Seasonal Price"},
@@ -4173,7 +4222,7 @@ class Command(BaseCommand):
                 {"code": "LS22", "en": "Lobster (with Superior E-FU Noodles)", "zh": "龙虾上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS23", "en": "Lobster (Salt & Pepper)", "zh": "椒盐龙虾", "price": "Seasonal Price"},
                 {"code": "LS24", "en": "Lobster (Salted Egg Yolk)", "zh": "金沙龙虾", "price": "Seasonal Price"},
-                {"code": "LS25", "en": "Lobster (Typhoon Shelter Style)", "zh": "避风塘炒龙虾", "price": "Seasonal Price"},
+                {"code": "LS25", "en": "Lobster (Pei Fong Dong)", "zh": "避风塘炒龙虾", "price": "Seasonal Price"},
                 {"code": "LS26", "en": "Lobster (Stir-Fried Ginger Onion)", "zh": "姜葱炒龙虾", "price": "Seasonal Price"},
                 {"code": "LS27", "en": "Lobster (Steamed)", "zh": "清蒸龙虾", "price": "Seasonal Price"},
                 {"code": "LS28", "en": "Lapu-Lapu (Baked in Superior Stock)", "zh": "石斑鱼焗上汤", "price": "Seasonal Price"},
@@ -4182,7 +4231,7 @@ class Command(BaseCommand):
                 {"code": "LS31", "en": "Lapu-Lapu (with Superior E-FU Noodles)", "zh": "石斑鱼上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS32", "en": "Lapu-Lapu (Salt & Pepper)", "zh": "椒盐石斑鱼", "price": "Seasonal Price"},
                 {"code": "LS33", "en": "Lapu-Lapu (Salted Egg Yolk)", "zh": "金沙石斑鱼", "price": "Seasonal Price"},
-                {"code": "LS34", "en": "Lapu-Lapu (Typhoon Shelter Style)", "zh": "避风塘炒石斑鱼", "price": "Seasonal Price"},
+                {"code": "LS34", "en": "Lapu-Lapu (Pei Fong Dong)", "zh": "避风塘炒石斑鱼", "price": "Seasonal Price"},
                 {"code": "LS35", "en": "Lapu-Lapu (Stir-Fried Ginger Onion)", "zh": "姜葱炒石斑鱼", "price": "Seasonal Price"},
                 {"code": "LS36", "en": "Lapu-Lapu (Steamed)", "zh": "清蒸石斑鱼", "price": "Seasonal Price"},
                 {"code": "LS37", "en": "Rock Lobster (Baked in Superior Stock)", "zh": "大龙虾焗上汤", "price": "Seasonal Price"},
@@ -4191,7 +4240,7 @@ class Command(BaseCommand):
                 {"code": "LS40", "en": "Rock Lobster (with Superior E-FU Noodles)", "zh": "大龙虾上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS41", "en": "Rock Lobster (Salt & Pepper)", "zh": "椒盐大龙虾", "price": "Seasonal Price"},
                 {"code": "LS42", "en": "Rock Lobster (Salted Egg Yolk)", "zh": "金沙大龙虾", "price": "Seasonal Price"},
-                {"code": "LS43", "en": "Rock Lobster (Typhoon Shelter Style)", "zh": "避风塘炒大龙虾", "price": "Seasonal Price"},
+                {"code": "LS43", "en": "Rock Lobster (Pei Fong Dong)", "zh": "避风塘炒大龙虾", "price": "Seasonal Price"},
                 {"code": "LS44", "en": "Rock Lobster (Stir-Fried Ginger Onion)", "zh": "姜葱炒大龙虾", "price": "Seasonal Price"},
                 {"code": "LS45", "en": "Rock Lobster (Steamed)", "zh": "清蒸大龙虾", "price": "Seasonal Price"},
                 {"code": "LS46", "en": "Mud Crab (Baked in Superior Stock)", "zh": "螃蟹焗上汤", "price": "Seasonal Price"},
@@ -4200,7 +4249,7 @@ class Command(BaseCommand):
                 {"code": "LS49", "en": "Mud Crab (with Superior E-FU Noodles)", "zh": "螃蟹上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS50", "en": "Mud Crab (Salt & Pepper)", "zh": "椒盐螃蟹", "price": "Seasonal Price"},
                 {"code": "LS51", "en": "Mud Crab (Salted Egg Yolk)", "zh": "金沙螃蟹", "price": "Seasonal Price"},
-                {"code": "LS52", "en": "Mud Crab (Typhoon Shelter Style)", "zh": "避风塘炒螃蟹", "price": "Seasonal Price"},
+                {"code": "LS52", "en": "Mud Crab (Pei Fong Dong)", "zh": "避风塘炒螃蟹", "price": "Seasonal Price"},
                 {"code": "LS53", "en": "Mud Crab (Stir-Fried Ginger Onion)", "zh": "姜葱炒螃蟹", "price": "Seasonal Price"},
                 {"code": "LS54", "en": "Mud Crab (Steamed)", "zh": "清蒸螃蟹", "price": "Seasonal Price"},
                 {"code": "LS55", "en": "Clams (Baked in Superior Stock)", "zh": "蛤蜊焗上汤", "price": "Seasonal Price"},
@@ -4209,7 +4258,7 @@ class Command(BaseCommand):
                 {"code": "LS58", "en": "Clams (with Superior E-FU Noodles)", "zh": "蛤蜊上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS59", "en": "Clams (Salt & Pepper)", "zh": "椒盐蛤蜊", "price": "Seasonal Price"},
                 {"code": "LS60", "en": "Clams (Salted Egg Yolk)", "zh": "金沙蛤蜊", "price": "Seasonal Price"},
-                {"code": "LS61", "en": "Clams (Typhoon Shelter Style)", "zh": "避风塘炒蛤蜊", "price": "Seasonal Price"},
+                {"code": "LS61", "en": "Clams (Pei Fong Dong)", "zh": "避风塘炒蛤蜊", "price": "Seasonal Price"},
                 {"code": "LS62", "en": "Clams (Stir-Fried Ginger Onion)", "zh": "姜葱炒蛤蜊", "price": "Seasonal Price"},
                 {"code": "LS63", "en": "Clams (Steamed)", "zh": "清蒸蛤蜊", "price": "Seasonal Price"},
                 {"code": "LS64", "en": "Nylon Clams (Baked in Superior Stock)", "zh": "蛤蜊焗上汤", "price": "Seasonal Price"},
@@ -4218,7 +4267,7 @@ class Command(BaseCommand):
                 {"code": "LS67", "en": "Nylon Clams (with Superior E-FU Noodles)", "zh": "蛤蜊上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS68", "en": "Nylon Clams (Salt & Pepper)", "zh": "椒盐蛤蜊", "price": "Seasonal Price"},
                 {"code": "LS69", "en": "Nylon Clams (Salted Egg Yolk)", "zh": "金沙蛤蜊", "price": "Seasonal Price"},
-                {"code": "LS70", "en": "Nylon Clams (Typhoon Shelter Style)", "zh": "避风塘炒蛤蜊", "price": "Seasonal Price"},
+                {"code": "LS70", "en": "Nylon Clams (Pei Fong Dong)", "zh": "避风塘炒蛤蜊", "price": "Seasonal Price"},
                 {"code": "LS71", "en": "Nylon Clams (Stir-Fried Ginger Onion)", "zh": "姜葱炒蛤蜊", "price": "Seasonal Price"},
                 {"code": "LS72", "en": "Nylon Clams (Steamed)", "zh": "清蒸蛤蜊", "price": "Seasonal Price"},
                 {"code": "LS73", "en": "Shark (Baked in Superior Stock)", "zh": "鲨鱼焗上汤", "price": "Seasonal Price"},
@@ -4227,7 +4276,7 @@ class Command(BaseCommand):
                 {"code": "LS76", "en": "Shark (with Superior E-FU Noodles)", "zh": "鲨鱼上汤伊面", "price": "Seasonal Price"},
                 {"code": "LS77", "en": "Shark (Salt & Pepper)", "zh": "椒盐鲨鱼", "price": "Seasonal Price"},
                 {"code": "LS78", "en": "Shark (Salted Egg Yolk)", "zh": "金沙鲨鱼", "price": "Seasonal Price"},
-                {"code": "LS79", "en": "Shark (Typhoon Shelter Style)", "zh": "避风塘炒鲨鱼", "price": "Seasonal Price"},
+                {"code": "LS79", "en": "Shark (Pei Fong Dong)", "zh": "避风塘炒鲨鱼", "price": "Seasonal Price"},
                 {"code": "LS80", "en": "Shark (Stir-Fried Ginger Onion)", "zh": "姜葱炒鲨鱼", "price": "Seasonal Price"},
                 {"code": "LS81", "en": "Shark (Steamed)", "zh": "清蒸鲨鱼", "price": "Seasonal Price"},
             ],
@@ -4540,8 +4589,8 @@ ADMIN_PHONE_NUMBERS=09778103650,09175807166,09778098741
 # # ────────────────────────────────
 # # 🧵 CELERY + REDIS
 # # ────────────────────────────────
-# CELERY_BROKER_URL=redis://localhost:6379/0
-# CELERY_RESULT_BACKEND=redis://localhost:6379/0
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
 
 # # ────────────────────────────────
 # # 🌐 CORS / CSRF CONFIGURATION
@@ -6350,13 +6399,14 @@ jobs:
           
           # 2. Pull Latest Code (Will now abort if git fails)
           git checkout main
+          git reset --hard HEAD
           git pull origin main
           
-          # 3. Rebuild Frontend (Happens first so backend can collect the new files)
+          # 3. Rebuild Frontend
           echo "🎨 Building Frontend..."
           cd frontend
           npm install --legacy-peer-deps
-          npm install react-is --save --legacy-peer-deps
+          npm install react-is react-helmet-async recharts react-calendar date-fns react-quill-new react-icons --save --legacy-peer-deps
           npm run build
           
           # 4. Update Backend

@@ -9,6 +9,8 @@ FILES_TO_READ = [
     'backend/goldenbay/settings.py',
     'backend/goldenbay/urls.py',
     'backend/goldenbay/wsgi.py',
+    'backend/goldenbay/celery.py',
+
 
     'backend/core/admin.py',
     'backend/core/apps.py',
@@ -38,6 +40,7 @@ FILES_TO_READ = [
     'backend/reservations/urls.py',
     'backend/reservations/views.py',
     'backend/reservations/utils.py',
+    'backend/reservations/tasks.py',
 
     'backend/marketing/admin.py',
     'backend/marketing/apps.py',
