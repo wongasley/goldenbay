@@ -127,18 +127,6 @@ const BookingManager = () => {
       }
   };
 
-  // Helper for the new Source logic
-  const getSourceDisplay = (source) => {
-      if (!source) return 'Website';
-      switch(source) {
-          case 'WEB': return 'Website';
-          case 'WALK_IN': return 'Walk-In';
-          case 'PHONE': return 'Phone';
-          case 'SOCIAL': return 'Social Media';
-          default: return source;
-      }
-  };
-
   return (
     <div className="space-y-4 pb-20">
       
@@ -149,7 +137,7 @@ const BookingManager = () => {
                   <h1 className="text-xl font-bold text-gray-900 font-serif">Booking Management</h1>
                   <p className="text-gray-500 text-xs mt-0.5">Manage, confirm, and track reservations.</p>
               </div>
-              <button onClick={() => setShowManualForm(true)} className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-all flex items-center gap-1.5 w-full md:w-auto justify-center">
+              <button onClick={() => setShowManualForm(true)} className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[9px] rounded shadow-sm hover:bg-gold-700 transition-all flex items-center gap-1.5 w-full md:w-auto justify-center">
                   <Plus size={14} /> Manual Booking
               </button>
           </div>
@@ -161,7 +149,7 @@ const BookingManager = () => {
                   <button 
                     key={f} 
                     onClick={() => setFilter(f)} 
-                    className={`text-[9px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded transition-all border 
+                    className={`text-[8px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded transition-all border 
                         ${filter === f 
                             ? 'bg-gray-900 text-white border-gray-900 shadow-sm' 
                             : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-900'}`}
@@ -206,12 +194,12 @@ const BookingManager = () => {
             <table className="w-full text-left border-collapse">
             <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">ID</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Customer Info</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Schedule</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Details</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                <th className="px-4 py-3 text-[9px] font-bold text-gray-500 uppercase tracking-widest">ID</th>
+                <th className="px-4 py-3 text-[9px] font-bold text-gray-500 uppercase tracking-widest">Customer Info</th>
+                <th className="px-4 py-3 text-[9px] font-bold text-gray-500 uppercase tracking-widest">Schedule</th>
+                <th className="px-4 py-3 text-[9px] font-bold text-gray-500 uppercase tracking-widest">Details</th>
+                <th className="px-4 py-3 text-[9px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
+                <th className="px-4 py-3 text-[9px] font-bold text-gray-500 uppercase tracking-widest text-right">Actions</th>
                 </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -230,29 +218,29 @@ const BookingManager = () => {
                     <tr key={b.id} className={`transition-colors hover:bg-gray-50 ${isStale(b.created_at, b.status) ? 'bg-rose-50/30' : ''}`}>
                         
                         <td className="px-4 py-3 align-top">
-                            <span className="text-xs font-mono font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">#{b.id}</span>
+                            <span className="text-[10px] font-mono font-medium text-gray-400">#{b.id}</span>
                         </td>
                         
                         <td className="px-4 py-3 align-top">
-                            <div className="flex flex-col gap-1">
+                            <div className="flex flex-col gap-0.5">
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-bold text-gray-900 text-sm">{b.customer_name}</span>
+                                    <span className="font-bold text-gray-900 text-xs">{b.customer_name}</span>
                                     {b.customer_no_show_count > 0 && (
-                                        <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest border border-rose-200" title={`${b.customer_no_show_count} previous No-Shows`}>
-                                            <Flag size={10} /> {b.customer_no_show_count}
+                                        <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded flex items-center gap-1 text-[8px] font-bold uppercase tracking-widest border border-rose-200" title={`${b.customer_no_show_count} previous No-Shows`}>
+                                            <Flag size={8} /> {b.customer_no_show_count}
                                         </span>
                                     )}
                                 </div>
-                                <div className="text-xs text-gray-500 font-mono flex items-center gap-1.5">
-                                    <Phone size={12} className="text-gray-400"/> {b.customer_contact}
+                                <div className="text-[11px] text-gray-500 font-mono flex items-center gap-1.5">
+                                    <Phone size={10} className="text-gray-400"/> {b.customer_contact}
                                 </div>
                             </div>
                         </td>
 
                         <td className="px-4 py-3 align-top">
                             <div className="flex flex-col gap-0.5">
-                                <span className="text-sm font-bold text-gray-800">{b.date}</span>
-                                <span className="text-xs font-medium text-gold-700 w-max">
+                                <span className="text-xs font-bold text-gray-800">{b.date}</span>
+                                <span className="text-[10px] font-medium text-gray-500 w-max uppercase tracking-wider">
                                     {b.time} ({b.session})
                                 </span>
                             </div>
@@ -260,33 +248,18 @@ const BookingManager = () => {
 
                         <td className="px-4 py-3 align-top">
                             <div className="flex flex-col gap-0.5">
-                                <span className="text-xs font-bold text-gray-800">{b.room_name || 'Main Dining Hall'}</span>
-                                <span className="text-[11px] text-gray-500 flex items-center gap-1">
-                                    <Users size={12} className="text-gray-400"/> {b.pax} Guests
+                                <span className="text-[11px] font-bold text-gray-800">{b.room_name || 'Main Dining Hall'}</span>
+                                <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                                    <Users size={10} className="text-gray-400"/> {b.pax} Guests
                                 </span>
                             </div>
                         </td>
 
                         <td className="px-4 py-3 align-top">
                             <div className="flex flex-col gap-1.5 items-start">
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${getStatusBadge(b.status)}`}>
+                                <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border ${getStatusBadge(b.status)}`}>
                                     {b.status.replace('_', '-')}
                                 </span>
-                                
-                                {/* AUDIT LOG & SOURCE IN TABLE */}
-                                <div className="text-[9px] text-gray-400 font-mono flex flex-col leading-tight border-t border-gray-100 pt-1.5 w-full max-w-[120px]">
-                                    <span className="text-gold-600 font-bold mb-0.5 uppercase">
-                                        [{getSourceDisplay(b.source)}]
-                                    </span>
-                                    <span className="truncate" title={`Created: ${new Date(b.created_at).toLocaleString()}`}>
-                                        <span className="font-bold">E:</span> {b.encoded_by_name || 'Web'}
-                                    </span>
-                                    {b.last_modified_by_name && (
-                                        <span className="truncate" title={`Modified: ${new Date(b.updated_at).toLocaleString()}`}>
-                                            <span className="font-bold">M:</span> {b.last_modified_by_name}
-                                        </span>
-                                    )}
-                                </div>
                             </div>
                         </td>
 
@@ -295,39 +268,39 @@ const BookingManager = () => {
                             <div className="flex justify-end gap-1.5 flex-wrap max-w-[160px] ml-auto">
                                 
                                 {b.status === 'PENDING' && (
-                                    <button onClick={(e) => updateStatus(b.id, {status: 'CONFIRMED'}, "Confirmed!", e)} className="bg-blue-600 text-white px-2 py-1.5 rounded hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider w-full justify-center">
-                                        <Check size={14} /> Confirm
+                                    <button onClick={(e) => updateStatus(b.id, {status: 'CONFIRMED'}, "Confirmed!", e)} className="bg-blue-600 text-white px-2 py-1.5 rounded hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider w-full justify-center">
+                                        <Check size={12} /> Confirm
                                     </button>
                                 )}
 
                                 {b.status === 'CONFIRMED' && (
                                     <>
-                                        <button onClick={(e) => updateStatus(b.id, {status: 'SEATED'}, "Guest Seated", e)} className="flex-1 bg-indigo-600 text-white px-2 py-1.5 rounded hover:bg-indigo-700 transition-colors shadow-sm flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider">
-                                            <UserCheck size={12} /> Seat
+                                        <button onClick={(e) => updateStatus(b.id, {status: 'SEATED'}, "Guest Seated", e)} className="flex-1 bg-indigo-600 text-white px-2 py-1.5 rounded hover:bg-indigo-700 transition-colors shadow-sm flex items-center justify-center gap-1 text-[9px] font-bold uppercase tracking-wider">
+                                            <UserCheck size={10} /> Seat
                                         </button>
-                                        <button onClick={(e) => updateStatus(b.id, {status: 'NO_SHOW'}, "Marked as No-Show", e)} className="flex-1 bg-orange-100 text-orange-800 border border-orange-300 px-2 py-1.5 rounded hover:bg-orange-200 transition-colors shadow-sm flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider">
-                                            <Flag size={12} /> NS
+                                        <button onClick={(e) => updateStatus(b.id, {status: 'NO_SHOW'}, "Marked as No-Show", e)} className="flex-1 bg-orange-100 text-orange-800 border border-orange-300 px-2 py-1.5 rounded hover:bg-orange-200 transition-colors shadow-sm flex items-center justify-center gap-1 text-[9px] font-bold uppercase tracking-wider">
+                                            <Flag size={10} /> NS
                                         </button>
                                     </>
                                 )}
 
                                 {b.status === 'SEATED' && (
-                                    <button onClick={(e) => updateStatus(b.id, {status: 'COMPLETED'}, "Booking Completed", e)} className="w-full bg-emerald-600 text-white px-2 py-1.5 rounded hover:bg-emerald-700 transition-colors shadow-sm flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider">
-                                        <CheckCircle2 size={14} /> Complete
+                                    <button onClick={(e) => updateStatus(b.id, {status: 'COMPLETED'}, "Booking Completed", e)} className="w-full bg-emerald-600 text-white px-2 py-1.5 rounded hover:bg-emerald-700 transition-colors shadow-sm flex items-center justify-center gap-1 text-[9px] font-bold uppercase tracking-wider">
+                                        <CheckCircle2 size={12} /> Complete
                                     </button>
                                 )}
 
                                 {/* Always show Edit unless Cancelled/Completed */}
                                 {!['CANCELLED', 'COMPLETED', 'NO_SHOW'].includes(b.status) && (
                                     <button onClick={(e) => handleOpenEdit(b, e)} className="bg-white text-gray-600 p-1.5 rounded border border-gray-300 hover:bg-gray-100 shadow-sm transition-colors" title="Edit Booking">
-                                        <Edit size={14} />
+                                        <Edit size={12} />
                                     </button>
                                 )}
                                 
                                 {/* Only allow Cancel on active states */}
                                 {['PENDING', 'CONFIRMED'].includes(b.status) && hasCancelPermission && (
                                     <button onClick={(e) => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!", e)} className="bg-rose-50 text-rose-600 p-1.5 rounded border border-rose-200 hover:bg-rose-100 shadow-sm transition-colors" title="Cancel Booking">
-                                        <X size={14} />
+                                        <X size={12} />
                                     </button>
                                 )}
                             </div>
@@ -354,16 +327,16 @@ const BookingManager = () => {
                     <div className="flex justify-between items-start gap-3">
                         <div>
                             <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <h3 className="font-bold text-gray-900 text-base">{b.customer_name}</h3>
+                                <h3 className="font-bold text-gray-900 text-sm">{b.customer_name}</h3>
                                 {b.customer_no_show_count > 0 && (
-                                    <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest border border-rose-200">
+                                    <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded flex items-center gap-1 text-[8px] font-bold uppercase tracking-widest border border-rose-200">
                                         <Flag size={10} /> {b.customer_no_show_count}
                                     </span>
                                 )}
                             </div>
-                            <span className="text-xs text-gray-500 font-mono flex items-center gap-1.5"><Phone size={12} className="text-gray-400"/> {b.customer_contact}</span>
+                            <span className="text-[11px] text-gray-500 font-mono flex items-center gap-1.5"><Phone size={10} className="text-gray-400"/> {b.customer_contact}</span>
                         </div>
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border shrink-0 ${getStatusBadge(b.status)}`}>
+                        <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest border shrink-0 ${getStatusBadge(b.status)}`}>
                             {b.status.replace('_', '-')}
                         </span>
                     </div>
@@ -371,48 +344,39 @@ const BookingManager = () => {
                     {/* Details Grid */}
                     <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-md border border-gray-100">
                         <div>
-                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Schedule</p>
-                            <p className="font-bold text-gray-800 text-sm">{b.date}</p>
-                            <p className="text-xs text-gold-700 font-medium">{b.time}</p>
+                            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Schedule</p>
+                            <p className="font-bold text-gray-800 text-xs">{b.date}</p>
+                            <p className="text-[11px] text-gray-500 font-medium">{b.time}</p>
                         </div>
                         <div>
-                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Details</p>
-                            <p className="font-bold text-gray-800 text-xs line-clamp-1">{b.room_name || 'Main Hall'}</p>
-                            <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5"><Users size={10} /> {b.pax}</p>
+                            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Details</p>
+                            <p className="font-bold text-gray-800 text-[11px] line-clamp-1">{b.room_name || 'Main Hall'}</p>
+                            <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5"><Users size={10} /> {b.pax}</p>
                         </div>
-                    </div>
-
-                    {/* Mobile Audit Log */}
-                    <div className="text-[9px] text-gray-400 font-mono flex items-center justify-between px-1">
-                        <div className="flex gap-2">
-                            <span>Enc: <span className="font-medium text-gray-600">{b.encoded_by_name || 'Web'}</span></span>
-                            {b.last_modified_by_name && <span>Mod: <span className="font-medium text-gray-600">{b.last_modified_by_name}</span></span>}
-                        </div>
-                        <span className="text-gold-600 font-bold uppercase">[{getSourceDisplay(b.source)}]</span>
                     </div>
                     
                     {/* Mobile Action Buttons */}
                     <div className="flex flex-wrap gap-1.5 pt-2 border-t border-gray-100">
                         {b.status === 'PENDING' && (
-                            <button onClick={(e) => updateStatus(b.id, {status: 'CONFIRMED'}, "Confirmed!", e)} className="flex-1 bg-blue-600 text-white py-2 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm"><Check size={14} className="inline mr-1"/> Confirm</button>
+                            <button onClick={(e) => updateStatus(b.id, {status: 'CONFIRMED'}, "Confirmed!", e)} className="flex-1 bg-blue-600 text-white py-2 rounded text-[9px] font-bold uppercase tracking-wider shadow-sm"><Check size={12} className="inline mr-1"/> Confirm</button>
                         )}
                         {b.status === 'CONFIRMED' && (
                             <>
-                                <button onClick={(e) => updateStatus(b.id, {status: 'SEATED'}, "Guest Seated", e)} className="flex-1 bg-indigo-600 text-white py-2 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm"><UserCheck size={14} className="inline mr-1"/> Seated</button>
-                                <button onClick={(e) => updateStatus(b.id, {status: 'NO_SHOW'}, "Marked as No-Show", e)} className="flex-1 bg-orange-100 text-orange-800 border border-orange-200 py-2 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm"><Flag size={12} className="inline mr-1"/> No Show</button>
+                                <button onClick={(e) => updateStatus(b.id, {status: 'SEATED'}, "Guest Seated", e)} className="flex-1 bg-indigo-600 text-white py-2 rounded text-[9px] font-bold uppercase tracking-wider shadow-sm"><UserCheck size={12} className="inline mr-1"/> Seated</button>
+                                <button onClick={(e) => updateStatus(b.id, {status: 'NO_SHOW'}, "Marked as No-Show", e)} className="flex-1 bg-orange-100 text-orange-800 border border-orange-200 py-2 rounded text-[9px] font-bold uppercase tracking-wider shadow-sm"><Flag size={10} className="inline mr-1"/> No Show</button>
                             </>
                         )}
                         {b.status === 'SEATED' && (
-                            <button onClick={(e) => updateStatus(b.id, {status: 'COMPLETED'}, "Booking Completed", e)} className="w-full bg-emerald-600 text-white py-2 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm"><CheckCircle2 size={14} className="inline mr-1"/> Complete</button>
+                            <button onClick={(e) => updateStatus(b.id, {status: 'COMPLETED'}, "Booking Completed", e)} className="w-full bg-emerald-600 text-white py-2 rounded text-[9px] font-bold uppercase tracking-wider shadow-sm"><CheckCircle2 size={12} className="inline mr-1"/> Complete</button>
                         )}
                         
                         <div className="w-full flex gap-1.5 mt-0.5">
                             {!['CANCELLED', 'COMPLETED', 'NO_SHOW'].includes(b.status) && (
-                                <button onClick={(e) => handleOpenEdit(b, e)} className="flex-1 bg-white text-gray-700 py-2 rounded text-[10px] font-bold uppercase tracking-wider border border-gray-300 shadow-sm hover:bg-gray-50"><Edit size={12} className="inline mr-1 text-gray-400"/> Edit</button>
+                                <button onClick={(e) => handleOpenEdit(b, e)} className="flex-1 bg-white text-gray-700 py-2 rounded text-[9px] font-bold uppercase tracking-wider border border-gray-300 shadow-sm hover:bg-gray-50"><Edit size={10} className="inline mr-1 text-gray-400"/> Edit</button>
                             )}
                             
                             {['PENDING', 'CONFIRMED'].includes(b.status) && hasCancelPermission && (
-                                <button onClick={(e) => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!", e)} className="flex-1 bg-rose-50 text-rose-700 py-2 rounded text-[10px] font-bold uppercase tracking-wider border border-rose-200 shadow-sm hover:bg-rose-100"><X size={12} className="inline mr-1 text-rose-500"/> Cancel</button>
+                                <button onClick={(e) => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!", e)} className="flex-1 bg-rose-50 text-rose-700 py-2 rounded text-[9px] font-bold uppercase tracking-wider border border-rose-200 shadow-sm hover:bg-rose-100"><X size={10} className="inline mr-1 text-rose-500"/> Cancel</button>
                             )}
                         </div>
                     </div>
@@ -507,7 +471,7 @@ const BookingManager = () => {
                           </select>
                       </div>
 
-                      {/* --- AUDIT LOG BLOCK --- */}
+                      {/* --- AUDIT LOG BLOCK (Hidden in table, shown in Edit Modal) --- */}
                       <div className="bg-gray-50 p-3 rounded border border-gray-100 text-[10px] text-gray-500 font-mono space-y-1.5 mt-4">
                           <p className="flex justify-between items-center">
                               <span className="uppercase tracking-widest font-bold text-gray-400 text-[9px]">Source</span> 
