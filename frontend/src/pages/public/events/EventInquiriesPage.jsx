@@ -21,7 +21,7 @@ const EventInquiriesPage = () => {
   return (
     <div className="min-h-screen bg-cream-50 text-gray-900 font-sans selection:bg-gold-500 selection:text-white">
       
-      {/* --- HERO BANNER (Matches Menu/Reservation Style) --- */}
+      {/* --- HERO BANNER (Standardized size) --- */}
       <div className="relative h-[40vh] w-full flex items-center justify-center pt-24 bg-black">
         <div className="absolute inset-0 opacity-60">
           <img src={heroimage} className="w-full h-full object-cover" alt="Golden Bay Grand Events" />
@@ -55,7 +55,7 @@ const EventInquiriesPage = () => {
               <Users size={28} strokeWidth={1} />
             </div>
             <h3 className={`text-xl font-serif font-bold text-gray-900 ${getFontClass()}`}>{t('events.f1Title')}</h3>
-            <p className="text-sm text-gray-500 leading-loose font-light">{t('events.f1Desc')}</p>
+            <p className={`text-sm text-gray-500 leading-loose font-light ${getFontClass()}`}>{t('events.f1Desc')}</p>
           </motion.div>
 
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.1 }} className="text-center space-y-4">
@@ -63,7 +63,7 @@ const EventInquiriesPage = () => {
               <Building size={28} strokeWidth={1} />
             </div>
             <h3 className={`text-xl font-serif font-bold text-gray-900 ${getFontClass()}`}>{t('events.f2Title')}</h3>
-            <p className="text-sm text-gray-500 leading-loose font-light">{t('events.f2Desc')}</p>
+            <p className={`text-sm text-gray-500 leading-loose font-light ${getFontClass()}`}>{t('events.f2Desc')}</p>
           </motion.div>
 
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.2 }} className="text-center space-y-4">
@@ -71,7 +71,7 @@ const EventInquiriesPage = () => {
               <MonitorPlay size={28} strokeWidth={1} />
             </div>
             <h3 className={`text-xl font-serif font-bold text-gray-900 ${getFontClass()}`}>{t('events.f3Title')}</h3>
-            <p className="text-sm text-gray-500 leading-loose font-light">{t('events.f3Desc')}</p>
+            <p className={`text-sm text-gray-500 leading-loose font-light ${getFontClass()}`}>{t('events.f3Desc')}</p>
           </motion.div>
         </div>
       </div>
@@ -79,12 +79,19 @@ const EventInquiriesPage = () => {
       {/* --- CONTENT SECTION 2: MILESTONES (ENGAGING ICONS) --- */}
       <div className="bg-white py-24 border-y border-gray-100">
         <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center mb-16">
-                <h2 className={`text-3xl md:text-4xl font-serif text-gray-900 mb-4 ${getFontClass()}`}>{t('events.milestones')}</h2>
-                <p className="text-gray-500 font-light max-w-lg mx-auto">{t('events.milestonesDesc')}</p>
+            <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
+                <div className="max-w-xl text-left">
+                    <h2 className={`text-3xl md:text-4xl font-serif text-gray-900 mb-4 ${getFontClass()}`}>
+                        {t('events.milestones')}
+                    </h2>
+                    <p className={`text-gray-500 font-light ${getFontClass()}`}>
+                        {t('events.milestonesDesc')}
+                    </p>
+                </div>
+                <div className="h-px flex-1 bg-gray-100 hidden md:block mx-10 mb-4"></div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-left">
                 {[
                     { label: "Weddings", icon: <Heart className="w-6 h-6"/> },
                     { label: "Corporate", icon: <Award className="w-6 h-6"/> },
@@ -106,34 +113,34 @@ const EventInquiriesPage = () => {
               <div className="absolute top-0 right-0 w-96 h-96 bg-gold-600/10 rounded-full -mr-48 -mt-48 blur-3xl"></div>
               <h2 className={`text-3xl font-serif mb-12 text-center text-gold-400 ${getFontClass()}`}>{t('events.venueSpecs')}</h2>
               
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto relative z-10">
                   <table className="w-full text-left min-w-[600px]">
                       <thead className="border-b border-white/10 text-gold-500 uppercase text-[10px] tracking-[0.3em] font-bold">
                           <tr>
-                              <th className="pb-8">{t('events.space')}</th>
-                              <th className="pb-8">{t('events.banquet')}</th>
-                              <th className="pb-8">{t('events.cocktail')}</th>
-                              <th className="pb-8">{t('events.amenities')}</th>
+                              <th className={`pb-8 ${getFontClass()}`}>{t('events.space')}</th>
+                              <th className={`pb-8 ${getFontClass()}`}>{t('events.banquet')}</th>
+                              <th className={`pb-8 ${getFontClass()}`}>{t('events.cocktail')}</th>
+                              <th className={`pb-8 ${getFontClass()}`}>{t('events.amenities')}</th>
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5 text-sm font-light">
                           <tr>
-                              <td className="py-8 font-serif text-xl pr-6 text-white">{t('events.hallName')}</td>
-                              <td className="py-8 text-lg">800 - 1,200</td>
-                              <td className="py-8 text-lg">1,500</td>
-                              <td className="py-8 text-gray-400 text-xs leading-relaxed uppercase tracking-wider">{t('events.hallDesc')}</td>
+                              <td className={`py-8 font-serif text-xl pr-6 text-white ${getFontClass()}`}>{t('events.hallName')}</td>
+                              <td className="py-8 text-lg font-sans">800 - 1,200</td>
+                              <td className="py-8 text-lg font-sans">1,500</td>
+                              <td className={`py-8 text-gray-400 text-xs leading-relaxed uppercase tracking-wider ${getFontClass()}`}>{t('events.hallDesc')}</td>
                           </tr>
                           <tr>
-                              <td className="py-8 font-serif text-xl pr-6 text-white">{t('events.miniHall')}</td>
-                              <td className="py-8 text-lg">200</td>
-                              <td className="py-8 text-lg">350</td>
-                              <td className="py-8 text-gray-400 text-xs leading-relaxed uppercase tracking-wider">{t('events.miniDesc')}</td>
+                              <td className={`py-8 font-serif text-xl pr-6 text-white ${getFontClass()}`}>{t('events.miniHall')}</td>
+                              <td className="py-8 text-lg font-sans">200</td>
+                              <td className="py-8 text-lg font-sans">350</td>
+                              <td className={`py-8 text-gray-400 text-xs leading-relaxed uppercase tracking-wider ${getFontClass()}`}>{t('events.miniDesc')}</td>
                           </tr>
                           <tr>
-                              <td className="py-8 font-serif text-xl pr-6 text-white">{t('events.vipManila')}</td>
-                              <td className="py-8 text-lg">60</td>
-                              <td className="py-8 text-lg">100</td>
-                              <td className="py-8 text-gray-400 text-xs leading-relaxed uppercase tracking-wider">{t('events.vipDesc')}</td>
+                              <td className={`py-8 font-serif text-xl pr-6 text-white ${getFontClass()}`}>{t('events.vipManila')}</td>
+                              <td className="py-8 text-lg font-sans">60</td>
+                              <td className="py-8 text-lg font-sans">100</td>
+                              <td className={`py-8 text-gray-400 text-xs leading-relaxed uppercase tracking-wider ${getFontClass()}`}>{t('events.vipDesc')}</td>
                           </tr>
                       </tbody>
                   </table>
@@ -148,7 +155,7 @@ const EventInquiriesPage = () => {
             <img src={diningImg} alt="Event Setup" className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
             <div className="absolute inset-0 bg-black/20"></div>
           </div>
-          <div className="p-12 lg:p-24 flex flex-col justify-center bg-white">
+          <div className="p-12 lg:p-24 flex flex-col justify-center bg-white text-left">
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}>
               <h2 className={`text-3xl md:text-5xl font-serif text-gray-900 mb-6 ${getFontClass()}`}>{t('events.connect')}</h2>
               <p className={`text-gray-500 text-sm leading-loose mb-12 max-w-md ${getFontClass()}`}>{t('events.cDesc')}</p>
@@ -172,7 +179,7 @@ const EventInquiriesPage = () => {
                 
                 <button onClick={() => setShowWeChat(true)} className="flex items-center gap-6 group transition-all w-full text-left">
                   <div className="w-12 h-12 bg-green-50 flex items-center justify-center rounded-full text-green-600 group-hover:bg-green-600 group-hover:text-white transition-all duration-300 shadow-sm"><MessageSquare size={20} /></div>
-                  <div className="flex-1 pb-4">
+                  <div className="flex-1 pb-4 border-b border-gray-100 lg:border-none">
                     <p className={`text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1 ${getFontClass()}`}>{t('events.instant')}</p>
                     <p className={`text-sm font-medium text-gray-900 group-hover:text-green-600 transition-colors ${getFontClass()}`}>{t('events.via')}</p>
                   </div>
@@ -194,8 +201,8 @@ const EventInquiriesPage = () => {
                 <img src={wechatQr} alt="Golden Bay WeChat QR" className="w-48 h-48 object-contain" />
               </div>
               <div className="space-y-1 pt-6 border-t border-gray-100">
-                <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em]">Events Manager</p>
-                <p className="text-xl font-bold text-gray-900 tracking-wider">+63 917 580 7166</p>
+                <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-sans">Events Manager</p>
+                <p className="text-xl font-bold text-gray-900 tracking-wider font-sans">+63 917 580 7166</p>
               </div>
             </motion.div>
           </motion.div>
