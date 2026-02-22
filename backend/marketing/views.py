@@ -4,6 +4,7 @@ from .models import Post
 from .serializers import PostSerializer
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
+from core.permissions import IsAdminUserOnly
 
 class PublicPostListView(generics.ListAPIView):
     serializer_class = PostSerializer
@@ -26,13 +27,15 @@ class PostDetailView(generics.RetrieveAPIView):
 class AdminPostListCreateView(generics.ListCreateAPIView):
     queryset = Post.objects.all().order_by('-created_at')
     serializer_class = PostSerializer
-    permission_classes = [IsAuthenticated] # Secure this!
+    # RECEPTIONISTS CANNOT MANAGE MARKETING
+    permission_classes = [IsAdminUserOnly] 
     parser_classes = [MultiPartParser, FormParser]
 
 class AdminPostDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
-    permission_classes = [IsAuthenticated]
+    # RECEPTIONISTS CANNOT MANAGE MARKETING
+    permission_classes = [IsAdminUserOnly]
     lookup_field = 'id'
     parser_classes = [MultiPartParser, FormParser]
 

@@ -4,9 +4,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from marketing.views import dynamic_sitemap
+from users.serializers import CustomTokenObtainPairSerializer
 
 class ThrottledTokenObtainPairView(TokenObtainPairView):
     throttle_scope = 'burst'
+    serializer_class = CustomTokenObtainPairSerializer
 
 urlpatterns = [
     path('admin/', admin.site.urls),

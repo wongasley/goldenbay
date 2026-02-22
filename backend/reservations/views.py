@@ -109,6 +109,18 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
         old_date = old_instance.date
         old_time = old_instance.time
 
+        new_status = request.data.get('status', old_status)
+        
+        # Prevent Receptionists from Cancelling
+        if new_status == 'CANCELLED' and old_status != 'CANCELLED':
+            if not (request.user.is_superuser or request.user.groups.filter(name__in=['Supervisor', 'Admin']).exists()):
+                raise PermissionDenied("Only Supervisors and Admins can cancel bookings.")
+        
+        # Prevent Receptionists from changing a Completed or Cancelled booking back to active
+        if old_status in ['COMPLETED', 'CANCELLED'] and new_status not in ['COMPLETED', 'CANCELLED']:
+            if not (request.user.is_superuser or request.user.groups.filter(name__in=['Supervisor', 'Admin']).exists()):
+                 raise PermissionDenied("Only Supervisors and Admins can reopen finalized bookings.")
+            
         # 2. Perform the save (this automatically runs your collision validations)
         response = super().update(request, *args, **kwargs)
 
@@ -140,6 +152,11 @@ class CustomerDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = CustomerSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = 'id'
+
+    def delete(self, request, *args, **kwargs):
+         if not (request.user.is_superuser or request.user.groups.filter(name='Admin').exists()):
+             raise PermissionDenied("Only Admins can delete customer records.")
+         return super().delete(request, *args, **kwargs)
 
 class VIPRoomListView(generics.ListAPIView):
     serializer_class = DiningAreaSerializer
