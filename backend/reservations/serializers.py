@@ -16,9 +16,13 @@ class DiningAreaSerializer(serializers.ModelSerializer):
 class ReservationSerializer(serializers.ModelSerializer):
     room_name = serializers.CharField(source='dining_area.name', read_only=True)
     customer_no_show_count = serializers.SerializerMethodField()
+    encoded_by_name = serializers.CharField(source='encoded_by.username', read_only=True)
+    last_modified_by_name = serializers.CharField(source='last_modified_by.username', read_only=True)
+
     class Meta:
         model = Reservation
         fields = '__all__'
+        read_only_fields = ['encoded_by', 'last_modified_by', 'created_at', 'updated_at']
     
     def get_customer_no_show_count(self, obj):
         customer = Customer.objects.filter(phone=obj.customer_contact).first()

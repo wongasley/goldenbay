@@ -108,6 +108,13 @@ const ReservationForm = ({
             status: isManualEntry ? 'CONFIRMED' : 'PENDING'
         };
 
+        const token = localStorage.getItem('accessToken');
+        const headers = { 'Content-Type': 'application/json' };
+        
+        if (isManualEntry && token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
         try {
             const res = await fetch(`${BACKEND_URL}/api/reservations/create/`, {
                 method: 'POST',

@@ -56,8 +56,9 @@ class ReservationCreateView(generics.CreateAPIView):
     permission_classes = [AllowAny] 
 
     def perform_create(self, serializer):
+        user = self.request.user if self.request.user.is_authenticated else None
         # 1. Save data to DB first
-        reservation = serializer.save()
+        reservation = serializer.save(encoded_by=user, _history_user=user)
         # 2. Fire notifications ASYNCHRONOUSLY using Celery (.delay)
         send_new_booking_notifications.delay(reservation.id)
 
@@ -99,7 +100,11 @@ class AdminReservationListView(generics.ListCreateAPIView):
 class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
     queryset = Reservation.objects.all()
     serializer_class = ReservationSerializer
-    permission_classes = [IsAuthenticated] 
+    permission_classes = [IsAuthenticated]
+
+    def perform_update(self, serializer):
+        # Inject the staff member modifying the record
+        serializer.save(last_modified_by=self.request.user, _history_user=self.request.user)
 
     def update(self, request, *args, **kwargs):
         # 1. Capture the old data BEFORE saving

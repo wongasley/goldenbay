@@ -2,6 +2,8 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.contrib.auth.models import User # <--- ADD THIS IMPORT
+from simple_history.models import HistoricalRecords
 
 class DiningArea(models.Model):
     TYPE_CHOICES = [
@@ -59,8 +61,14 @@ class Reservation(models.Model):
     # System Fields
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     reminder_sent = models.BooleanField(default=False, help_text="Has the 4-hour reminder been sent?")
+
+    encoded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='encoded_reservations')
+    last_modified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='modified_reservations')
+    
+    history = HistoricalRecords() # <--- ADD THIS
     
     class Meta:
         ordering = ['-date', '-time']

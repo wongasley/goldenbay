@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Plus, Check, X, Phone, Edit, UserCheck, Flag, CheckCircle2 } from 'lucide-react';
-import ReservationForm from '../../../components/reservations/ReservationForm';
+import ReservationForm from '../../../components/reservations/ReservationForm'; // <-- ADD THIS LINE
 import { canCancelBooking } from '../../../utils/auth';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
