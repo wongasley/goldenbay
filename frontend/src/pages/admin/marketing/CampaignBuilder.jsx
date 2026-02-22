@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
-import { Send, Users, Mail, Smartphone } from 'lucide-react';
+import { Send, Users, Mail, Smartphone, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
