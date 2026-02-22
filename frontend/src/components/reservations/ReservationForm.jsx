@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+
 import toast from 'react-hot-toast';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
@@ -114,7 +115,7 @@ const ReservationForm = ({
         if (isManualEntry && token) {
             headers['Authorization'] = `Bearer ${token}`;
         }
-        
+
         try {
             const res = await fetch(`${BACKEND_URL}/api/reservations/create/`, {
                 method: 'POST',
