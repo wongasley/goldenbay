@@ -21,7 +21,7 @@ const EventInquiriesPage = () => {
   return (
     <div className="min-h-screen bg-cream-50 text-gray-900 font-sans selection:bg-gold-500 selection:text-white">
       
-      {/* --- HERO BANNER (Standardized size) --- */}
+      {/* --- HERO BANNER (Matches Menu/Reservation Style) --- */}
       <div className="relative h-[40vh] w-full flex items-center justify-center pt-24 bg-black">
         <div className="absolute inset-0 opacity-60">
           <img src={heroimage} className="w-full h-full object-cover" alt="Golden Bay Grand Events" />
@@ -55,7 +55,7 @@ const EventInquiriesPage = () => {
               <Users size={28} strokeWidth={1} />
             </div>
             <h3 className={`text-xl font-serif font-bold text-gray-900 ${getFontClass()}`}>{t('events.f1Title')}</h3>
-            <p className={`text-sm text-gray-500 leading-loose font-light ${getFontClass()}`}>{t('events.f1Desc')}</p>
+            <p className="text-sm text-gray-500 leading-loose font-light">{t('events.f1Desc')}</p>
           </motion.div>
 
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.1 }} className="text-center space-y-4">
@@ -63,7 +63,7 @@ const EventInquiriesPage = () => {
               <Building size={28} strokeWidth={1} />
             </div>
             <h3 className={`text-xl font-serif font-bold text-gray-900 ${getFontClass()}`}>{t('events.f2Title')}</h3>
-            <p className={`text-sm text-gray-500 leading-loose font-light ${getFontClass()}`}>{t('events.f2Desc')}</p>
+            <p className="text-sm text-gray-500 leading-loose font-light">{t('events.f2Desc')}</p>
           </motion.div>
 
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.2 }} className="text-center space-y-4">
@@ -71,7 +71,7 @@ const EventInquiriesPage = () => {
               <MonitorPlay size={28} strokeWidth={1} />
             </div>
             <h3 className={`text-xl font-serif font-bold text-gray-900 ${getFontClass()}`}>{t('events.f3Title')}</h3>
-            <p className={`text-sm text-gray-500 leading-loose font-light ${getFontClass()}`}>{t('events.f3Desc')}</p>
+            <p className="text-sm text-gray-500 leading-loose font-light">{t('events.f3Desc')}</p>
           </motion.div>
         </div>
       </div>
@@ -93,14 +93,14 @@ const EventInquiriesPage = () => {
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-left">
                 {[
-                    { label: "Weddings", icon: <Heart className="w-6 h-6"/> },
-                    { label: "Corporate", icon: <Award className="w-6 h-6"/> },
-                    { label: "Birthdays", icon: <Star className="w-6 h-6"/> },
-                    { label: "Banquets", icon: <Utensils className="w-6 h-6"/> }
+                    { label: t('events.m1'), icon: <Heart className="w-6 h-6"/> },
+                    { label: t('events.m2'), icon: <Award className="w-6 h-6"/> },
+                    { label: t('events.m3'), icon: <Star className="w-6 h-6"/> },
+                    { label: t('events.m4'), icon: <Utensils className="w-6 h-6"/> }
                 ].map((item, i) => (
                     <div key={i} className="flex flex-col items-center p-10 border border-gray-100 bg-cream-50/20 rounded-sm hover:border-gold-400 hover:bg-white hover:shadow-2xl transition-all duration-500 group">
                         <div className="text-gold-600 mb-6 group-hover:scale-110 transition-transform">{item.icon}</div>
-                        <h4 className="text-sm font-bold uppercase tracking-widest text-gray-900">{item.label}</h4>
+                        <h4 className={`text-sm font-bold uppercase tracking-widest text-gray-900 ${getFontClass()}`}>{item.label}</h4>
                     </div>
                 ))}
             </div>
