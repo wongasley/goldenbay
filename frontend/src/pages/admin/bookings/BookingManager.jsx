@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { Plus, Check, X, Phone, Edit, UserCheck, Flag, CheckCircle2, MoreVertical, Search, Filter } from 'lucide-react';
+// ADDED "Users" TO THIS IMPORT LINE
+import { Plus, Check, X, Phone, Edit, UserCheck, Flag, CheckCircle2, MoreVertical, Search, Filter, Users } from 'lucide-react';
 import ReservationForm from '../../../components/reservations/ReservationForm';
 import { canCancelBooking } from '../../../utils/auth';
 
