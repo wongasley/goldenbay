@@ -188,11 +188,11 @@ const EventInquiriesPage = () => {
                     </div>
                     <div className="col-span-2 flex md:block items-center gap-2">
                         <span className="md:hidden text-[10px] uppercase tracking-widest text-gray-400 font-bold">{t('events.banquet')}:</span>
-                        <span className="text-gray-700 font-sans">800 - 1,200</span>
+                        <span className="text-gray-700 font-sans">700 - 800</span>
                     </div>
                     <div className="col-span-2 flex md:block items-center gap-2">
                         <span className="md:hidden text-[10px] uppercase tracking-widest text-gray-400 font-bold">{t('events.cocktail')}:</span>
-                        <span className="text-gray-700 font-sans">1,500</span>
+                        <span className="text-gray-700 font-sans">1,200</span>
                     </div>
                     <div className="col-span-3">
                         <span className={`text-xs text-gray-500 uppercase tracking-wider font-light ${getFontClass()}`}>{t('events.hallDesc')}</span>
