@@ -302,6 +302,23 @@ const BookingManager = () => {
                           </select>
                       </div>
 
+                      <div className="bg-gray-50 p-3 rounded border border-gray-100 text-[10px] text-gray-500 font-mono space-y-1.5 mt-6">
+                          <p className="flex justify-between">
+                              <span>Created:</span> 
+                              <span className="text-gray-900 font-bold">
+                                  {new Date(editingBooking.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                                  {editingBooking.encoded_by_name ? ` by ${editingBooking.encoded_by_name}` : ' via Web'}
+                              </span>
+                          </p>
+                          <p className="flex justify-between">
+                              <span>Last Update:</span> 
+                              <span className="text-gray-900 font-bold">
+                                  {new Date(editingBooking.updated_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                                  {editingBooking.last_modified_by_name && ` by ${editingBooking.last_modified_by_name}`}
+                              </span>
+                          </p>
+                      </div>
+
                       <button 
                         onClick={() => updateStatus(editingBooking.id, {
                             date: editingBooking.date,
