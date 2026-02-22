@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     'marketing',
     'rest_framework_simplejwt',
     'ckeditor',
+    'simple_history',
 ]
 
 REST_FRAMEWORK = {
@@ -122,6 +123,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'simple_history.middleware.HistoryRequestMiddleware',
 ]
 
 ROOT_URLCONF = 'goldenbay.urls'
@@ -543,6 +545,8 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.contrib.auth.models import User
+from simple_history.models import HistoricalRecords
 
 class DiningArea(models.Model):
     TYPE_CHOICES = [
@@ -600,8 +604,14 @@ class Reservation(models.Model):
     # System Fields
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     reminder_sent = models.BooleanField(default=False, help_text="Has the 4-hour reminder been sent?")
+
+    encoded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='encoded_reservations')
+    last_modified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='modified_reservations')
+    
+    history = HistoricalRecords() # <--- ADD THIS
     
     class Meta:
         ordering = ['-date', '-time']
@@ -694,9 +704,13 @@ class DiningAreaSerializer(serializers.ModelSerializer):
 class ReservationSerializer(serializers.ModelSerializer):
     room_name = serializers.CharField(source='dining_area.name', read_only=True)
     customer_no_show_count = serializers.SerializerMethodField()
+    encoded_by_name = serializers.CharField(source='encoded_by.username', read_only=True)
+    last_modified_by_name = serializers.CharField(source='last_modified_by.username', read_only=True)
+
     class Meta:
         model = Reservation
         fields = '__all__'
+        read_only_fields = ['encoded_by', 'last_modified_by', 'created_at', 'updated_at']
     
     def get_customer_no_show_count(self, obj):
         customer = Customer.objects.filter(phone=obj.customer_contact).first()
@@ -835,8 +849,9 @@ class ReservationCreateView(generics.CreateAPIView):
     permission_classes = [AllowAny] 
 
     def perform_create(self, serializer):
+        user = self.request.user if self.request.user.is_authenticated else None
         # 1. Save data to DB first
-        reservation = serializer.save()
+        reservation = serializer.save(encoded_by=user, _history_user=user)
         # 2. Fire notifications ASYNCHRONOUSLY using Celery (.delay)
         send_new_booking_notifications.delay(reservation.id)
 
@@ -878,7 +893,11 @@ class AdminReservationListView(generics.ListCreateAPIView):
 class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
     queryset = Reservation.objects.all()
     serializer_class = ReservationSerializer
-    permission_classes = [IsAuthenticated] 
+    permission_classes = [IsAuthenticated]
+
+    def perform_update(self, serializer):
+        # Inject the staff member modifying the record
+        serializer.save(last_modified_by=self.request.user, _history_user=self.request.user)
 
     def update(self, request, *args, **kwargs):
         # 1. Capture the old data BEFORE saving
@@ -2901,6 +2920,23 @@ const BookingManager = () => {
                           </select>
                       </div>
 
+                      <div className="bg-gray-50 p-3 rounded border border-gray-100 text-[10px] text-gray-500 font-mono space-y-1.5 mt-6">
+                          <p className="flex justify-between">
+                              <span>Created:</span> 
+                              <span className="text-gray-900 font-bold">
+                                  {new Date(editingBooking.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                                  {editingBooking.encoded_by_name ? ` by ${editingBooking.encoded_by_name}` : ' via Web'}
+                              </span>
+                          </p>
+                          <p className="flex justify-between">
+                              <span>Last Update:</span> 
+                              <span className="text-gray-900 font-bold">
+                                  {new Date(editingBooking.updated_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                                  {editingBooking.last_modified_by_name && ` by ${editingBooking.last_modified_by_name}`}
+                              </span>
+                          </p>
+                      </div>
+
                       <button 
                         onClick={() => updateStatus(editingBooking.id, {
                             date: editingBooking.date,
@@ -2958,6 +2994,7 @@ export default BookingManager;
 
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+
 import toast from 'react-hot-toast';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
@@ -3065,6 +3102,13 @@ const ReservationForm = ({
             special_request: formData.message,
             status: isManualEntry ? 'CONFIRMED' : 'PENDING'
         };
+
+        const token = localStorage.getItem('accessToken');
+        const headers = { 'Content-Type': 'application/json' };
+        
+        if (isManualEntry && token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
 
         try {
             const res = await fetch(`${BACKEND_URL}/api/reservations/create/`, {

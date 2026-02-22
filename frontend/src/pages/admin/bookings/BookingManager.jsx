@@ -183,6 +183,10 @@ const BookingManager = () => {
                     <td className="px-4 py-2">
                         <div className="text-gold-700 font-bold">{b.date}</div>
                         <div className="text-[10px] text-gray-500 mt-0.5 uppercase tracking-wide">{b.time} ({b.session})</div>
+                        <div className="text-[9px] text-gray-400 mt-2 font-mono flex flex-col gap-0.5 border-t border-gray-100 pt-1">
+                            <span>Enc: {b.encoded_by_name || 'Web'}</span>
+                            {b.last_modified_by_name && <span>Mod: {b.last_modified_by_name}</span>}
+                        </div>
                     </td>
                     <td className="px-4 py-2">
                         <div className="font-bold text-gray-900">{b.room_name || 'Main Dining Hall'}</div>
