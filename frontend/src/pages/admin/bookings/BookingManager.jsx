@@ -177,10 +177,10 @@ const BookingManager = () => {
                     {b.status !== 'CANCELLED' && (
                         <div className="flex justify-end gap-1.5">
                             {b.status === 'PENDING' && (
-                                <button onClick={() => updateStatus(b.id, {status: 'CONFIRMED'}, "Confirmed!")} className="bg-green-50 text-green-600 p-1.5 rounded border border-green-200 hover:bg-green-100" title="Confirm"><Check size={14} /></button>
+                                <button onClick={() => updateStatus(b.id, {status: 'CONFIRMED'}, "Confirmed!")} className="bg-green-50 text-green-600 p-1.5 rounded border border-green-200 hover:bg-green-100" title="Quick Confirm"><Check size={14} /></button>
                             )}
                             {/* NEW EDIT BUTTON */}
-                            <button onClick={() => handleOpenEdit(b)} className="bg-blue-50 text-blue-600 p-1.5 rounded border border-blue-200 hover:bg-blue-100" title="Transfer Room / Edit Details"><Edit size={14} /></button>
+                            <button onClick={() => handleOpenEdit(b)} className="bg-blue-50 text-blue-600 p-1.5 rounded border border-blue-200 hover:bg-blue-100" title="Transfer Room / Edit Status"><Edit size={14} /></button>
                             <button onClick={() => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!")} className="bg-red-50 text-red-600 p-1.5 rounded border border-red-200 hover:bg-red-100" title="Cancel"><X size={14} /></button>
                         </div>
                     )}
@@ -268,23 +268,35 @@ const BookingManager = () => {
                           </div>
                       </div>
 
-                      <div>
-                          <label className="block text-[10px] font-bold uppercase text-gray-500 mb-1">Assign Room {isCheckingRooms && <span className="text-gold-500 normal-case">(Checking...)</span>}</label>
-                          <select className="w-full border p-2 text-sm rounded" value={editingBooking.dining_area} onChange={e => setEditingBooking({...editingBooking, dining_area: e.target.value})}>
-                              {editRooms.map(room => {
-                                  // It is disabled if it's not available AND it's not the room they currently have selected
-                                  const isDisabled = !room.is_available && room.id !== editingBooking.original_dining_area;
-                                  let label = room.name;
-                                  if (room.area_type === 'HALL') label += ` (${room.remaining_capacity} seats left)`;
-                                  else if (isDisabled) label += " [BOOKED]";
-                                  
-                                  return (
-                                      <option key={room.id} value={room.id} disabled={isDisabled} className={isDisabled ? 'text-gray-300' : ''}>
-                                          {label}
-                                      </option>
-                                  );
-                              })}
-                          </select>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-[10px] font-bold uppercase text-gray-500 mb-1">Assign Room {isCheckingRooms && <span className="text-gold-500 normal-case">(Checking...)</span>}</label>
+                              <select className="w-full border p-2 text-sm rounded" value={editingBooking.dining_area} onChange={e => setEditingBooking({...editingBooking, dining_area: e.target.value})}>
+                                  {editRooms.map(room => {
+                                      // It is disabled if it's not available AND it's not the room they currently have selected
+                                      const isDisabled = !room.is_available && room.id !== editingBooking.original_dining_area;
+                                      let label = room.name;
+                                      if (room.area_type === 'HALL') label += ` (${room.remaining_capacity} seats left)`;
+                                      else if (isDisabled) label += " [BOOKED]";
+                                      
+                                      return (
+                                          <option key={room.id} value={room.id} disabled={isDisabled} className={isDisabled ? 'text-gray-300' : ''}>
+                                              {label}
+                                          </option>
+                                      );
+                                  })}
+                              </select>
+                          </div>
+                          <div>
+                              <label className="block text-[10px] font-bold uppercase text-gray-500 mb-1">Status</label>
+                              <select className={`w-full border p-2 text-sm rounded font-bold ${editingBooking.status === 'CONFIRMED' ? 'text-green-700 bg-green-50' : 'text-yellow-700 bg-yellow-50'}`} 
+                                value={editingBooking.status} 
+                                onChange={e => setEditingBooking({...editingBooking, status: e.target.value})}>
+                                  <option value="PENDING">Pending (Reviewing)</option>
+                                  <option value="CONFIRMED">Confirmed</option>
+                                  <option value="CANCELLED">Cancelled</option>
+                              </select>
+                          </div>
                       </div>
 
                       <button 
@@ -293,8 +305,9 @@ const BookingManager = () => {
                             session: editingBooking.session,
                             time: editingBooking.time,
                             pax: editingBooking.pax,
-                            dining_area: editingBooking.dining_area
-                        }, "Booking Transferred & Notified!")} 
+                            dining_area: editingBooking.dining_area,
+                            status: editingBooking.status // Sends the updated status
+                        }, "Booking Updated & Notified!")} 
                         className="w-full bg-gold-600 text-white font-bold uppercase tracking-widest py-3 text-xs rounded shadow hover:bg-black transition-colors mt-4">
                           Save & Notify Customer
                       </button>
