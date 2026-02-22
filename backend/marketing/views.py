@@ -89,7 +89,6 @@ class MarketingBlastView(APIView):
 
     def post(self, request):
         audience = request.data.get('audience', 'ALL')
-        channel = request.data.get('channel', 'EMAIL')
         subject = request.data.get('subject')
         content = request.data.get('content')
 
@@ -97,6 +96,6 @@ class MarketingBlastView(APIView):
             return Response({"error": "Subject and content required."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Fire the Celery Task!
-        send_mass_blast.delay(audience, channel, subject, content)
+        send_mass_blast.delay(audience, subject, content)
         
-        return Response({"message": "Campaign is now sending in the background!"}, status=status.HTTP_200_OK)
+        return Response({"message": "Email Campaign is now sending in the background!"}, status=status.HTTP_200_OK)
