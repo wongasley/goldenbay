@@ -9,7 +9,7 @@ import heroimage from '../../../assets/images/heroimage3.webp';
 import diningImg from '../../../assets/images/dining_area.webp';
 import wechatQr from '../../../assets/images/qrcode.svg'; 
 // MAKE SURE YOU ADD A WHATSAPP QR IMAGE TO YOUR FOLDER OR IT WILL BREAK
-import whatsappQr from '../../../assets/images/qrcode.svg'; 
+import whatsappQr from '../../../assets/images/qr-code-whatsapp.svg'; 
 
 const EventInquiriesPage = () => {
   const [showWeChat, setShowWeChat] = useState(false);

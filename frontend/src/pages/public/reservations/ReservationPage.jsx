@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { Users, CheckCircle, MessageSquare, X } from 'lucide-react';
 import wechatQr from '../../../assets/images/qrcode.svg'; 
 // MAKE SURE YOU ADD A WHATSAPP QR IMAGE TO YOUR FOLDER OR IT WILL BREAK
-import whatsappQr from '../../../assets/images/qrcode.svg'; 
+import whatsappQr from '../../../assets/images/qr-code-whatsapp.svg'; 
 import heroimage from '../../../assets/images/heroimage4.webp';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../../context/LanguageContext';
