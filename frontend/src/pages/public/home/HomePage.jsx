@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import logo from '../../../assets/images/goldenbaylogo2.svg';
 import { useLanguage } from '../../../context/LanguageContext';
+import SEO from '../../../components/seo/SEO';
 
 const HomePage = () => {
   const { t, getFontClass } = useLanguage();
@@ -30,9 +31,35 @@ const HomePage = () => {
     visible: { opacity: 1, transition: { delay: 1.5, duration: 1.5 } },
   };
 
+  const schemaData = {
+    "@context": "https://schema.org",
+    "@type": "Restaurant",
+    "name": "Golden Bay Fresh Seafood Restaurant",
+    "image": "https://goldenbay.com.ph/assets/images/golden_bay_cover.webp",
+    "url": "https://goldenbay.com.ph",
+    "telephone": "+63288040332",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "Lot 3&4 Block A2, Diosdado Macapagal Blvd, CBP",
+      "addressLocality": "Pasay City",
+      "addressRegion": "Metro Manila",
+      "addressCountry": "PH"
+    },
+    "servesCuisine": "Chinese, Seafood",
+    "priceRange": "$$$"
+  };
+
   return (
     <div className="relative flex flex-col items-center justify-center h-screen bg-black overflow-hidden font-sans">
-      
+      {/* --- ADD SEO & SCHEMA --- */}
+      <SEO 
+        title="Premium Seafood & Chinese Restaurant" 
+        description="Experience luxury Chinese dining and live seafood at Golden Bay Restaurant. Located at Diosdado Macapagal Blvd, Pasay City. Book your VIP room today!" 
+      />
+      <script type="application/ld+json">
+        {JSON.stringify(schemaData)}
+      </script>
+
       <Helmet>
         <title>Golden Bay | Premium Seafood & Chinese Restaurant</title>
         <meta name="description" content="Experience luxury Chinese dining and live seafood at Golden Bay Restaurant. Located at Diosdado Macapagal Blvd, Pasay City. Book your VIP room today!" />

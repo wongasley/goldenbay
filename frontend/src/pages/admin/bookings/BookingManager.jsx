@@ -127,6 +127,18 @@ const BookingManager = () => {
       }
   };
 
+  // Helper for the new Source logic
+  const getSourceDisplay = (source) => {
+      if (!source) return 'Website';
+      switch(source) {
+          case 'WEB': return 'Website';
+          case 'WALK_IN': return 'Walk-In';
+          case 'PHONE': return 'Phone';
+          case 'SOCIAL': return 'Social Media';
+          default: return source;
+      }
+  };
+
   return (
     <div className="space-y-4 pb-20">
       
@@ -261,8 +273,11 @@ const BookingManager = () => {
                                     {b.status.replace('_', '-')}
                                 </span>
                                 
-                                {/* AUDIT LOG IN TABLE */}
-                                <div className="text-[9px] text-gray-400 font-mono flex flex-col leading-tight border-t border-gray-100 pt-1 w-full max-w-[120px]">
+                                {/* AUDIT LOG & SOURCE IN TABLE */}
+                                <div className="text-[9px] text-gray-400 font-mono flex flex-col leading-tight border-t border-gray-100 pt-1.5 w-full max-w-[120px]">
+                                    <span className="text-gold-600 font-bold mb-0.5 uppercase">
+                                        [{getSourceDisplay(b.source)}]
+                                    </span>
                                     <span className="truncate" title={`Created: ${new Date(b.created_at).toLocaleString()}`}>
                                         <span className="font-bold">E:</span> {b.encoded_by_name || 'Web'}
                                     </span>
@@ -368,9 +383,12 @@ const BookingManager = () => {
                     </div>
 
                     {/* Mobile Audit Log */}
-                    <div className="text-[9px] text-gray-400 font-mono flex justify-between px-1">
-                        <span>Enc: <span className="font-medium text-gray-600">{b.encoded_by_name || 'Web'}</span></span>
-                        {b.last_modified_by_name && <span>Mod: <span className="font-medium text-gray-600">{b.last_modified_by_name}</span></span>}
+                    <div className="text-[9px] text-gray-400 font-mono flex items-center justify-between px-1">
+                        <div className="flex gap-2">
+                            <span>Enc: <span className="font-medium text-gray-600">{b.encoded_by_name || 'Web'}</span></span>
+                            {b.last_modified_by_name && <span>Mod: <span className="font-medium text-gray-600">{b.last_modified_by_name}</span></span>}
+                        </div>
+                        <span className="text-gold-600 font-bold uppercase">[{getSourceDisplay(b.source)}]</span>
                     </div>
                     
                     {/* Mobile Action Buttons */}
@@ -491,6 +509,12 @@ const BookingManager = () => {
 
                       {/* --- AUDIT LOG BLOCK --- */}
                       <div className="bg-gray-50 p-3 rounded border border-gray-100 text-[10px] text-gray-500 font-mono space-y-1.5 mt-4">
+                          <p className="flex justify-between items-center">
+                              <span className="uppercase tracking-widest font-bold text-gray-400 text-[9px]">Source</span> 
+                              <span className="text-gold-600 font-bold uppercase">
+                                  {getSourceDisplay(editingBooking.source)}
+                              </span>
+                          </p>
                           <p className="flex justify-between items-center">
                               <span className="uppercase tracking-widest font-bold text-gray-400 text-[9px]">Created</span> 
                               <span className="text-gray-900">

@@ -1,37 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-
 import toast from 'react-hot-toast';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const ReservationForm = ({ 
-    selectedRoom, // Passed from visual grid (Customer Mode)
+    selectedRoom, 
     date, 
-    session, // Default session passed from parent
+    session, 
     selectedTime, 
     isManualEntry = false, 
     onSuccess, 
     onCancel 
 }) => {
-    // --- STATE ---
     const [formData, setFormData] = useState({
-        name: '',
-        contact: '',
-        email: '',
-        pax: 2,
-        message: ''
+        name: '', contact: '', email: '', pax: 2, message: ''
     });
     
-    // --- ADMIN MANUAL ENTRY STATE ---
     const [manualDate, setManualDate] = useState(date ? format(date, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'));
     const [manualSession, setManualSession] = useState(session || 'LUNCH');
     const [manualTime, setManualTime] = useState(selectedTime || '');
     const [rooms, setRooms] = useState([]); 
     const [manualRoomId, setManualRoomId] = useState(''); 
+    const [manualSource, setManualSource] = useState('PHONE'); // <-- NEW: Default to Phone for manual entry
     const [submitStatus, setSubmitStatus] = useState(null);
 
-    // --- HELPER: Generate Time Slots (Same as Customer View) ---
     const generateTimeSlots = (sessionType) => {
         const slots = [];
         const startHour = sessionType === 'LUNCH' ? 11 : 17; 
@@ -40,11 +33,7 @@ const ReservationForm = ({
         for (let hour = startHour; hour <= endHour; hour++) {
             const displayHour = hour > 12 ? hour - 12 : hour;
             const ampm = hour >= 12 ? 'PM' : 'AM';
-            
-            // Full hour
             slots.push({ value: `${hour}:00:00`, label: `${displayHour}:00 ${ampm}` });
-            
-            // Half hour (don't add half hour for the very last slot if it's closing time)
             if (hour !== endHour) {
                 slots.push({ value: `${hour}:30:00`, label: `${displayHour}:30 ${ampm}` });
             }
@@ -52,7 +41,6 @@ const ReservationForm = ({
         return slots;
     };
 
-    // --- EFFECT: Fetch Rooms & Reset Time when Date/Session Changes ---
     useEffect(() => {
         if (isManualEntry) {
             const fetchRooms = async () => {
@@ -65,15 +53,12 @@ const ReservationForm = ({
                 }
             };
             fetchRooms();
-            
-            // Reset time and room selection when session changes to prevent invalid combos
             setManualTime(''); 
             setManualRoomId('');
         }
     }, [isManualEntry, manualDate, manualSession]);
 
 
-    // --- SUBMIT HANDLER ---
     const handleSubmit = async (e) => {
         e.preventDefault();
         
@@ -106,7 +91,8 @@ const ReservationForm = ({
             pax: formData.pax,
             dining_area: finalRoomId,
             special_request: formData.message,
-            status: isManualEntry ? 'CONFIRMED' : 'PENDING'
+            status: isManualEntry ? 'CONFIRMED' : 'PENDING',
+            source: isManualEntry ? manualSource : 'WEB' // <-- NEW: Passes source to backend
         };
 
         const token = localStorage.getItem('accessToken');
@@ -119,7 +105,7 @@ const ReservationForm = ({
         try {
             const res = await fetch(`${BACKEND_URL}/api/reservations/create/`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: headers,
                 body: JSON.stringify(payload),
             });
 
@@ -140,7 +126,6 @@ const ReservationForm = ({
         }
     };
 
-    // Styling
     const inputClass = "w-full bg-white border border-gray-300 p-2.5 text-gray-900 text-sm focus:border-gold-500 focus:ring-1 focus:ring-gold-500 outline-none rounded-sm transition-all shadow-sm";
     const labelClass = "block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1";
 
@@ -154,7 +139,6 @@ const ReservationForm = ({
                         Logistics
                     </h3>
                     
-                    {/* Row 1: Date & Session Switcher */}
                     <div className="grid grid-cols-2 gap-4 mb-4">
                         <div>
                             <label className={labelClass}>Date</label>
@@ -187,8 +171,7 @@ const ReservationForm = ({
                         </div>
                     </div>
 
-                    {/* Row 2: Time & Room */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4 mb-4">
                         <div>
                             <label className={labelClass}>Arrival Time</label>
                             <select 
@@ -233,6 +216,21 @@ const ReservationForm = ({
                             </select>
                         </div>
                     </div>
+
+                    {/* NEW: Booking Source Selection */}
+                    <div>
+                        <label className={labelClass}>Booking Source</label>
+                        <select 
+                            className={inputClass}
+                            value={manualSource}
+                            onChange={e => setManualSource(e.target.value)}
+                        >
+                            <option value="PHONE">Phone Call / Mobile</option>
+                            <option value="SOCIAL">Social Media (Viber/WeChat/FB)</option>
+                            <option value="WALK_IN">Walk-in</option>
+                        </select>
+                    </div>
+
                 </div>
             )}
 

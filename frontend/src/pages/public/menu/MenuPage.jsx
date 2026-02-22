@@ -5,6 +5,7 @@ import { Search, X } from 'lucide-react';
 import logo from '../../../assets/images/goldenbaylogo.svg'; 
 import heroimage from '../../../assets/images/heroimage.webp'; 
 import { useLanguage } from '../../../context/LanguageContext';
+import SEO from '../../../components/seo/SEO';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
@@ -105,6 +106,10 @@ const MenuPage = () => {
 
   return (
     <div className="min-h-screen bg-cream-50 text-gray-900 overflow-x-hidden font-sans">
+      <SEO 
+        title="Exquisite Menu & Live Catch" 
+        description="Browse our selection of premium Chinese cuisine, dimsum, and live catch seafood cooked to your preference."
+      />
       <div className="relative h-[40vh] w-full flex items-center justify-center pt-24 bg-black">
         <div className="absolute inset-0 opacity-60">
           <img src={heroimage} className="w-full h-full object-cover" alt="Interior" />

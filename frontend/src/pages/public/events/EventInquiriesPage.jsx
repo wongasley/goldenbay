@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Phone, Mail, MessageSquare, MonitorPlay, Users, Building, X, Heart, Star, Utensils, Award, ArrowRight, ShieldCheck, Maximize, MapPin } from 'lucide-react';
 import { useLanguage } from '../../../context/LanguageContext';
+import SEO from '../../../components/seo/SEO';
 
 // Images
 import heroimage from '../../../assets/images/heroimage3.webp'; 
@@ -22,7 +23,10 @@ const EventInquiriesPage = () => {
 
   return (
     <div className="min-h-screen bg-cream-50 text-gray-900 font-sans selection:bg-gold-500 selection:text-white pb-10">
-      
+      <SEO 
+        title="Grand Events & Banquets" 
+        description="Host your weddings, corporate galas, and milestones in our pillar-less Grand Banquet Hall accommodating up to 1,200 guests."
+      />
       {/* --- HERO BANNER (Matches Menu/Reservation Style) --- */}
       <div className="relative h-[40vh] w-full flex items-center justify-center pt-24 bg-black">
         <div className="absolute inset-0 opacity-60">

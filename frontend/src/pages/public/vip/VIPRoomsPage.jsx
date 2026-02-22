@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Users, Mic2, Tv, Armchair, Star } from 'lucide-react'; 
 import heroimage from '../../../assets/images/heroimage4.webp'; 
 import { useLanguage } from '../../../context/LanguageContext';
+import SEO from '../../../components/seo/SEO';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
@@ -30,7 +31,10 @@ const VIPRoomsPage = () => {
 
   return (
     <div className="min-h-screen bg-cream-50 text-gray-900 overflow-x-hidden font-sans">
-      
+      <SEO 
+        title="Private VIP Rooms" 
+        description="Exclusive VIP rooms featuring KTV, private lounges, and customized dining spaces. Ideal for private parties up to 70 guests."
+      />
       <div className="relative h-[40vh] w-full flex items-center justify-center pt-24 bg-black">
         <div className="absolute inset-0 opacity-60">
           <img src={heroimage} className="w-full h-full object-cover" alt="Interior" />

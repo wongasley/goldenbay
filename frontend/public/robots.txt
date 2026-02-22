@@ -3,4 +3,4 @@ Disallow: /staff/
 Disallow: /login/
 Allow: /
 
-Sitemap: https://goldenbay.com.ph/api/sitemap.xml
+Sitemap: https://goldenbay.com.ph/sitemap.xml

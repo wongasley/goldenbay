@@ -45,6 +45,13 @@ class Reservation(models.Model):
         ('CANCELLED', 'Cancelled'),
     ]
 
+    SOURCE_CHOICES = [
+        ('WEB', 'Website'),
+        ('WALK_IN', 'Walk-in'),
+        ('PHONE', 'Phone Call'),
+        ('SOCIAL', 'Social Media'),
+    ]
+
     # Customer Info
     customer_name = models.CharField(max_length=100)
     customer_contact = models.CharField(max_length=50, help_text="Phone or Viber")

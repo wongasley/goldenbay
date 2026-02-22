@@ -109,6 +109,7 @@ FILES_TO_READ = [
     'frontend/src/components/layout/FloatingWidget.jsx',
     'frontend/src/context/LanguageContext.jsx',
     'frontend/src/utils/translations.jsx',
+    'frontend/src/components/seo/SEO.jsx',
 
 ]
 

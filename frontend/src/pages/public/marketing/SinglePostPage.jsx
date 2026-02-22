@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Calendar, ArrowLeft } from 'lucide-react';
-import { Helmet } from 'react-helmet-async';
+import SEO from '../../../components/seo/SEO';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
@@ -46,14 +46,14 @@ const SinglePostPage = () => {
 
   return (
     <div className="min-h-screen bg-cream-50 text-gray-900 pt-32 pb-20 px-6 md:px-24">
-      {/* DYNAMIC SEO TAGS */}
-      <Helmet>
-        <title>{post.title} | Golden Bay</title>
-        <meta name="description" content={getExcerpt(post.content)} />
-        <meta property="og:title" content={post.title} />
-        <meta property="og:description" content={getExcerpt(post.content)} />
-        {imageUrl && <meta property="og:image" content={imageUrl} />}
-      </Helmet>
+      
+      {/* DYNAMIC SEO TAGS (Old Helmet removed!) */}
+      <SEO 
+        title={post.title}
+        description={getExcerpt(post.content)}
+        image={imageUrl || undefined}
+        type="article"
+      />
 
       <div className="max-w-3xl mx-auto">
         <Link to="/news" className="inline-flex items-center text-gold-600 hover:text-black mb-8 transition-colors text-xs uppercase tracking-widest">
@@ -79,7 +79,6 @@ const SinglePostPage = () => {
             </div>
         )}
 
-        {/* RICH TEXT RENDERER */}
         <div 
             className="prose prose-lg max-w-none text-gray-600 font-light leading-relaxed prose-headings:text-gold-600 prose-headings:font-serif prose-a:text-gold-600 hover:prose-a:text-black prose-strong:text-gray-900"
             dangerouslySetInnerHTML={{ __html: post.content }} 
