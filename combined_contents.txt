@@ -655,6 +655,9 @@ class Customer(models.Model):
     whatsapp = models.CharField(max_length=100, blank=True, null=True)
     telegram = models.CharField(max_length=100, blank=True, null=True)
     
+    visit_count = models.IntegerField(default=0, help_text="Total completed visits")
+    is_vip = models.BooleanField(default=False, help_text="Auto-tagged after 3 visits")
+    
     no_show_count = models.IntegerField(default=0, help_text="Automatically calculated no-shows")
     notes = models.TextField(blank=True, null=True, help_text="VVIP status, allergies, preferences")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -804,6 +807,7 @@ import requests
 import os
 from django.db import transaction
 from rest_framework import generics, status
+from rest_framework.exceptions import PermissionDenied
 from datetime import date, timedelta
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -937,11 +941,23 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
                               (old_date != reservation.date) or \
                               (old_time != reservation.time)
 
-            # 3. Fire appropriate notification
-            if status_changed and reservation.status in ['CONFIRMED', 'CANCELLED']:
+            # 3. Fire appropriate notification & Logic
+            if status_changed and reservation.status == 'COMPLETED':
+                # Track Visit & VIP Status
+                customer = Customer.objects.filter(phone=reservation.customer_contact).first()
+                if customer:
+                    customer.visit_count += 1
+                    if customer.visit_count >= 3: # Tag as VIP after 3 visits
+                        customer.is_vip = True
+                    customer.save()
+                
+                # Trigger Post-Dining Feedback (Wait 7200 seconds / 2 Hours)
+                from .tasks import send_post_dining_feedback
+                send_post_dining_feedback.apply_async((reservation.id,), countdown=7200)
+                
+            elif status_changed and reservation.status in ['CONFIRMED', 'CANCELLED']:
                 send_status_update_notifications.delay(reservation.id, reservation.status)
             elif details_changed and reservation.status != 'CANCELLED':
-                # If they didn't change status, but changed the room/time, send the update text!
                 from .tasks import send_booking_modification_notifications
                 send_booking_modification_notifications.delay(reservation.id)
                 
@@ -1163,6 +1179,37 @@ def send_booking_modification_notifications(reservation_id):
     except Exception as e:
         print(f"Celery Task Error (Modification): {e}")
 
+@shared_task
+def send_post_dining_feedback(reservation_id):
+    """ ASYNCHRONOUS: Fired 2 hours after a reservation is marked COMPLETED """
+    try:
+        reservation = Reservation.objects.get(id=reservation_id)
+        
+        # We only send if they actually showed up and completed the dining experience
+        if reservation.status != 'COMPLETED':
+            return
+            
+        review_link = "https://g.page/r/CVOD2Qu6cEbVEAE/review"
+        
+        # 1. SEND SMS
+        contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
+        if len(contact_digits) >= 10:
+             sms_body = f"Hi {reservation.customer_name}, thank you for dining at Golden Bay today! We hope you enjoyed your meal. If you have a moment, we'd love your feedback: {review_link} - GOLDENBAY"
+             send_sms(reservation.customer_contact, sms_body)
+
+        # 2. SEND EMAIL (Optional fallback)
+        if reservation.customer_email and '@' in reservation.customer_email:
+            send_mail(
+                subject='Thank you for dining with Golden Bay',
+                message=f"Hi {reservation.customer_name},\n\nThank you for choosing Golden Bay. We'd love to hear about your experience!\n\nLeave a review: {review_link}",
+                from_email=settings.EMAIL_HOST_USER,
+                recipient_list=[reservation.customer_email],
+                fail_silently=True,
+            )
+            
+    except Exception as e:
+        print(f"Celery Task Error (Feedback Loop): {e}")
+
 from django.contrib import admin
 from .models import Post
 
@@ -1271,22 +1318,26 @@ class PostSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 from django.urls import path
-from .views import AdminPostDetailView, AdminPostListCreateView, PublicPostListView, PostDetailView
+from .views import AdminPostDetailView, AdminPostListCreateView, MarketingBlastView, PublicPostListView, PostDetailView
 
 urlpatterns = [
     path('', PublicPostListView.as_view()),
     path('<slug:slug>/', PostDetailView.as_view()),
     path('manage/all/', AdminPostListCreateView.as_view()),
     path('manage/<int:id>/', AdminPostDetailView.as_view()),
+    path('manage/blast/', MarketingBlastView.as_view()),
 ]
 
-from rest_framework import generics
+from rest_framework import generics, status
 from django.http import HttpResponse
 from .models import Post
+from rest_framework.views import APIView
+from rest_framework.response import Response
 from .serializers import PostSerializer
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
 from core.permissions import IsAdminUserOnly
+from .tasks import send_mass_blast
 
 class PublicPostListView(generics.ListAPIView):
     serializer_class = PostSerializer
@@ -1362,6 +1413,23 @@ def dynamic_sitemap(request):
     xml.append('</urlset>')
     
     return HttpResponse('\n'.join(xml), content_type='application/xml')
+
+class MarketingBlastView(APIView):
+    permission_classes = [IsAdminUserOnly]
+
+    def post(self, request):
+        audience = request.data.get('audience', 'ALL')
+        channel = request.data.get('channel', 'EMAIL')
+        subject = request.data.get('subject')
+        content = request.data.get('content')
+
+        if not subject or not content:
+            return Response({"error": "Subject and content required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Fire the Celery Task!
+        send_mass_blast.delay(audience, channel, subject, content)
+        
+        return Response({"message": "Campaign is now sending in the background!"}, status=status.HTTP_200_OK)
 
 from django.contrib import admin
 
@@ -1442,6 +1510,7 @@ const BookingManager = lazy(() => import('./pages/admin/bookings/BookingManager'
 const MarketingManager = lazy(() => import('./pages/admin/marketing/MarketingManager')); 
 const PostEditor = lazy(() => import('./pages/admin/marketing/PostEditor')); 
 const PhoneBookPage = lazy(() => import('./pages/admin/customers/PhoneBookPage')); 
+const CampaignBuilder = lazy(() => import('./pages/admin/marketing/CampaignBuilder'));
 
 // Premium Loading Fallback while splitting code
 const PageLoader = () => (
@@ -1502,6 +1571,7 @@ function App() {
               <Route path="marketing" element={<MarketingManager />} />
               <Route path="marketing/create" element={<PostEditor />} />
               <Route path="marketing/edit/:id" element={<PostEditor />} />
+              <Route path="marketing/blast" element={<CampaignBuilder />} />
             </Route>
             
           </Routes>
@@ -5391,7 +5461,7 @@ const SinglePostPage = () => {
 export default SinglePostPage;
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Send } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
@@ -5433,9 +5503,14 @@ const MarketingManager = () => {
             <h1 className="text-xl font-bold text-gray-900 font-serif">Marketing & Blog</h1>
             <p className="text-gray-500 text-xs">Manage news, events, and promotional content.</p>
         </div>
-        <Link to="/staff/marketing/create" className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-colors flex items-center gap-1.5">
-           <Plus size={14} /> New Post
-        </Link>
+        <div className="flex gap-2">
+            <Link to="/staff/marketing/blast" className="bg-white border border-gold-600 text-gold-600 px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-50 transition-colors flex items-center gap-1.5">
+               <Send size={14} /> Send Blast
+            </Link>
+            <Link to="/staff/marketing/create" className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-colors flex items-center gap-1.5">
+               <Plus size={14} /> New Post
+            </Link>
+        </div>
       </div>
 
       {/* 2. RESPONSIVE DATA DISPLAY */}
@@ -7735,3 +7810,67 @@ const SEO = ({
 };
 
 export default SEO;
+
+# backend/marketing/tasks.py
+
+from celery import shared_task
+from django.core.mail import send_mail
+from django.conf import settings
+from django.utils.html import strip_tags
+from reservations.models import Customer
+from reservations.utils import send_sms
+
+# 1. The "Micro Task" - Handles just ONE customer.
+# rate_limit='2/s' tells Celery to process a maximum of 2 of these per second, 
+# acting as an automatic throttle without blocking the queue!
+@shared_task(rate_limit='2/s')
+def send_single_blast_message(customer_id, channel, subject, plain_message, html_content):
+    try:
+        customer = Customer.objects.get(id=customer_id)
+        
+        # Send Email
+        if channel in ['EMAIL', 'BOTH'] and customer.email:
+            send_mail(
+                subject=subject,
+                message=plain_message,
+                from_email=settings.EMAIL_HOST_USER,
+                recipient_list=[customer.email],
+                fail_silently=True,
+                html_message=html_content
+            )
+            
+        # Send SMS (Careful with costs!)
+        if channel in ['SMS', 'BOTH'] and customer.phone:
+            # We strip HTML for SMS and keep it short
+            sms_body = f"GOLDEN BAY: {subject}. {plain_message[:100]}... See email/site for details!"
+            send_sms(customer.phone, sms_body)
+            
+    except Customer.DoesNotExist:
+        pass
+
+
+# 2. The "Master Task" - Instantly queues up the micro tasks.
+@shared_task
+def send_mass_blast(audience, channel, subject, html_content):
+    customers = Customer.objects.all()
+    
+    if audience == 'VIP':
+        customers = customers.filter(is_vip=True)
+    elif audience == 'INACTIVE':
+        # Future feature: Could filter by last_visit older than 6 months
+        pass 
+        
+    plain_message = strip_tags(html_content)
+    
+    # "Fan-Out": We loop through the customers and push a tiny task to the queue for each one.
+    # This loop finishes in less than a second, freeing up the worker to process them at its own pace!
+    for customer in customers:
+        send_single_blast_message.delay(
+            customer.id, 
+            channel, 
+            subject, 
+            plain_message, 
+            html_content
+        )
+        
+    return f"Successfully queued {customers.count()} messages for sending."

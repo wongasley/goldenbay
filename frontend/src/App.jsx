@@ -30,6 +30,7 @@ const BookingManager = lazy(() => import('./pages/admin/bookings/BookingManager'
 const MarketingManager = lazy(() => import('./pages/admin/marketing/MarketingManager')); 
 const PostEditor = lazy(() => import('./pages/admin/marketing/PostEditor')); 
 const PhoneBookPage = lazy(() => import('./pages/admin/customers/PhoneBookPage')); 
+const CampaignBuilder = lazy(() => import('./pages/admin/marketing/CampaignBuilder'));
 
 // Premium Loading Fallback while splitting code
 const PageLoader = () => (
@@ -90,6 +91,7 @@ function App() {
               <Route path="marketing" element={<MarketingManager />} />
               <Route path="marketing/create" element={<PostEditor />} />
               <Route path="marketing/edit/:id" element={<PostEditor />} />
+              <Route path="marketing/blast" element={<CampaignBuilder />} />
             </Route>
             
           </Routes>

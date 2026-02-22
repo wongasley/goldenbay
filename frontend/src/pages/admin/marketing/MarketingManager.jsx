@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Send } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
@@ -41,9 +41,14 @@ const MarketingManager = () => {
             <h1 className="text-xl font-bold text-gray-900 font-serif">Marketing & Blog</h1>
             <p className="text-gray-500 text-xs">Manage news, events, and promotional content.</p>
         </div>
-        <Link to="/staff/marketing/create" className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-colors flex items-center gap-1.5">
-           <Plus size={14} /> New Post
-        </Link>
+        <div className="flex gap-2">
+            <Link to="/staff/marketing/blast" className="bg-white border border-gold-600 text-gold-600 px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-50 transition-colors flex items-center gap-1.5">
+               <Send size={14} /> Send Blast
+            </Link>
+            <Link to="/staff/marketing/create" className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-colors flex items-center gap-1.5">
+               <Plus size={14} /> New Post
+            </Link>
+        </div>
       </div>
 
       {/* 2. RESPONSIVE DATA DISPLAY */}

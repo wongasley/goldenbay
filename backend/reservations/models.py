@@ -112,6 +112,9 @@ class Customer(models.Model):
     whatsapp = models.CharField(max_length=100, blank=True, null=True)
     telegram = models.CharField(max_length=100, blank=True, null=True)
     
+    visit_count = models.IntegerField(default=0, help_text="Total completed visits")
+    is_vip = models.BooleanField(default=False, help_text="Auto-tagged after 3 visits")
+    
     no_show_count = models.IntegerField(default=0, help_text="Automatically calculated no-shows")
     notes = models.TextField(blank=True, null=True, help_text="VVIP status, allergies, preferences")
     created_at = models.DateTimeField(auto_now_add=True)

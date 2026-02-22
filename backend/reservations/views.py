@@ -138,11 +138,23 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
                               (old_date != reservation.date) or \
                               (old_time != reservation.time)
 
-            # 3. Fire appropriate notification
-            if status_changed and reservation.status in ['CONFIRMED', 'CANCELLED']:
+            # 3. Fire appropriate notification & Logic
+            if status_changed and reservation.status == 'COMPLETED':
+                # Track Visit & VIP Status
+                customer = Customer.objects.filter(phone=reservation.customer_contact).first()
+                if customer:
+                    customer.visit_count += 1
+                    if customer.visit_count >= 3: # Tag as VIP after 3 visits
+                        customer.is_vip = True
+                    customer.save()
+                
+                # Trigger Post-Dining Feedback (Wait 7200 seconds / 2 Hours)
+                from .tasks import send_post_dining_feedback
+                send_post_dining_feedback.apply_async((reservation.id,), countdown=7200)
+                
+            elif status_changed and reservation.status in ['CONFIRMED', 'CANCELLED']:
                 send_status_update_notifications.delay(reservation.id, reservation.status)
             elif details_changed and reservation.status != 'CANCELLED':
-                # If they didn't change status, but changed the room/time, send the update text!
                 from .tasks import send_booking_modification_notifications
                 send_booking_modification_notifications.delay(reservation.id)
                 

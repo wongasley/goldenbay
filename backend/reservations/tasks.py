@@ -156,3 +156,34 @@ def send_booking_modification_notifications(reservation_id):
 
     except Exception as e:
         print(f"Celery Task Error (Modification): {e}")
+
+@shared_task
+def send_post_dining_feedback(reservation_id):
+    """ ASYNCHRONOUS: Fired 2 hours after a reservation is marked COMPLETED """
+    try:
+        reservation = Reservation.objects.get(id=reservation_id)
+        
+        # We only send if they actually showed up and completed the dining experience
+        if reservation.status != 'COMPLETED':
+            return
+            
+        review_link = "https://g.page/r/CVOD2Qu6cEbVEAE/review"
+        
+        # 1. SEND SMS
+        contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
+        if len(contact_digits) >= 10:
+             sms_body = f"Hi {reservation.customer_name}, thank you for dining at Golden Bay today! We hope you enjoyed your meal. If you have a moment, we'd love your feedback: {review_link} - GOLDENBAY"
+             send_sms(reservation.customer_contact, sms_body)
+
+        # 2. SEND EMAIL (Optional fallback)
+        if reservation.customer_email and '@' in reservation.customer_email:
+            send_mail(
+                subject='Thank you for dining with Golden Bay',
+                message=f"Hi {reservation.customer_name},\n\nThank you for choosing Golden Bay. We'd love to hear about your experience!\n\nLeave a review: {review_link}",
+                from_email=settings.EMAIL_HOST_USER,
+                recipient_list=[reservation.customer_email],
+                fail_silently=True,
+            )
+            
+    except Exception as e:
+        print(f"Celery Task Error (Feedback Loop): {e}")

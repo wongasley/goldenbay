@@ -110,6 +110,7 @@ FILES_TO_READ = [
     'frontend/src/context/LanguageContext.jsx',
     'frontend/src/utils/translations.jsx',
     'frontend/src/components/seo/SEO.jsx',
+    'backend/marketing/tasks.py',
 
 ]
 
