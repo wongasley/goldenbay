@@ -47,7 +47,7 @@ class ReservationSerializer(serializers.ModelSerializer):
                     dining_area=area, 
                     date=date_val, 
                     session=session_val
-                ).exclude(status='CANCELLED')
+                ).exclude(status__in=['CANCELLED', 'NO_SHOW'])
                 
                 # If updating, exclude self from the collision check
                 if instance:
@@ -62,7 +62,7 @@ class ReservationSerializer(serializers.ModelSerializer):
                     dining_area=area, 
                     date=date_val, 
                     session=session_val
-                ).exclude(status='CANCELLED')
+                ).exclude(status__in=['CANCELLED', 'NO_SHOW'])
 
                 # If updating, exclude self from the total calculation before adding new pax
                 if instance:

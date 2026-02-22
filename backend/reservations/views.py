@@ -27,7 +27,7 @@ class AvailableRoomsView(APIView):
             return Response({"error": "Date and Session required"}, status=status.HTTP_400_BAD_REQUEST)
 
         all_areas = DiningArea.objects.filter(is_active=True)
-        bookings = Reservation.objects.filter(date=date, session=session).exclude(status='CANCELLED')
+        bookings = Reservation.objects.filter(date=date, session=session).exclude(status__in=['CANCELLED', 'NO_SHOW'])
 
         results = []
         for area in all_areas:
@@ -64,7 +64,10 @@ class ReservationCreateView(generics.CreateAPIView):
 class DashboardStatsView(APIView):
     def get(self, request):
         today = date.today()
-        pax_today = Reservation.objects.filter(date=today, status='CONFIRMED').aggregate(Sum('pax'))['pax__sum'] or 0
+        pax_today = Reservation.objects.filter(
+            date=today, 
+            status__in=['CONFIRMED', 'SEATED', 'COMPLETED']
+        ).aggregate(Sum('pax'))['pax__sum'] or 0
         expected_revenue = pax_today * 1500 
 
         # Generate last 7 days chart data

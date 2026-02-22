@@ -30,8 +30,6 @@ class DiningArea(models.Model):
     
 
 class Reservation(models.Model):
-    # ... (Keep existing Reservation model code exactly as is) ...
-    # Just copy the existing Reservation class here to avoid breaking it.
     SESSION_CHOICES = [
         ('LUNCH', 'Lunch (11:00 AM - 2:30 PM)'),
         ('DINNER', 'Dinner (5:00 PM - 10:00 PM)'),
@@ -39,6 +37,9 @@ class Reservation(models.Model):
     STATUS_CHOICES = [
         ('PENDING', 'Pending Confirmation'),
         ('CONFIRMED', 'Confirmed'),
+        ('SEATED', 'Seated (Arrived)'),
+        ('COMPLETED', 'Completed'),
+        ('NO_SHOW', 'No-Show'),
         ('CANCELLED', 'Cancelled'),
     ]
 
