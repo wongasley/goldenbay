@@ -10,10 +10,13 @@ import {
 } from 'lucide-react';
 import LogoutButton from '../auth/LogoutButton';
 import logo from '../../assets/images/goldenbaylogo.svg'; 
+import { getUserRole, canManageMarketing } from '../../utils/auth';
 
 const AdminLayout = () => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const role = getUserRole(); // Get user role
+  const isMarketingAdmin = canManageMarketing();
 
   // Close mobile menu when navigating
   useEffect(() => {
@@ -21,11 +24,11 @@ const AdminLayout = () => {
   }, [location.pathname]);
 
   const navItems = [
-    { path: '/staff', label: 'Overview', icon: LayoutDashboard },
-    { path: '/staff/bookings', label: 'Reservations', icon: CalendarDays },
-    { path: '/staff/customers', label: 'Phone Book', icon: Users },
-    { path: '/staff/marketing', label: 'Marketing', icon: Megaphone },
-  ];
+    { path: '/staff', label: 'Overview', icon: LayoutDashboard, show: true },
+    { path: '/staff/bookings', label: 'Reservations', icon: CalendarDays, show: true },
+    { path: '/staff/customers', label: 'Phone Book', icon: Users, show: true },
+    { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: isMarketingAdmin }, // Only show to Admins
+  ].filter(item => item.show);
 
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900 font-sans overflow-hidden">
@@ -87,19 +90,10 @@ const AdminLayout = () => {
         
         {/* Top Header */}
         <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4 z-10 flex justify-between items-center shadow-sm shrink-0">
-           <div className="flex items-center gap-3">
-              <button 
-                onClick={() => setIsMobileMenuOpen(true)} 
-                className="md:hidden text-gray-600 hover:text-gray-900 p-1 -ml-2"
-              >
-                <Menu size={24} />
-              </button>
-              <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest hidden sm:block">
-                {location.pathname.split('/')[2] || 'Dashboard'}
-              </h2>
-           </div>
+           {/* ... */}
            <div className="flex items-center gap-3 md:gap-4">
-              <span className="text-[10px] md:text-xs font-medium text-gray-500 uppercase tracking-widest">Admin</span>
+              {/* Display the actual role */}
+              <span className="text-[10px] md:text-xs font-medium text-gray-500 uppercase tracking-widest">{role}</span>
               <div className="w-8 h-8 rounded-full bg-gold-100 flex items-center justify-center text-gold-700 font-bold text-xs border border-gold-200">
                  GB
               </div>

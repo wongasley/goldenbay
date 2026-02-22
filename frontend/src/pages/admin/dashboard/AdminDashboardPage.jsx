@@ -93,7 +93,15 @@ const AdminDashboardPage = () => {
                     <div key={b.id} className="p-4 hover:bg-gray-50 transition-colors">
                         <div className="flex justify-between mb-1">
                             <p className="font-bold text-gray-900 text-xs">{b.customer_name}</p>
-                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest border ${b.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : b.status === 'CONFIRMED' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>{b.status}</span>
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest border 
+                              ${b.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 
+                                 b.status === 'CONFIRMED' ? 'bg-blue-50 text-blue-700 border-blue-200' : 
+                                 b.status === 'SEATED' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                                 b.status === 'COMPLETED' ? 'bg-green-50 text-green-700 border-green-200' :
+                                 b.status === 'NO_SHOW' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                 'bg-red-50 text-red-700 border-red-200'}`}>
+                              {b.status.replace('_', '-')}
+                           </span>
                         </div>
                         <p className="text-[10px] text-gray-500">{b.date} • {b.time} • {b.pax} Pax</p>
                     </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Plus, Check, X, Phone, Edit, UserCheck, Flag, CheckCircle2 } from 'lucide-react';
 import ReservationForm from '../../../components/reservations/ReservationForm';
+import { canCancelBooking } from '../../../utils/auth';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
@@ -10,6 +11,7 @@ const BookingManager = () => {
   const [filter, setFilter] = useState('ALL'); 
   const [dateFilter, setDateFilter] = useState('');
   const [showManualForm, setShowManualForm] = useState(false);
+  const hasCancelPermission = canCancelBooking();
   
   // Edit Modal State
   const [editingBooking, setEditingBooking] = useState(null);
@@ -203,7 +205,7 @@ const BookingManager = () => {
                         )}
                         
                         {/* Only allow Cancel on active states */}
-                        {['PENDING', 'CONFIRMED'].includes(b.status) && (
+                        {['PENDING', 'CONFIRMED'].includes(b.status) && hasCancelPermission && (
                             <button onClick={() => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!")} className="bg-red-50 text-red-600 p-1.5 rounded border border-red-200 hover:bg-red-100" title="Cancel"><X size={14} /></button>
                         )}
                     </div>
@@ -250,7 +252,7 @@ const BookingManager = () => {
                         <button onClick={() => handleOpenEdit(b)} className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-md text-xs font-bold uppercase tracking-widest border border-gray-200"><Edit size={14} className="inline mr-1"/> Edit</button>
                     )}
                     
-                    {['PENDING', 'CONFIRMED'].includes(b.status) && (
+                    {['PENDING', 'CONFIRMED'].includes(b.status) && hasCancelPermission && (
                         <button onClick={() => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!")} className="flex-1 bg-red-50 text-red-700 py-2 rounded-md text-xs font-bold uppercase tracking-widest border border-red-200"><X size={14} className="inline mr-1"/> Cancel</button>
                     )}
                 </div>
