@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-// ADDED "Users" TO THIS IMPORT LINE
 import { Plus, Check, X, Phone, Edit, UserCheck, Flag, CheckCircle2, MoreVertical, Search, Filter, Users } from 'lucide-react';
 import ReservationForm from '../../../components/reservations/ReservationForm';
 import { canCancelBooking } from '../../../utils/auth';
@@ -128,13 +127,13 @@ const BookingManager = () => {
 
   const getStatusBadge = (status) => {
       switch(status) {
-          case 'PENDING': return 'text-amber-800 bg-amber-100 border-amber-300';
-          case 'CONFIRMED': return 'text-blue-800 bg-blue-100 border-blue-300';
-          case 'SEATED': return 'text-indigo-800 bg-indigo-100 border-indigo-300';
-          case 'COMPLETED': return 'text-emerald-800 bg-emerald-100 border-emerald-300';
-          case 'NO_SHOW': return 'text-orange-800 bg-orange-100 border-orange-300';
-          case 'CANCELLED': return 'text-rose-800 bg-rose-100 border-rose-300';
-          default: return 'text-gray-800 bg-gray-100 border-gray-300';
+          case 'PENDING': return 'text-yellow-700 bg-yellow-50 border-yellow-200';
+          case 'CONFIRMED': return 'text-blue-700 bg-blue-50 border-blue-200';
+          case 'SEATED': return 'text-indigo-700 bg-indigo-50 border-indigo-200';
+          case 'COMPLETED': return 'text-green-700 bg-green-50 border-green-200';
+          case 'NO_SHOW': return 'text-orange-700 bg-orange-50 border-orange-200';
+          case 'CANCELLED': return 'text-red-700 bg-red-50 border-red-200';
+          default: return 'text-gray-700 bg-gray-50 border-gray-200';
       }
   };
 
@@ -144,59 +143,59 @@ const BookingManager = () => {
   };
 
   return (
-    <div className="space-y-6 pb-20">
-      
+    <div className="space-y-4">
       {/* 1. HEADER & CONTROLS */}
-      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-100 pb-4">
-              <div>
-                  <h1 className="text-2xl font-bold text-gray-900 font-serif">Booking Management</h1>
-                  <p className="text-gray-600 text-sm mt-1">Manage, confirm, and track reservations.</p>
-              </div>
-              <button onClick={() => setShowManualForm(true)} className="bg-gold-600 text-white px-5 py-2.5 font-bold uppercase tracking-widest text-xs rounded-lg shadow-md hover:bg-gold-700 transition-all flex items-center gap-2 w-full md:w-auto justify-center">
-                  <Plus size={16} /> Manual Booking
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-gray-200 pb-3 gap-4">
+        <div>
+            <h1 className="text-xl font-bold text-gray-900 font-serif">Booking Management</h1>
+            <p className="text-gray-500 text-xs mt-0.5">Manage, confirm, and track reservations.</p>
+        </div>
+        <button onClick={() => setShowManualForm(true)} className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-all flex items-center gap-1.5 w-full md:w-auto justify-center">
+            <Plus size={14} /> Manual Booking
+        </button>
+      </div>
+
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 w-full">
+          {/* Status Filters */}
+          <div className="flex flex-wrap gap-1.5">
+            {['ALL', 'PENDING', 'CONFIRMED', 'SEATED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'].map(f => (
+              <button 
+                key={f} 
+                onClick={() => setFilter(f)} 
+                className={`text-[9px] font-bold uppercase tracking-widest px-2.5 py-1.5 rounded transition-all border 
+                    ${filter === f 
+                        ? 'bg-gray-900 text-white border-gray-900' 
+                        : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
+              >
+                  {f.replace('_', ' ')}
               </button>
+            ))}
           </div>
 
-          <div className="flex flex-col lg:flex-row justify-between gap-4">
-              {/* Status Filters */}
-              <div className="flex flex-wrap gap-2">
-                {['ALL', 'PENDING', 'CONFIRMED', 'SEATED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'].map(f => (
-                  <button 
-                    key={f} 
-                    onClick={() => setFilter(f)} 
-                    className={`text-[12px] font-bold uppercase tracking-wider px-3.5 py-2.5 rounded-md transition-all border 
-                        ${filter === f 
-                            ? 'bg-gray-900 text-white border-gray-900 shadow-md' 
-                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 hover:text-gray-900'}`}
-                  >
-                      {f.replace('_', ' ')}
-                  </button>
-                ))}
+          {/* Search & Date */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-grow sm:w-48">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={12} />
+                  <input 
+                      type="text" 
+                      placeholder="Search..." 
+                      className="w-full pl-7 pr-2 py-1.5 bg-white border border-gray-200 rounded text-[11px] text-gray-900 focus:border-gold-500 outline-none transition-all shadow-sm"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                  />
               </div>
-
-              {/* Search & Date */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-                  <div className="relative flex-grow sm:w-64">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                      <input 
-                          type="text" 
-                          placeholder="Search name, phone, ID..." 
-                          className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md text-sm text-gray-900 focus:bg-white focus:border-gold-500 focus:ring-1 focus:ring-gold-500 outline-none transition-all"
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                  </div>
-                  <div className="relative shrink-0">
+              <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Date:</span>
+                  <div className="relative">
                       <input 
                           type="date" 
                           value={dateFilter} 
                           onChange={(e) => setDateFilter(e.target.value)} 
-                          className="w-full sm:w-auto px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md text-sm text-gray-900 focus:bg-white focus:border-gold-500 outline-none transition-all" 
+                          className="px-2 py-1.5 bg-white border border-gray-200 rounded text-[11px] text-gray-900 focus:border-gold-500 outline-none transition-all shadow-sm" 
                       />
                       {dateFilter && (
-                          <button onClick={() => setDateFilter('')} className="absolute right-10 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-600 bg-gray-50 px-1">
-                              <X size={16}/>
+                          <button onClick={() => setDateFilter('')} className="absolute right-7 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-600 bg-white px-1">
+                              <X size={12}/>
                           </button>
                       )}
                   </div>
@@ -205,241 +204,209 @@ const BookingManager = () => {
       </div>
 
       {/* 2. DESKTOP TABLE */}
-      <div className="hidden lg:block bg-white border border-gray-200 rounded-xl overflow-visible shadow-sm">
-        <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-100 border-b border-gray-200">
+      <div className="hidden md:block bg-white border border-gray-200 rounded overflow-visible shadow-sm">
+        <table className="w-full text-left">
+          <thead className="bg-gray-50 border-b border-gray-200 text-gray-400 uppercase tracking-widest text-[10px] font-bold">
+            <tr>
+              <th className="px-4 py-2.5">ID</th>
+              <th className="px-4 py-2.5">Customer</th>
+              <th className="px-4 py-2.5">Date / Time</th>
+              <th className="px-4 py-2.5">Room & Pax</th>
+              <th className="px-4 py-2.5">Status</th>
+              <th className="px-4 py-2.5 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 text-xs">
+            {filteredBookings.length === 0 ? (
                 <tr>
-                <th className="px-6 py-4 text-xs font-bold text-gray-700 uppercase tracking-wider">ID</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-700 uppercase tracking-wider">Customer Info</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-700 uppercase tracking-wider">Schedule</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-700 uppercase tracking-wider">Details</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-700 uppercase tracking-wider text-right">Actions</th>
+                    <td colSpan="6" className="px-4 py-8 text-center">
+                        <div className="flex flex-col items-center justify-center text-gray-400">
+                            <Filter size={24} className="mb-2 opacity-50" />
+                            <p>No bookings found.</p>
+                        </div>
+                    </td>
                 </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-                {filteredBookings.length === 0 ? (
-                    <tr>
-                        <td colSpan="6" className="px-6 py-16 text-center">
-                            <div className="flex flex-col items-center justify-center text-gray-500">
-                                <Filter size={32} className="mb-3 text-gray-300" />
-                                <p className="text-base font-medium text-gray-900">No bookings found</p>
-                                <p className="text-sm mt-1">Try adjusting your filters or search query.</p>
-                            </div>
-                        </td>
-                    </tr>
-                ) : (
-                    filteredBookings.map((b) => (
-                    <tr key={b.id} className={`transition-colors hover:bg-gray-50 ${isStale(b.created_at, b.status) ? 'bg-rose-50/30' : ''}`}>
-                        
-                        <td className="px-6 py-5 align-top">
-                            <span className="text-sm font-mono font-bold text-gray-600 bg-gray-100 px-2 py-1 rounded">#{b.id}</span>
-                        </td>
-                        
-                        <td className="px-6 py-5 align-top">
-                            <div className="flex flex-col gap-1.5">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-bold text-gray-900 text-base">{b.customer_name}</span>
-                                    {b.customer_no_show_count > 0 && (
-                                        <span className="text-rose-700 bg-rose-100 px-2.5 py-1 rounded flex items-center gap-1 text-[11px] font-bold uppercase tracking-widest border border-rose-300" title={`${b.customer_no_show_count} previous No-Shows`}>
-                                            <Flag size={14} /> {b.customer_no_show_count}
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="text-sm text-gray-600 font-mono flex items-center gap-2">
-                                    <Phone size={14} className="text-gray-400"/> {b.customer_contact}
-                                </div>
-                            </div>
-                        </td>
-
-                        <td className="px-6 py-5 align-top">
-                            <div className="flex flex-col gap-1.5">
-                                <span className="text-base font-bold text-gray-900">{b.date}</span>
-                                <span className="text-sm font-medium text-gold-700 bg-gold-50 px-2 py-0.5 rounded w-max border border-gold-200">
-                                    {b.time} ({b.session})
+            ) : (
+                filteredBookings.map((b) => (
+                <tr key={b.id} className={`transition-colors hover:bg-gray-50 ${isStale(b.created_at, b.status) ? 'bg-red-50/50' : ''}`}>
+                    
+                    <td className="px-4 py-2 text-gray-400 font-mono">#{b.id}</td>
+                    
+                    <td className="px-4 py-2">
+                        <div className="font-bold text-gray-900 flex items-center gap-2">
+                            {b.customer_name}
+                            {b.customer_no_show_count > 0 && (
+                                <span className="text-red-500 bg-red-50 px-1.5 rounded flex items-center gap-1 text-[9px] uppercase tracking-widest border border-red-200" title={`${b.customer_no_show_count} previous No-Shows`}>
+                                    <Flag size={10} /> {b.customer_no_show_count} No-Show
                                 </span>
-                            </div>
-                        </td>
+                            )}
+                        </div>
+                        <div className="text-[10px] text-gray-500 flex gap-1 mt-0.5 font-mono items-center"><Phone size={10}/> {b.customer_contact}</div>
+                    </td>
 
-                        <td className="px-6 py-5 align-top">
-                            <div className="flex flex-col gap-1.5">
-                                <span className="text-sm font-bold text-gray-900">{b.room_name || 'Main Dining Hall'}</span>
-                                <span className="text-sm text-gray-600 flex items-center gap-1.5">
-                                    <Users size={16} className="text-gray-400"/> {b.pax} Guests
-                                </span>
-                            </div>
-                        </td>
+                    <td className="px-4 py-2">
+                        <div className="text-gold-700 font-bold">{b.date}</div>
+                        <div className="text-[10px] text-gray-500 mt-0.5 uppercase tracking-wide">{b.time} ({b.session})</div>
+                    </td>
 
-                        <td className="px-6 py-5 align-top">
-                            <div className="flex flex-col gap-2 items-start">
-                                <span className={`px-3.5 py-1.5 rounded text-[11px] font-bold uppercase tracking-wider border ${getStatusBadge(b.status)}`}>
-                                    {b.status.replace('_', '-')}
-                                </span>
-                                
-                                {/* AUDIT LOG IN TABLE */}
-                                <div className="text-[11px] text-gray-500 font-mono mt-2 flex flex-col gap-1 border-t border-gray-100 pt-2 w-full max-w-[150px]">
-                                    <span className="flex items-center gap-1.5" title={`Created: ${new Date(b.created_at).toLocaleString()}`}>
-                                        <span className="text-gray-400 font-bold uppercase text-[9px] tracking-widest">ENC:</span> 
-                                        <span className="font-medium text-gray-700 truncate">{b.encoded_by_name || 'Web'}</span>
-                                    </span>
-                                    {b.last_modified_by_name && (
-                                        <span className="flex items-center gap-1.5" title={`Modified: ${new Date(b.updated_at).toLocaleString()}`}>
-                                            <span className="text-gray-400 font-bold uppercase text-[9px] tracking-widest">MOD:</span> 
-                                            <span className="font-medium text-gray-700 truncate">{b.last_modified_by_name}</span>
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        </td>
+                    <td className="px-4 py-2">
+                        <div className="font-bold text-gray-900">{b.room_name || 'Main Dining Hall'}</div>
+                        <div className="text-[10px] text-gray-500 mt-0.5 flex items-center gap-1">
+                            <Users size={10} className="text-gray-400"/> {b.pax} Guests
+                        </div>
+                    </td>
 
-                        <td className="px-6 py-5 align-top text-right relative">
-                            {/* ACTION BUTTONS */}
-                            <div className="flex items-center justify-end gap-2">
-                                
-                                {b.status === 'PENDING' && (
-                                    <button onClick={(e) => updateStatus(b.id, {status: 'CONFIRMED'}, "Confirmed!", e)} className="bg-blue-600 text-white p-2.5 rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide">
-                                        <Check size={16} /> Confirm
+                    <td className="px-4 py-2 align-top pt-3">
+                        <div className="flex flex-col items-start gap-1">
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border ${getStatusBadge(b.status)}`}>
+                                {b.status.replace('_', '-')}
+                            </span>
+                            <div className="text-[9px] text-gray-400 font-mono mt-0.5" title={`Created: ${new Date(b.created_at).toLocaleString()}`}>
+                                Enc: <span className="font-medium text-gray-600">{b.encoded_by_name || 'Web'}</span>
+                            </div>
+                        </div>
+                    </td>
+
+                    <td className="px-4 py-2 text-right relative">
+                        <div className="flex justify-end gap-1.5">
+                            
+                            {b.status === 'PENDING' && (
+                                <button onClick={(e) => updateStatus(b.id, {status: 'CONFIRMED'}, "Confirmed!", e)} className="bg-blue-50 text-blue-600 p-1.5 rounded border border-blue-200 hover:bg-blue-100" title="Confirm Booking">
+                                    <Check size={14} />
+                                </button>
+                            )}
+
+                            {b.status === 'CONFIRMED' && (
+                                <>
+                                    <button onClick={(e) => updateStatus(b.id, {status: 'SEATED'}, "Guest Seated", e)} className="bg-indigo-50 text-indigo-600 p-1.5 rounded border border-indigo-200 hover:bg-indigo-100" title="Mark Seated">
+                                        <UserCheck size={14} />
                                     </button>
-                                )}
+                                    <button onClick={(e) => updateStatus(b.id, {status: 'NO_SHOW'}, "Marked as No-Show", e)} className="bg-orange-50 text-orange-600 p-1.5 rounded border border-orange-200 hover:bg-orange-100" title="No Show">
+                                        <Flag size={14} />
+                                    </button>
+                                </>
+                            )}
 
-                                {b.status === 'CONFIRMED' && (
-                                    <div className="flex gap-2">
-                                        <button onClick={(e) => updateStatus(b.id, {status: 'SEATED'}, "Guest Seated", e)} className="bg-indigo-600 text-white px-3 py-2.5 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide">
-                                            <UserCheck size={16} /> Seated
-                                        </button>
-                                        <button onClick={(e) => updateStatus(b.id, {status: 'NO_SHOW'}, "Marked as No-Show", e)} className="bg-orange-100 text-orange-800 border border-orange-300 px-3 py-2.5 rounded-lg hover:bg-orange-200 transition-colors shadow-sm flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide">
-                                            <Flag size={14} /> No Show
-                                        </button>
+                            {b.status === 'SEATED' && (
+                                <button onClick={(e) => updateStatus(b.id, {status: 'COMPLETED'}, "Booking Completed", e)} className="bg-green-50 text-green-600 p-1.5 rounded border border-green-200 hover:bg-green-100" title="Mark Completed">
+                                    <CheckCircle2 size={14} />
+                                </button>
+                            )}
+
+                            <div className="relative">
+                                <button 
+                                    onClick={(e) => toggleDropdown(b.id, e)}
+                                    className="bg-gray-50 text-gray-500 p-1.5 rounded border border-gray-200 hover:bg-gray-100 transition-colors"
+                                >
+                                    <MoreVertical size={14} />
+                                </button>
+                                
+                                {activeDropdown === b.id && (
+                                    <div className="absolute right-0 mt-1 w-40 bg-white rounded shadow-lg border border-gray-200 z-50 overflow-hidden text-left text-xs animate-in fade-in duration-100">
+                                        <div className="p-1">
+                                            {!['CANCELLED', 'COMPLETED', 'NO_SHOW'].includes(b.status) && (
+                                                <button 
+                                                    onClick={(e) => handleOpenEdit(b, e)} 
+                                                    className="w-full flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded transition-colors"
+                                                >
+                                                    <Edit size={12} className="text-gray-400" /> Edit Details
+                                                </button>
+                                            )}
+                                            
+                                            {['PENDING', 'CONFIRMED'].includes(b.status) && hasCancelPermission && (
+                                                <button 
+                                                    onClick={(e) => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!", e)} 
+                                                    className="w-full flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                >
+                                                    <X size={12} className="text-red-500" /> Cancel Booking
+                                                </button>
+                                            )}
+
+                                            {['CANCELLED', 'COMPLETED', 'NO_SHOW'].includes(b.status) && !hasCancelPermission && (
+                                                <div className="px-3 py-2 text-[10px] text-gray-400 text-center">
+                                                    No actions available
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
-
-                                {b.status === 'SEATED' && (
-                                    <button onClick={(e) => updateStatus(b.id, {status: 'COMPLETED'}, "Booking Completed", e)} className="bg-emerald-600 text-white px-3 py-2.5 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide">
-                                        <CheckCircle2 size={16} /> Complete
-                                    </button>
-                                )}
-
-                                {/* Dropdown Menu for Edit/Cancel */}
-                                <div className="relative">
-                                    <button 
-                                        onClick={(e) => toggleDropdown(b.id, e)}
-                                        className="p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors border border-transparent hover:border-gray-200"
-                                    >
-                                        <MoreVertical size={20} />
-                                    </button>
-                                    
-                                    {activeDropdown === b.id && (
-                                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden text-left animate-in fade-in slide-in-from-top-2 duration-200">
-                                            <div className="p-1.5">
-                                                {!['CANCELLED', 'COMPLETED', 'NO_SHOW'].includes(b.status) && (
-                                                    <button 
-                                                        onClick={(e) => handleOpenEdit(b, e)} 
-                                                        className="w-full flex items-center gap-2 px-3 py-3 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                                                    >
-                                                        <Edit size={16} className="text-gray-400" /> Edit Details
-                                                    </button>
-                                                )}
-                                                
-                                                {['PENDING', 'CONFIRMED'].includes(b.status) && hasCancelPermission && (
-                                                    <button 
-                                                        onClick={(e) => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!", e)} 
-                                                        className="w-full flex items-center gap-2 px-3 py-3 text-sm font-medium text-rose-700 hover:bg-rose-50 rounded-md transition-colors mt-1"
-                                                    >
-                                                        <X size={16} className="text-rose-500" /> Cancel Booking
-                                                    </button>
-                                                )}
-
-                                                {['CANCELLED', 'COMPLETED', 'NO_SHOW'].includes(b.status) && !hasCancelPermission && (
-                                                    <div className="px-3 py-3 text-sm text-gray-400 font-medium text-center">
-                                                        No actions available
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
                             </div>
-                        </td>
-                    </tr>
-                    ))
-                )}
-            </tbody>
-            </table>
-        </div>
+
+                        </div>
+                    </td>
+                </tr>
+                ))
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* 3. MOBILE CARDS */}
-      <div className="lg:hidden flex flex-col gap-4">
+      <div className="md:hidden flex flex-col gap-4">
         {filteredBookings.length === 0 ? (
-            <div className="bg-white p-8 rounded-xl border border-gray-200 text-center text-gray-500 text-sm shadow-sm">
-                No bookings found matching your criteria.
+            <div className="bg-white p-8 rounded border border-gray-200 text-center text-gray-500 text-xs shadow-sm">
+                No bookings found.
             </div>
         ) : (
             filteredBookings.map((b) => (
-                <div key={b.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
+                <div key={b.id} className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm space-y-3">
                     
-                    {/* Header: Name & Status */}
                     <div className="flex justify-between items-start gap-4">
                         <div>
                             <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <h3 className="font-bold text-gray-900 text-lg">{b.customer_name}</h3>
+                                <h3 className="font-bold text-gray-900 text-base">{b.customer_name}</h3>
                                 {b.customer_no_show_count > 0 && (
-                                    <span className="text-rose-700 bg-rose-100 px-2 py-0.5 rounded flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest border border-rose-300">
+                                    <span className="text-red-500 bg-red-50 px-1.5 py-0.5 rounded flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest border border-red-200">
                                         <Flag size={10} /> {b.customer_no_show_count}
                                     </span>
                                 )}
                             </div>
-                            <span className="text-sm text-gray-600 font-mono flex items-center gap-1.5"><Phone size={14} className="text-gray-400"/> {b.customer_contact}</span>
+                            <span className="text-xs text-gray-500 font-mono flex items-center gap-1.5"><Phone size={12} className="text-gray-400"/> {b.customer_contact}</span>
                         </div>
-                        <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-widest border shrink-0 ${getStatusBadge(b.status)}`}>
+                        <span className={`px-2 py-1 rounded text-[9px] font-bold uppercase tracking-widest border shrink-0 ${getStatusBadge(b.status)}`}>
                             {b.status.replace('_', '-')}
                         </span>
                     </div>
 
-                    {/* Details Grid */}
-                    <div className="grid grid-cols-2 gap-3 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded border border-gray-100">
                         <div>
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Date & Time</p>
-                            <p className="font-bold text-gray-900 text-sm">{b.date}</p>
-                            <p className="text-sm text-gold-700 font-medium">{b.time}</p>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Schedule</p>
+                            <p className="font-bold text-gray-900 text-xs">{b.date}</p>
+                            <p className="text-[11px] text-gold-700">{b.time}</p>
                         </div>
                         <div>
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Room</p>
-                            <p className="font-bold text-gray-900 text-sm line-clamp-1">{b.room_name || 'Main Hall'}</p>
-                            <p className="text-sm text-gray-600">{b.pax} Guests</p>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Details</p>
+                            <p className="font-bold text-gray-900 text-xs line-clamp-1">{b.room_name || 'Main Hall'}</p>
+                            <p className="text-[11px] text-gray-600">{b.pax} Guests</p>
                         </div>
                     </div>
 
-                    {/* Mobile Audit Log */}
-                    <div className="text-[11px] text-gray-500 font-mono flex justify-between px-1">
-                        <span><span className="text-gray-400 font-bold uppercase text-[9px] tracking-widest">ENC:</span> <span className="font-medium text-gray-700">{b.encoded_by_name || 'Web'}</span></span>
-                        {b.last_modified_by_name && <span><span className="text-gray-400 font-bold uppercase text-[9px] tracking-widest">MOD:</span> <span className="font-medium text-gray-700">{b.last_modified_by_name}</span></span>}
+                    <div className="text-[9px] text-gray-400 font-mono flex justify-between px-1">
+                        <span>Enc: <span className="font-medium text-gray-600">{b.encoded_by_name || 'Web'}</span></span>
+                        {b.last_modified_by_name && <span>Mod: <span className="font-medium text-gray-600">{b.last_modified_by_name}</span></span>}
                     </div>
                     
-                    {/* Mobile Action Buttons */}
-                    <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+                    <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
                         {b.status === 'PENDING' && (
-                            <button onClick={() => updateStatus(b.id, {status: 'CONFIRMED'}, "Confirmed!")} className="flex-1 bg-blue-600 text-white py-3 rounded-lg text-sm font-bold uppercase tracking-widest shadow-sm"><Check size={16} className="inline mr-1.5"/> Confirm</button>
+                            <button onClick={(e) => updateStatus(b.id, {status: 'CONFIRMED'}, "Confirmed!", e)} className="flex-1 bg-blue-600 text-white py-2 rounded text-xs font-bold uppercase tracking-widest"><Check size={14} className="inline mr-1"/> Confirm</button>
                         )}
                         {b.status === 'CONFIRMED' && (
                             <>
-                                <button onClick={() => updateStatus(b.id, {status: 'SEATED'}, "Guest Seated")} className="flex-1 bg-indigo-600 text-white py-3 rounded-lg text-sm font-bold uppercase tracking-widest shadow-sm"><UserCheck size={16} className="inline mr-1.5"/> Seated</button>
-                                <button onClick={() => updateStatus(b.id, {status: 'NO_SHOW'}, "Marked as No-Show")} className="flex-1 bg-orange-100 text-orange-800 border border-orange-300 py-3 rounded-lg text-sm font-bold uppercase tracking-widest shadow-sm"><Flag size={14} className="inline mr-1.5"/> No Show</button>
+                                <button onClick={(e) => updateStatus(b.id, {status: 'SEATED'}, "Guest Seated", e)} className="flex-1 bg-indigo-600 text-white py-2 rounded text-xs font-bold uppercase tracking-widest"><UserCheck size={14} className="inline mr-1"/> Seated</button>
+                                <button onClick={(e) => updateStatus(b.id, {status: 'NO_SHOW'}, "Marked as No-Show", e)} className="flex-1 bg-orange-100 text-orange-700 border border-orange-200 py-2 rounded text-xs font-bold uppercase tracking-widest"><Flag size={12} className="inline mr-1"/> No Show</button>
                             </>
                         )}
                         {b.status === 'SEATED' && (
-                            <button onClick={() => updateStatus(b.id, {status: 'COMPLETED'}, "Booking Completed")} className="w-full bg-emerald-600 text-white py-3 rounded-lg text-sm font-bold uppercase tracking-widest shadow-sm"><CheckCircle2 size={16} className="inline mr-1.5"/> Mark Completed</button>
+                            <button onClick={(e) => updateStatus(b.id, {status: 'COMPLETED'}, "Booking Completed", e)} className="w-full bg-green-600 text-white py-2 rounded text-xs font-bold uppercase tracking-widest"><CheckCircle2 size={14} className="inline mr-1"/> Complete</button>
                         )}
                         
                         <div className="w-full flex gap-2 mt-1">
                             {!['CANCELLED', 'COMPLETED', 'NO_SHOW'].includes(b.status) && (
-                                <button onClick={() => handleOpenEdit(b)} className="flex-1 bg-white text-gray-700 py-3 rounded-lg text-xs font-bold uppercase tracking-widest border border-gray-300 shadow-sm hover:bg-gray-50"><Edit size={14} className="inline mr-1.5 text-gray-400"/> Edit</button>
+                                <button onClick={(e) => handleOpenEdit(b, e)} className="flex-1 bg-white text-gray-700 py-2 rounded text-xs font-bold uppercase tracking-widest border border-gray-200"><Edit size={12} className="inline mr-1 text-gray-400"/> Edit</button>
                             )}
                             
                             {['PENDING', 'CONFIRMED'].includes(b.status) && hasCancelPermission && (
-                                <button onClick={() => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!")} className="flex-1 bg-rose-50 text-rose-700 py-3 rounded-lg text-xs font-bold uppercase tracking-widest border border-rose-200 shadow-sm hover:bg-rose-100"><X size={14} className="inline mr-1.5 text-rose-500"/> Cancel</button>
+                                <button onClick={(e) => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!", e)} className="flex-1 bg-red-50 text-red-700 py-2 rounded text-xs font-bold uppercase tracking-widest border border-red-200"><X size={12} className="inline mr-1 text-red-500"/> Cancel</button>
                             )}
                         </div>
                     </div>
@@ -451,36 +418,35 @@ const BookingManager = () => {
       {/* --- EDIT MODAL --- */}
       {editingBooking && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
-              <div className="bg-white p-0 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="bg-white p-0 rounded shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
                   
-                  <div className="px-6 py-5 border-b border-gray-200 bg-gray-50 flex justify-between items-center sticky top-0 z-10">
+                  <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center sticky top-0 z-10">
                     <div>
-                        <h2 className="text-xl font-serif text-gray-900 font-bold">Edit Details</h2>
-                        <p className="text-sm text-gray-500 mt-1 font-mono">Ref: #{editingBooking.id} — <span className="font-bold text-gray-700">{editingBooking.customer_name}</span></p>
+                        <h2 className="text-lg font-serif text-gray-900 font-bold">Edit Details</h2>
+                        <p className="text-xs text-gray-500 mt-0.5 font-mono">Ref: #{editingBooking.id} — <span className="font-bold text-gray-700">{editingBooking.customer_name}</span></p>
                     </div>
-                    <button onClick={() => setEditingBooking(null)} className="p-2.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><X size={24}/></button>
+                    <button onClick={() => setEditingBooking(null)} className="p-2 text-gray-400 hover:text-red-600 rounded transition-colors"><X size={18}/></button>
                   </div>
                   
-                  <div className="p-6 overflow-y-auto space-y-6">
-                      
-                      <div className="grid grid-cols-2 gap-6">
+                  <div className="p-6 overflow-y-auto space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
                           <div>
-                              <label className="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-2">Date</label>
-                              <input type="date" required className="w-full bg-white border border-gray-300 p-3 text-gray-900 text-sm focus:border-gold-500 outline-none rounded-md transition-all shadow-sm" value={editingBooking.date} onChange={e => { setEditingBooking({...editingBooking, date: e.target.value}); checkEditRooms(e.target.value, editingBooking.session); }} />
+                              <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Date</label>
+                              <input type="date" required className="w-full bg-white border border-gray-300 p-2 text-gray-900 text-sm focus:border-gold-500 outline-none rounded-sm transition-all" value={editingBooking.date} onChange={e => { setEditingBooking({...editingBooking, date: e.target.value}); checkEditRooms(e.target.value, editingBooking.session); }} />
                           </div>
                           <div>
-                              <label className="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-2">Session</label>
-                              <select className="w-full bg-white border border-gray-300 p-3 text-gray-900 text-sm focus:border-gold-500 outline-none rounded-md transition-all shadow-sm" value={editingBooking.session} onChange={e => { setEditingBooking({...editingBooking, session: e.target.value, time: ''}); checkEditRooms(editingBooking.date, e.target.value); }}>
+                              <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Session</label>
+                              <select className="w-full bg-white border border-gray-300 p-2 text-gray-900 text-sm focus:border-gold-500 outline-none rounded-sm transition-all" value={editingBooking.session} onChange={e => { setEditingBooking({...editingBooking, session: e.target.value, time: ''}); checkEditRooms(editingBooking.date, e.target.value); }}>
                                   <option value="LUNCH">Lunch</option>
                                   <option value="DINNER">Dinner</option>
                               </select>
                           </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-2 gap-4">
                           <div>
-                              <label className="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-2">Time</label>
-                              <select required className="w-full bg-white border border-gray-300 p-3 text-gray-900 text-sm focus:border-gold-500 outline-none rounded-md transition-all shadow-sm" value={editingBooking.time} onChange={e => setEditingBooking({...editingBooking, time: e.target.value})}>
+                              <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Time</label>
+                              <select required className="w-full bg-white border border-gray-300 p-2 text-gray-900 text-sm focus:border-gold-500 outline-none rounded-sm transition-all" value={editingBooking.time} onChange={e => setEditingBooking({...editingBooking, time: e.target.value})}>
                                   <option value="" disabled>Select Time</option>
                                   {generateTimeSlots(editingBooking.session).map((slot, i) => (
                                       <option key={i} value={slot.value}>{slot.label}</option>
@@ -488,17 +454,17 @@ const BookingManager = () => {
                               </select>
                           </div>
                           <div>
-                              <label className="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-2">Guests (Pax)</label>
-                              <input type="number" min="1" required className="w-full bg-white border border-gray-300 p-3 text-gray-900 text-sm focus:border-gold-500 outline-none rounded-md transition-all shadow-sm" value={editingBooking.pax} onChange={e => setEditingBooking({...editingBooking, pax: e.target.value})} />
+                              <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Guests (Pax)</label>
+                              <input type="number" min="1" required className="w-full bg-white border border-gray-300 p-2 text-gray-900 text-sm focus:border-gold-500 outline-none rounded-sm transition-all" value={editingBooking.pax} onChange={e => setEditingBooking({...editingBooking, pax: e.target.value})} />
                           </div>
                       </div>
 
                       <div>
-                          <label className="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-2 flex items-center justify-between">
+                          <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 flex items-center justify-between">
                               <span>Dining Area</span>
-                              {isCheckingRooms && <span className="text-gold-600 text-[10px] normal-case animate-pulse">Checking...</span>}
+                              {isCheckingRooms && <span className="text-gold-600 text-[9px] normal-case animate-pulse">Checking...</span>}
                           </label>
-                          <select required className="w-full bg-white border border-gray-300 p-3 text-gray-900 text-sm focus:border-gold-500 outline-none rounded-md transition-all shadow-sm" value={editingBooking.dining_area} onChange={e => setEditingBooking({...editingBooking, dining_area: e.target.value})}>
+                          <select required className="w-full bg-white border border-gray-300 p-2 text-gray-900 text-sm focus:border-gold-500 outline-none rounded-sm transition-all" value={editingBooking.dining_area} onChange={e => setEditingBooking({...editingBooking, dining_area: e.target.value})}>
                               <option value="" disabled>Select Room</option>
                               {editRooms.map(room => {
                                   let label = room.name;
@@ -520,9 +486,9 @@ const BookingManager = () => {
                           </select>
                       </div>
 
-                      <div className="pt-4 border-t border-gray-100 mt-4">
-                          <label className="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-2">Status</label>
-                          <select className={`w-full border-2 p-3 text-sm rounded-md font-bold outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-200 transition-all ${getStatusBadge(editingBooking.status)}`} 
+                      <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Status</label>
+                          <select className={`w-full border p-2 text-sm rounded-sm font-bold outline-none transition-all ${getStatusBadge(editingBooking.status)}`} 
                             value={editingBooking.status} 
                             onChange={e => setEditingBooking({...editingBooking, status: e.target.value})}>
                               <option value="PENDING" className="text-gray-900 bg-white font-medium">Pending (Reviewing)</option>
@@ -535,16 +501,16 @@ const BookingManager = () => {
                       </div>
 
                       {/* --- AUDIT LOG BLOCK --- */}
-                      <div className="bg-gray-100 p-4 rounded-lg border border-gray-200 text-xs text-gray-600 font-mono space-y-2.5 mt-6 shadow-inner">
+                      <div className="bg-gray-50 p-3 rounded border border-gray-100 text-[10px] text-gray-500 font-mono space-y-1.5 mt-6">
                           <p className="flex justify-between items-center">
-                              <span className="uppercase tracking-widest font-bold text-gray-400 text-[10px]">Created</span> 
+                              <span>Created:</span> 
                               <span className="text-gray-900">
                                   {new Date(editingBooking.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
                                   {editingBooking.encoded_by_name ? ` by ${editingBooking.encoded_by_name}` : ' via Web'}
                               </span>
                           </p>
                           <p className="flex justify-between items-center">
-                              <span className="uppercase tracking-widest font-bold text-gray-400 text-[10px]">Last Update</span> 
+                              <span>Last Update:</span> 
                               <span className="text-gray-900">
                                   {new Date(editingBooking.updated_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
                                   {editingBooking.last_modified_by_name && ` by ${editingBooking.last_modified_by_name}`}
@@ -554,8 +520,8 @@ const BookingManager = () => {
 
                   </div>
                   
-                  <div className="p-6 bg-white border-t border-gray-100 sticky bottom-0 z-10 flex gap-4">
-                      <button onClick={() => setEditingBooking(null)} className="flex-1 py-3 text-gray-600 hover:bg-gray-100 font-bold uppercase tracking-widest text-sm rounded-lg transition-colors border border-gray-200 shadow-sm">
+                  <div className="p-4 bg-white border-t border-gray-100 sticky bottom-0 z-10 flex gap-2">
+                      <button onClick={() => setEditingBooking(null)} className="flex-1 py-2 text-gray-500 hover:bg-gray-100 font-bold uppercase tracking-widest text-xs rounded transition-colors border border-transparent">
                           Cancel
                       </button>
                       <button 
@@ -567,7 +533,7 @@ const BookingManager = () => {
                             dining_area: editingBooking.dining_area,
                             status: editingBooking.status 
                         }, "Booking Updated!")} 
-                        className="flex-[2] bg-gold-600 text-white font-bold uppercase tracking-widest py-3 text-sm rounded-lg shadow-md hover:bg-gold-700 transition-colors">
+                        className="flex-1 bg-gold-600 text-white font-bold uppercase tracking-widest py-2 text-xs rounded shadow-sm hover:bg-gold-700 transition-colors">
                           Save Changes
                       </button>
                   </div>
@@ -578,21 +544,21 @@ const BookingManager = () => {
       {/* --- CREATE MANUAL MODAL --- */}
       {showManualForm && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
-              <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="bg-white w-full max-w-2xl rounded shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                   
                   {/* Modal Header */}
-                  <div className="px-6 py-5 border-b border-gray-200 bg-gray-50 flex justify-between items-center sticky top-0 z-10">
+                  <div className="px-6 py-4 border-b border-gray-100 bg-white flex justify-between items-center sticky top-0 z-10">
                       <div>
-                          <h2 className="text-xl font-serif text-gray-900 font-bold">Create Manual Booking</h2>
-                          <p className="text-sm text-gray-500 uppercase tracking-widest mt-1">Admin Entry</p>
+                          <h2 className="text-lg font-serif text-gray-900 font-bold">Create Manual Booking</h2>
+                          <p className="text-xs text-gray-500 uppercase tracking-widest mt-0.5">Admin Entry</p>
                       </div>
-                      <button onClick={() => setShowManualForm(false)} className="p-2.5 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors">
-                          <X size={24}/>
+                      <button onClick={() => setShowManualForm(false)} className="p-1.5 hover:bg-gray-100 rounded text-gray-500 transition-colors">
+                          <X size={18}/>
                       </button>
                   </div>
                   
                   {/* Modal Body (Scrollable) */}
-                  <div className="p-6 overflow-y-auto bg-white">
+                  <div className="p-6 overflow-y-auto bg-gray-50/50">
                       <ReservationForm 
                           isManualEntry={true} 
                           onSuccess={() => {
