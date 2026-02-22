@@ -77,11 +77,11 @@ export const translations = {
             consultation: "Consultation",
             connect: "Start Planning Your Event", 
             cDesc: "Our dedicated event specialists are ready to help you curate the perfect menu and logistical plan for your big day.", 
-            direct: "Events Hotlines", emailInq: "Email Proposals", instant: "Instant Assistance", via: "Chat via WeChat or Viber",
+            direct: "Events Hotlines", emailInq: "Email Proposals", instant: "Instant Assistance", via: "Chat via WeChat or WhatsApp",
             scanQR: "Scan QR or save our number", coordinator: "Events Coordinator"
         },
         contact: { title: "Location & Contact", getTouch: "Get in Touch", cDesc: "Whether you have a question about our menu, need assistance finding us, or wish to inquire about corporate partnerships, our team is at your service.", addrLabel: "Address", resInq: "Reservations & Inquiries", emailLabel: "Email", hoursLabel: "Operating Hours" },
-        reservation: { title: "Reservations", details: "Details", selectPref: "Select your preferred date and experience.", bookWechat: "Book via WeChat", vipRooms: "VIP Private Rooms", alaCarte: "Ala Carte Dining", checking: "Checking availability...", confirmTitle: "Confirm Details", fName: "Full Name", fContact: "Contact / Viber", fEmail: "Email (Optional)", fGuests: "Number of Guests", fTime: "Arrival Time", selTime: "Select Preferred Time", fNotes: "Special Request / Menu Preferences", proc: "Processing Request...", reqRes: "Request Reservation", wechatTitle: "Book via WeChat", scan: "Scan this code to chat directly with our reservation specialist.", retWeb: "Return to Web Booking", reqPend: "Request Pending", rev: "We are reviewing your details", allow: "Please allow up to 30 minutes for confirmation during operating hours. Requests made after hours will be confirmed the following morning.", retHome: "Return to Home" }
+        reservation: { title: "Reservations", details: "Details", selectPref: "Select your preferred date and experience.", bookWechat: "Book via WeChat / WhatsApp", vipRooms: "VIP Private Rooms", alaCarte: "Ala Carte Dining", checking: "Checking availability...", confirmTitle: "Confirm Details", fName: "Full Name", fContact: "Contact / WhatsApp", fEmail: "Email (Optional)", fGuests: "Number of Guests", fTime: "Arrival Time", selTime: "Select Preferred Time", fNotes: "Special Request / Menu Preferences", proc: "Processing Request...", reqRes: "Request Reservation", wechatTitle: "WeChat / WhatsApp", scan: "Scan a code to chat directly with our reservation specialist.", retWeb: "Return to Web Booking", reqPend: "Request Pending", rev: "We are reviewing your details", allow: "Please allow up to 30 minutes for confirmation during operating hours. Requests made after hours will be confirmed the following morning.", retHome: "Return to Home" }
     },
     zh: {
         nav: { menu: "菜单", events: "活动", news: "新闻与优惠", rooms: "贵宾包厢", about: "关于我们", contact: "联系我们", book: "预订餐桌" },
@@ -115,11 +115,11 @@ export const translations = {
             consultation: "专属咨询",
             connect: "开始策划您的活动", 
             cDesc: "我们的专属活动专家已准备就绪，为您的大日子定制完美的菜单和执行方案。", 
-            direct: "活动专线", emailInq: "策划方案咨询", instant: "即时通讯服务", via: "通过微信或Viber联系",
+            direct: "活动专线", emailInq: "策划方案咨询", instant: "即时通讯服务", via: "通过微信或WhatsApp联系",
             scanQR: "扫码或保存我们的号码", coordinator: "活动协调员"
         },
         contact: { title: "位置与联系方式", getTouch: "联系我们", cDesc: "无论您对菜单有疑问、需要寻路指引，还是希望咨询企业合作，我们的团队随时为您服务。", addrLabel: "地址", resInq: "预订与咨询", emailLabel: "电子邮件", hoursLabel: "营业时间" },
-        reservation: { title: "预订座位", details: "预订详情", selectPref: "选择您的首选日期和体验。", bookWechat: "通过微信预订", vipRooms: "贵宾包厢", alaCarte: "大厅散座", checking: "正在查询...", confirmTitle: "确认详情", fName: "全名", fContact: "联系电话 / Viber", fEmail: "电子邮件 (选填)", fGuests: "就餐人数", fTime: "预计到达时间", selTime: "选择时间", fNotes: "特殊要求 / 饮食偏好", proc: "处理中...", reqRes: "提交预订", wechatTitle: "微信预订", scan: "扫描此二维码，直接与我们的预订专员沟通。", retWeb: "返回网页预订", reqPend: "预订已提交", rev: "我们正在审核您的预订信息", allow: "营业时间内请预留最多30分钟以便我们确认。非营业时间的预订将在次日上午处理。", retHome: "返回首页" }
+        reservation: { title: "预订座位", details: "预订详情", selectPref: "选择您的首选日期和体验。", bookWechat: "通过微信 / WhatsApp预订", vipRooms: "贵宾包厢", alaCarte: "大厅散座", checking: "正在查询...", confirmTitle: "确认详情", fName: "全名", fContact: "联系电话 / WhatsApp", fEmail: "电子邮件 (选填)", fGuests: "就餐人数", fTime: "预计到达时间", selTime: "选择时间", fNotes: "特殊要求 / 饮食偏好", proc: "处理中...", reqRes: "提交预订", wechatTitle: "微信 / WhatsApp", scan: "扫描二维码，直接与我们的预订专员沟通。", retWeb: "返回网页预订", reqPend: "预订已提交", rev: "我们正在审核您的预订信息", allow: "营业时间内请预留最多30分钟以便我们确认。非营业时间的预订将在次日上午处理。", retHome: "返回首页" }
     },
     zh_hant: {
         nav: { menu: "菜單", events: "活動", news: "新聞與優惠", rooms: "貴賓包廂", about: "關於我們", contact: "聯繫我們", book: "預訂餐桌" },
@@ -153,11 +153,11 @@ export const translations = {
             consultation: "專屬諮詢",
             connect: "開始策劃您的活動", 
             cDesc: "我們的專屬活動專家已準備就緒，為您的大日子定制完美的菜單和執行方案。", 
-            direct: "活動專線", emailInq: "策劃方案諮詢", instant: "即時通訊服務", via: "通過微信或Viber聯繫",
+            direct: "活動專線", emailInq: "策劃方案諮詢", instant: "即時通訊服務", via: "通過微信或WhatsApp聯繫",
             scanQR: "掃碼或保存我們的號碼", coordinator: "活動協調員"
         },
         contact: { title: "位置與聯繫方式", getTouch: "聯繫我們", cDesc: "無論您對菜單有疑問、需要尋路指引，還是希望諮詢企業合作，我們的團隊隨時為您服務。", addrLabel: "地址", resInq: "預訂與諮詢", emailLabel: "電子郵件", hoursLabel: "營業時間" },
-        reservation: { title: "預訂座位", details: "預訂詳情", selectPref: "選擇您的首選日期和體驗。", bookWechat: "通過微信預訂", vipRooms: "貴賓包廂", alaCarte: "大廳散座", checking: "正在查詢...", confirmTitle: "確認詳情", fName: "全名", fContact: "聯繫電話 / Viber", fEmail: "電子郵件 (選填)", fGuests: "就餐人數", fTime: "預計到達時間", selTime: "選擇時間", fNotes: "特殊要求 / 飲食偏好", proc: "處理中...", reqRes: "提交預訂", wechatTitle: "微信預訂", scan: "掃描此二維碼，直接與我們的預訂專員溝通。", retWeb: "返回網頁預訂", reqPend: "預訂已提交", rev: "我們正在審核您的預訂信息", allow: "營業時間內請預留最多30分鐘以便我們確認。非營業時間的預訂將在次日上午處理。", retHome: "返回首頁" }
+        reservation: { title: "預訂座位", details: "預訂詳情", selectPref: "選擇您的首選日期和體驗。", bookWechat: "通過微信 / WhatsApp預訂", vipRooms: "貴賓包廂", alaCarte: "大廳散座", checking: "正在查詢...", confirmTitle: "確認詳情", fName: "全名", fContact: "聯繫電話 / WhatsApp", fEmail: "電子郵件 (選填)", fGuests: "就餐人數", fTime: "預計到達時間", selTime: "選擇時間", fNotes: "特殊要求 / 飲食偏好", proc: "處理中...", reqRes: "提交預訂", wechatTitle: "微信 / WhatsApp", scan: "掃描此二維碼，直接與我們的預訂專員溝通。", retWeb: "返回網頁預訂", reqPend: "預訂已提交", rev: "我們正在審核您的預訂信息", allow: "營業時間內請預留最多30分鐘以便我們確認。非營業時間的預訂將在次日上午處理。", retHome: "返回首頁" }
     },
     ja: {
         nav: { menu: "メニュー", events: "イベント", news: "ニュース＆プロモ", rooms: "個室", about: "私たちについて", contact: "お問い合わせ", book: "予約する" },
@@ -191,11 +191,11 @@ export const translations = {
             consultation: "ご相談",
             connect: "イベントの計画を始める", 
             cDesc: "カスタマイズされたイベントの性質上、専任のイベントチームが空き状況、メニュー、ロジスティクスについてご相談を承ります。", 
-            direct: "イベント専用ダイヤル", emailInq: "メールでのご提案", instant: "インスタントメッセージ", via: "WeChatまたはViber経由でチャット",
+            direct: "イベント専用ダイヤル", emailInq: "メールでのご提案", instant: "インスタントメッセージ", via: "WeChatまたはWhatsApp経由でチャット",
             scanQR: "QRをスキャンするか、番号を保存してください", coordinator: "イベントコーディネーター"
         },
         contact: { title: "場所と連絡先", getTouch: "お問い合わせ", cDesc: "メニューに関するご質問、道案内が必要な場合、または企業パートナーシップに関するお問い合わせなど、私たちのチームが対応いたします。", addrLabel: "住所", resInq: "予約と問い合わせ", emailLabel: "メール", hoursLabel: "営業時間" },
-        reservation: { title: "ご予約", details: "詳細", selectPref: "ご希望の日付と体験を選択してください。", bookWechat: "WeChatで予約", vipRooms: "VIP個室", alaCarte: "アラカルトダイニング", checking: "空き状況を確認中...", confirmTitle: "詳細を確認", fName: "フルネーム", fContact: "連絡先 / Viber", fEmail: "メールアドレス (任意)", fGuests: "ゲストの数", fTime: "到着時間", selTime: "希望の時間を選択", fNotes: "特別なご要望 / メニューの好み", proc: "リクエストを処理中...", reqRes: "予約をリクエストする", wechatTitle: "WeChatで予約", scan: "このコードをスキャンして、予約スペシャリストと直接チャットしてください。", retWeb: "Web予約に戻る", reqPend: "リクエスト保留中", rev: "詳細を確認しています", allow: "営業時間内のご予約は、確認まで最大30分ほどお待ちください。営業時間外のリクエストは翌朝処理されます。", retHome: "ホームに戻る" }
+        reservation: { title: "ご予約", details: "詳細", selectPref: "ご希望の日付と体験を選択してください。", bookWechat: "WeChat / WhatsApp で予約", vipRooms: "VIP個室", alaCarte: "アラカルトダイニング", checking: "空き状況を確認中...", confirmTitle: "詳細を確認", fName: "フルネーム", fContact: "連絡先 / WhatsApp", fEmail: "メールアドレス (任意)", fGuests: "ゲストの数", fTime: "到着時間", selTime: "希望の時間を選択", fNotes: "特別なご要望 / メニューの好み", proc: "リクエストを処理中...", reqRes: "予約をリクエストする", wechatTitle: "WeChat / WhatsApp", scan: "このコードをスキャンして、予約スペシャリストと直接チャットしてください。", retWeb: "Web予約に戻る", reqPend: "リクエスト保留中", rev: "詳細を確認しています", allow: "営業時間内のご予約は、確認まで最大30分ほどお待ちください。営業時間外のリクエストは翌朝処理されます。", retHome: "ホームに戻る" }
     },
     ko: {
         nav: { menu: "메뉴", events: "이벤트", news: "뉴스 및 프로모션", rooms: "프라이빗 룸", about: "소개", contact: "연락처", book: "테이블 예약" },
@@ -229,10 +229,10 @@ export const translations = {
             consultation: "상담",
             connect: "이벤트 기획 시작하기", 
             cDesc: "맞춤형 이벤트의 특성상, 전담 이벤트 팀이 일정, 맞춤 메뉴 및 세부 사항에 대해 논의할 준비가 되어 있습니다.", 
-            direct: "이벤트 직통 전화", emailInq: "이메일 제안서 요청", instant: "빠른 상담", via: "WeChat 또는 Viber를 통한 채팅",
+            direct: "이벤트 직통 전화", emailInq: "이메일 제안서 요청", instant: "빠른 상담", via: "WeChat 또는 WhatsApp을 통한 채팅",
             scanQR: "QR을 스캔하거나 번호를 저장하세요", coordinator: "이벤트 코디네이터"
         },
         contact: { title: "위치 및 연락처", getTouch: "연락하기", cDesc: "메뉴에 대한 질문이 있거나, 길 안내가 필요하거나, 기업 파트너십에 대해 문의하고 싶으시다면 저희 팀이 도와드리겠습니다.", addrLabel: "주소", resInq: "예약 및 문의", emailLabel: "이메일", hoursLabel: "영업 시간" },
-        reservation: { title: "예약", details: "세부 정보", selectPref: "원하는 날짜와 경험을 선택하십시오.", bookWechat: "WeChat을 통한 예약", vipRooms: "VIP 프라이빗 룸", alaCarte: "알라카르트 다이닝", checking: "예약 가능 여부 확인 중...", confirmTitle: "세부 정보 확인", fName: "성명", fContact: "연락처 / Viber", fEmail: "이메일 (선택 사항)", fGuests: "게스트 수", fTime: "도착 시간", selTime: "원하는 시간 선택", fNotes: "특별 요청 / 메뉴 기본 설정", proc: "요청 처리 중...", reqRes: "예약 요청", wechatTitle: "WeChat을 통한 예약", scan: "이 코드를 스캔하여 예약 전문가와 직접 채팅하십시오.", retWeb: "웹 예약으로 돌아가기", reqPend: "요청 대기 중", rev: "세부 정보를 검토 중입니다", allow: "영업 시간 중 예약 확인에는 최대 30분이 소요됩니다. 영업 시간 외 요청은 다음 날 아침에 처리됩니다.", retHome: "홈으로 돌아가기" }
+        reservation: { title: "예약", details: "세부 정보", selectPref: "원하는 날짜와 경험을 선택하십시오.", bookWechat: "WeChat / WhatsApp 예약", vipRooms: "VIP 프라이빗 룸", alaCarte: "알라카르트 다이닝", checking: "예약 가능 여부 확인 중...", confirmTitle: "세부 정보 확인", fName: "성명", fContact: "연락처 / WhatsApp", fEmail: "이메일 (선택 사항)", fGuests: "게스트 수", fTime: "도착 시간", selTime: "원하는 시간 선택", fNotes: "특별 요청 / 메뉴 기본 설정", proc: "요청 처리 중...", reqRes: "예약 요청", wechatTitle: "WeChat / WhatsApp", scan: "이 코드를 스캔하여 예약 전문가와 직접 채팅하십시오.", retWeb: "웹 예약으로 돌아가기", reqPend: "요청 대기 중", rev: "세부 정보를 검토 중입니다", allow: "영업 시간 중 예약 확인에는 최대 30분이 소요됩니다. 영업 시간 외 요청은 다음 날 아침에 처리됩니다.", retHome: "홈으로 돌아가기" }
     }
 };

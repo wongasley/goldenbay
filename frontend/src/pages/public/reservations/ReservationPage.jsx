@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css'; 
 import { format } from 'date-fns';
-import { Users, CheckCircle, MessageSquare } from 'lucide-react';
+import { Users, CheckCircle, MessageSquare, X } from 'lucide-react';
 import wechatQr from '../../../assets/images/qrcode.svg'; 
+// MAKE SURE YOU ADD A WHATSAPP QR IMAGE TO YOUR FOLDER OR IT WILL BREAK
+import whatsappQr from '../../../assets/images/qrcode.svg'; 
 import heroimage from '../../../assets/images/heroimage4.webp';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../../context/LanguageContext';
@@ -85,12 +87,24 @@ const ReservationPage = () => {
   if (isWeChat) {
     return (
       <div className="min-h-screen bg-cream-50 text-gray-900 flex flex-col items-center justify-center p-8 text-center pt-32">
-        <h2 className={`text-3xl font-serif text-gold-600 mb-6 ${getFontClass()}`}>{t('reservation.wechatTitle')}</h2>
-        <div className="bg-white p-4 rounded-lg shadow-lg">
-            <img src={wechatQr} alt="WeChat QR" className="w-64 h-64 object-contain" />
+        <h2 className={`text-3xl font-serif text-gray-900 mb-2 ${getFontClass()}`}>{t('reservation.wechatTitle')}</h2>
+        <p className={`text-gray-500 mb-8 max-w-md ${getFontClass()}`}>{t('reservation.scan')}</p>
+        
+        <div className="flex flex-col md:flex-row gap-8 justify-center items-center">
+            <div className="bg-white p-6 rounded-lg shadow-lg border-t-4 border-[#07c160] text-center">
+                <img src={wechatQr} alt="WeChat QR" className="w-48 h-48 object-contain mb-4" />
+                <p className="font-bold text-sm text-[#07c160] uppercase tracking-widest">WeChat</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-lg border-t-4 border-[#25D366] text-center">
+                {/* Use the whatsapp image here once you upload it */}
+                <img src={whatsappQr} alt="WhatsApp QR" className="w-48 h-48 object-contain mb-4" />
+                <p className="font-bold text-sm text-[#25D366] uppercase tracking-widest">WhatsApp</p>
+            </div>
         </div>
-        <p className={`mt-6 text-gray-500 max-w-md ${getFontClass()}`}>{t('reservation.scan')}</p>
-        <button onClick={() => setIsWeChat(false)} className={`mt-8 text-sm tracking-widest uppercase border-b border-gold-600 pb-1 hover:text-gold-600 ${getFontClass()}`}>
+
+        <p className="text-xl font-bold text-gray-900 tracking-wider mt-8">+63 917 580 7166</p>
+
+        <button onClick={() => setIsWeChat(false)} className={`mt-10 text-sm font-bold tracking-widest uppercase border-b border-gold-600 pb-1 hover:text-gold-600 transition-colors ${getFontClass()}`}>
           {t('reservation.retWeb')}
         </button>
       </div>

@@ -8,6 +8,8 @@ import { useLanguage } from '../../../context/LanguageContext';
 import heroimage from '../../../assets/images/heroimage3.webp'; 
 import diningImg from '../../../assets/images/dining_area.webp';
 import wechatQr from '../../../assets/images/qrcode.svg'; 
+// MAKE SURE YOU ADD A WHATSAPP QR IMAGE TO YOUR FOLDER OR IT WILL BREAK
+import whatsappQr from '../../../assets/images/qrcode.svg'; 
 
 const EventInquiriesPage = () => {
   const [showWeChat, setShowWeChat] = useState(false);
@@ -294,22 +296,32 @@ const EventInquiriesPage = () => {
         </div>
       </div>
 
-      {/* --- WECHAT / VIBER MODAL --- */}
+      {/* --- WECHAT / WHATSAPP MODAL --- */}
       <AnimatePresence>
         {showWeChat && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[100] p-4" onClick={() => setShowWeChat(false)}>
-            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-white p-12 rounded-sm shadow-2xl max-w-sm w-full text-center relative" onClick={(e) => e.stopPropagation()}>
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-gold-400 to-green-500"></div>
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-white p-12 rounded-sm shadow-2xl max-w-2xl w-full text-center relative" onClick={(e) => e.stopPropagation()}>
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#07c160] to-[#25D366]"></div>
               
               <button onClick={() => setShowWeChat(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-900 transition-colors">
                 <X size={24} strokeWidth={1.5} />
               </button>
               
-              <h3 className={`text-2xl font-serif text-gray-900 mb-2 mt-2 ${getFontClass()}`}>WeChat / Viber</h3>
-              <p className={`text-xs text-gray-500 font-light mb-6 ${getFontClass()}`}>{t('events.scanQR')}</p>
+              <h3 className={`text-2xl font-serif text-gray-900 mb-2 mt-2 ${getFontClass()}`}>WeChat / WhatsApp</h3>
+              <p className={`text-xs text-gray-500 font-light mb-8 ${getFontClass()}`}>{t('events.scanQR')}</p>
               
-              <div className="bg-gray-50 p-6 rounded-sm border border-gray-100 mb-8 inline-block">
-                <img src={wechatQr} alt="Golden Bay WeChat QR" className="w-40 h-40 object-contain" />
+              <div className="flex flex-col md:flex-row justify-center items-center gap-8 mb-8">
+                  {/* WeChat QR */}
+                  <div className="bg-gray-50 p-6 rounded-sm border border-gray-100 flex flex-col items-center">
+                    <img src={wechatQr} alt="WeChat QR" className="w-40 h-40 object-contain mb-4" />
+                    <p className="font-bold text-[10px] text-[#07c160] uppercase tracking-widest">WeChat</p>
+                  </div>
+
+                  {/* WhatsApp QR */}
+                  <div className="bg-gray-50 p-6 rounded-sm border border-gray-100 flex flex-col items-center">
+                    <img src={whatsappQr} alt="WhatsApp QR" className="w-40 h-40 object-contain mb-4" />
+                    <p className="font-bold text-[10px] text-[#25D366] uppercase tracking-widest">WhatsApp</p>
+                  </div>
               </div>
               
               <div className="space-y-1 pt-6 border-t border-gray-100">
