@@ -87,9 +87,9 @@ const MenuPage = () => {
         onClick={() => setSelectedDish(item)}
         className="group bg-white border border-gray-200 hover:border-gold-400/50 transition-all duration-500 rounded-sm overflow-hidden flex flex-col shadow-sm hover:shadow-xl cursor-pointer"
     >
-        <div className="aspect-[4/3] overflow-hidden relative bg-gray-50 border-b border-gray-100">
+        <div className="aspect-[4/3] overflow-hidden relative bg-white border-b border-gray-100 flex items-center justify-center">
             {item.image ? (
-                <img src={`${BACKEND_URL}${item.image}`} loading="lazy" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 bg-gray-100" alt={item.name} />
+                <img src={`${BACKEND_URL}${item.image}`} loading="lazy" className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105" alt={item.name} />
             ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center opacity-10">
                     <img src={logo} className="h-20 w-auto grayscale" alt="placeholder" />
@@ -198,9 +198,9 @@ const MenuPage = () => {
                     onClick={() => setSelectedDish(item)}
                     className="group bg-white border border-gray-200 hover:border-gold-400/50 transition-all duration-500 rounded-sm overflow-hidden flex flex-col shadow-sm hover:shadow-xl cursor-pointer"
                   >
-                    <div className="aspect-[4/3] overflow-hidden relative bg-gray-50 border-b border-gray-100">
+                    <div className="aspect-[4/3] overflow-hidden relative bg-white border-b border-gray-100 flex items-center justify-center">
                       {item.image ? (
-                        <img src={item.image.startsWith('http') ? item.image : `${BACKEND_URL}${item.image}`} loading="lazy" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 bg-gray-100" alt={item.name} />
+                        <img src={item.image.startsWith('http') ? item.image : `${BACKEND_URL}${item.image}`} loading="lazy" className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105" alt={item.name} />
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center opacity-10"><img src={logo} className="h-20 w-auto grayscale" alt="placeholder" /></div>
                       )}
@@ -268,13 +268,13 @@ const MenuPage = () => {
                         <X size={18} />
                     </button>
 
-                    {/* Left: High Res Image */}
-                    <div className="w-full md:w-3/5 h-[30vh] md:h-[600px] bg-gray-100 relative">
+                    {/* Left: High Res Image with Object-Contain for 4:3 Aspect Ratio */}
+                    <div className="w-full md:w-3/5 h-[30vh] md:h-[600px] bg-white relative flex items-center justify-center border-b md:border-b-0 md:border-r border-gray-100">
                         {selectedDish.image ? (
                             <img 
                                 src={selectedDish.image.startsWith('http') ? selectedDish.image : `${BACKEND_URL}${selectedDish.image}`} 
                                 alt={selectedDish.name}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain p-4"
                             />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center opacity-20">
@@ -313,7 +313,7 @@ const MenuPage = () => {
                                 <p className={`text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-4 ${getFontClass()}`}>{t('menu.styles')}</p>
                                 <div className="flex flex-wrap gap-2">
                                     {selectedDish.cooking_methods.map((method) => (
-                                        <span key={method.id} className={`bg-white border border-gray-200 text-gray-700 px-4 py-2 text-sm rounded-sm ${getFontClass()}`}>
+                                        <span key={method.id} className={`bg-white border border-gray-200 text-gray-700 px-4 py-2 text-sm rounded-sm shadow-sm ${getFontClass()}`}>
                                             {getLocData(method, 'name')}
                                         </span>
                                     ))}
