@@ -79,8 +79,13 @@ const ReservationPage = () => {
         const res = await fetch(`${BACKEND_URL}/api/reservations/create/`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
         });
-        if (res.ok) { setSubmitStatus('success'); window.scrollTo({ top: 0, behavior: 'smooth' }); } 
-        else { setSubmitStatus('error'); }
+        if (res.ok) { 
+          setSubmitStatus('success'); 
+          window.scrollTo({ top: 0, behavior: 'smooth' }); 
+          if (window.fbq) window.fbq('track', 'Lead');
+        } else { 
+          setSubmitStatus('error'); 
+        }
     } catch (error) { setSubmitStatus('error'); }
   };
 

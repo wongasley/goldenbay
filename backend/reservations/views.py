@@ -99,14 +99,31 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated] 
 
     def update(self, request, *args, **kwargs):
+        # 1. Capture the old data BEFORE saving
+        old_instance = self.get_object()
+        old_status = old_instance.status
+        old_room_id = old_instance.dining_area_id
+        old_date = old_instance.date
+        old_time = old_instance.time
+
+        # 2. Perform the save (this automatically runs your collision validations)
         response = super().update(request, *args, **kwargs)
+
         if response.status_code == 200:
             reservation = self.get_object()
-            new_status = request.data.get('status')
             
-            # Fire notifications ASYNCHRONOUSLY using Celery (.delay)
-            if new_status in ['CONFIRMED', 'CANCELLED']:
-                send_status_update_notifications.delay(reservation.id, new_status)
+            status_changed = old_status != reservation.status
+            details_changed = (old_room_id != reservation.dining_area_id) or \
+                              (old_date != reservation.date) or \
+                              (old_time != reservation.time)
+
+            # 3. Fire appropriate notification
+            if status_changed and reservation.status in ['CONFIRMED', 'CANCELLED']:
+                send_status_update_notifications.delay(reservation.id, reservation.status)
+            elif details_changed and reservation.status != 'CANCELLED':
+                # If they didn't change status, but changed the room/time, send the update text!
+                from .tasks import send_booking_modification_notifications
+                send_booking_modification_notifications.delay(reservation.id)
                 
         return response
     

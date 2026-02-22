@@ -16,6 +16,9 @@ const FloatingWidget = () => {
         href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={() => {
+            if (window.fbq) window.fbq('track', 'Contact'); // <-- ADD THIS LINE
+        }}
         className="pointer-events-auto flex items-center justify-center w-[52px] h-[52px] md:w-14 md:h-14 bg-[#25D366] text-white rounded-full shadow-[0_8px_30px_rgba(37,211,102,0.4)] hover:scale-110 active:scale-95 transition-all duration-300 group relative"
         title="Chat with us on WhatsApp"
       >

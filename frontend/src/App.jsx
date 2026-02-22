@@ -8,6 +8,7 @@ import ProtectedRoute from './components/layout/ProtectedRoute';
 import ScrollToTop from './components/layout/ScrollToTop';
 import FloatingWidget from './components/layout/FloatingWidget'; 
 import { LanguageProvider } from './context/LanguageContext';
+import PixelTracker from './components/layout/PixelTracker';
 
 // --- LAZY LOAD PUBLIC PAGES ---
 const HomePage = lazy(() => import('./pages/public/home/HomePage'));
@@ -43,6 +44,7 @@ function App() {
       <LanguageProvider>
     <Router>
       <ScrollToTop />
+      <PixelTracker />
       <div className="w-full min-h-screen font-sans bg-gray-50 text-gray-900 relative">
         
         <Toaster 

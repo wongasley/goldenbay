@@ -27,6 +27,8 @@
                             <p style="color: #555555; font-size: 15px; line-height: 26px; margin-bottom: 30px;">
                                 {% if status == 'CONFIRMED' %}
                                     We are pleased to confirm your reservation. We look forward to welcoming you.
+                                {% elif status == 'UPDATED' %}
+                                    Your reservation details have been updated by our concierge. Please review your new room assignment and schedule below.
                                 {% elif status == 'PENDING' %}
                                     We have received your request. Our team is currently reviewing availability for your chosen date and time. You will receive a final confirmation shortly.
                                 {% elif status == 'CANCELLED' %}

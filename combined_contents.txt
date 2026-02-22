@@ -869,14 +869,31 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated] 
 
     def update(self, request, *args, **kwargs):
+        # 1. Capture the old data BEFORE saving
+        old_instance = self.get_object()
+        old_status = old_instance.status
+        old_room_id = old_instance.dining_area_id
+        old_date = old_instance.date
+        old_time = old_instance.time
+
+        # 2. Perform the save (this automatically runs your collision validations)
         response = super().update(request, *args, **kwargs)
+
         if response.status_code == 200:
             reservation = self.get_object()
-            new_status = request.data.get('status')
             
-            # Fire notifications ASYNCHRONOUSLY using Celery (.delay)
-            if new_status in ['CONFIRMED', 'CANCELLED']:
-                send_status_update_notifications.delay(reservation.id, new_status)
+            status_changed = old_status != reservation.status
+            details_changed = (old_room_id != reservation.dining_area_id) or \
+                              (old_date != reservation.date) or \
+                              (old_time != reservation.time)
+
+            # 3. Fire appropriate notification
+            if status_changed and reservation.status in ['CONFIRMED', 'CANCELLED']:
+                send_status_update_notifications.delay(reservation.id, reservation.status)
+            elif details_changed and reservation.status != 'CANCELLED':
+                # If they didn't change status, but changed the room/time, send the update text!
+                from .tasks import send_booking_modification_notifications
+                send_booking_modification_notifications.delay(reservation.id)
                 
         return response
     
@@ -943,75 +960,43 @@ from .utils import send_sms
 from .models import Reservation 
 
 @shared_task
-def send_new_booking_notifications(reservation_id):
-    """ ASYNCHRONOUS: Fired by Celery when a NEW booking is created """
+def send_booking_modification_notifications(reservation_id):
+    """ ASYNCHRONOUS: Fired when an admin edits a booking's room, date, or time """
     try:
-        # Fetch the reservation inside the task
         reservation = Reservation.objects.get(id=reservation_id)
         area_name = reservation.dining_area.name if reservation.dining_area else "Main Dining Hall"
         
-        # 1. NOTIFY THE RESTAURANT ADMINS
-        admin_context = {
-            'name': reservation.customer_name,
-            'contact': reservation.customer_contact,
-            'date': reservation.date.strftime('%B %d, %Y'),
-            'time': reservation.time.strftime('%I:%M %p'),
-            'pax': reservation.pax,
-            'area': area_name,
-            'notes': reservation.special_request or 'None',
-            'id': reservation.id
-        }
-        admin_html = render_to_string('emails/admin_notification.html', admin_context)
-        admin_plain = strip_tags(admin_html)
-        
-        send_mail(
-            subject=f'New Booking Request: {reservation.customer_name}',
-            message=admin_plain,
-            from_email=settings.EMAIL_HOST_USER,
-            recipient_list=['marketing@goldenbay.com.ph'], 
-            html_message=admin_html,
-            fail_silently=False,
-        )
-
-        admin_numbers_env = os.getenv('ADMIN_PHONE_NUMBERS')
-        if admin_numbers_env:
-            admin_numbers = [num.strip() for num in admin_numbers_env.split(',') if num.strip()]
-            admin_sms_body = f"New Booking: {reservation.customer_name} ({reservation.pax} pax) for {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')}. Area: {area_name}. Check Dashboard."
-            
-            for num in admin_numbers:
-                send_sms(num, admin_sms_body)
-
-        # 2. NOTIFY THE CUSTOMER
+        # 1. SEND HTML EMAIL
         if reservation.customer_email and '@' in reservation.customer_email:
-            customer_context = {
+            context = {
                 'name': reservation.customer_name,
-                'status': 'PENDING',
+                'status': 'UPDATED', # Triggers the "Updated" block in your template
                 'date': reservation.date.strftime('%B %d, %Y'),
                 'time': reservation.time.strftime('%I:%M %p'),
                 'pax': reservation.pax,
                 'area': area_name,
                 'id': reservation.id
             }
-            customer_html = render_to_string('emails/confirmation.html', customer_context)
-            customer_plain = strip_tags(customer_html)
-            
+            html_message = render_to_string('emails/confirmation.html', context)
+            plain_message = strip_tags(html_message)
+
             send_mail(
-                subject='Reservation Request Received - Golden Bay',
-                message=customer_plain,
+                subject='Reservation Updated - Golden Bay',
+                message=plain_message,
                 from_email=settings.EMAIL_HOST_USER,
                 recipient_list=[reservation.customer_email],
-                html_message=customer_html,
                 fail_silently=False,
+                html_message=html_message
             )
-
+            
+        # 2. SEND SMS
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
         if len(contact_digits) >= 10:
-             # UPDATED SMS TEXT HERE
-             sms_body = f"Hi {reservation.customer_name}, we received your booking request for {reservation.pax} pax on {reservation.date.strftime('%b %d')}. Our team is reviewing availability and will confirm during operating hours. - GOLDENBAY"
+             sms_body = f"Hi {reservation.customer_name}, your Golden Bay reservation has been UPDATED. You are now booked for {reservation.pax} pax on {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')} in the {area_name}. - GOLDENBAY"
              send_sms(reservation.customer_contact, sms_body)
 
     except Exception as e:
-        print(f"Celery Task Error (New Booking): {e}")
+        print(f"Celery Task Error (Modification): {e}")
 
 @shared_task
 def send_status_update_notifications(reservation_id, new_status):
@@ -1284,6 +1269,7 @@ import ProtectedRoute from './components/layout/ProtectedRoute';
 import ScrollToTop from './components/layout/ScrollToTop';
 import FloatingWidget from './components/layout/FloatingWidget'; 
 import { LanguageProvider } from './context/LanguageContext';
+import PixelTracker from './components/layout/PixelTracker';
 
 // --- LAZY LOAD PUBLIC PAGES ---
 const HomePage = lazy(() => import('./pages/public/home/HomePage'));
@@ -1319,6 +1305,7 @@ function App() {
       <LanguageProvider>
     <Router>
       <ScrollToTop />
+      <PixelTracker />
       <div className="w-full min-h-screen font-sans bg-gray-50 text-gray-900 relative">
         
         <Toaster 
@@ -2200,8 +2187,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css'; 
 import { format } from 'date-fns';
-import { Users, CheckCircle, MessageSquare } from 'lucide-react';
+import { Users, CheckCircle, MessageSquare, X } from 'lucide-react';
 import wechatQr from '../../../assets/images/qrcode.svg'; 
+// MAKE SURE YOU ADD A WHATSAPP QR IMAGE TO YOUR FOLDER OR IT WILL BREAK
+import whatsappQr from '../../../assets/images/qrcode.svg'; 
 import heroimage from '../../../assets/images/heroimage4.webp';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../../context/LanguageContext';
@@ -2274,20 +2263,45 @@ const ReservationPage = () => {
         const res = await fetch(`${BACKEND_URL}/api/reservations/create/`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
         });
-        if (res.ok) { setSubmitStatus('success'); window.scrollTo({ top: 0, behavior: 'smooth' }); } 
-        else { setSubmitStatus('error'); }
+        if (res.ok) { 
+          setSubmitStatus('success'); 
+          window.scrollTo({ top: 0, behavior: 'smooth' }); 
+          if (window.fbq) window.fbq('track', 'Lead');
+        } else { 
+          setSubmitStatus('error'); 
+        }
     } catch (error) { setSubmitStatus('error'); }
   };
 
+  // --- WECHAT / WHATSAPP VIEW ---
   if (isWeChat) {
     return (
       <div className="min-h-screen bg-cream-50 text-gray-900 flex flex-col items-center justify-center p-8 text-center pt-32">
-        <h2 className={`text-3xl font-serif text-gold-600 mb-6 ${getFontClass()}`}>{t('reservation.wechatTitle')}</h2>
-        <div className="bg-white p-4 rounded-lg shadow-lg">
-            <img src={wechatQr} alt="WeChat QR" className="w-64 h-64 object-contain" />
+        <h2 className={`text-3xl font-serif text-gray-900 mb-2 ${getFontClass()}`}>{t('reservation.wechatTitle')}</h2>
+        <p className={`text-gray-500 mb-8 max-w-md ${getFontClass()}`}>{t('reservation.scan')}</p>
+        
+        <div className="flex flex-col md:flex-row gap-8 justify-center items-center">
+            <div className="bg-white p-6 rounded-lg shadow-lg border-t-4 border-[#07c160] text-center">
+                <img src={wechatQr} alt="WeChat QR" className="w-48 h-48 object-contain mb-4" />
+                <p className="font-bold text-sm text-[#07c160] uppercase tracking-widest">WeChat</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-lg border-t-4 border-[#25D366] text-center">
+                {/* Use the whatsapp image here once you upload it */}
+                <img src={whatsappQr} alt="WhatsApp QR" className="w-48 h-48 object-contain mb-4" />
+                <p className="font-bold text-sm text-[#25D366] uppercase tracking-widest">WhatsApp</p>
+            </div>
         </div>
-        <p className={`mt-6 text-gray-500 max-w-md ${getFontClass()}`}>{t('reservation.scan')}</p>
-        <button onClick={() => setIsWeChat(false)} className={`mt-8 text-sm tracking-widest uppercase border-b border-gold-600 pb-1 hover:text-gold-600 ${getFontClass()}`}>
+
+        <p className="text-xl font-bold text-gray-900 tracking-wider mt-8">+63 917 580 7166</p>
+
+        {/* FORCED SCROLL TO TOP ON RETURN */}
+        <button 
+          onClick={() => { 
+            setIsWeChat(false); 
+            window.scrollTo({ top: 0, behavior: 'instant' }); 
+          }} 
+          className={`mt-10 text-sm font-bold tracking-widest uppercase border-b border-gold-600 pb-1 hover:text-gold-600 transition-colors ${getFontClass()}`}
+        >
           {t('reservation.retWeb')}
         </button>
       </div>
@@ -2349,7 +2363,14 @@ const ReservationPage = () => {
                 ))}
               </div>
               
-              <button onClick={() => setIsWeChat(true)} className={`w-full flex items-center justify-center gap-3 py-4 border border-green-600/30 text-green-600 hover:bg-green-50 transition-all rounded-sm uppercase tracking-widest text-xs font-bold ${getFontClass()}`}>
+              {/* FORCED SCROLL TO TOP ON CLICK */}
+              <button 
+                onClick={() => {
+                  setIsWeChat(true);
+                  window.scrollTo({ top: 0, behavior: 'instant' });
+                }} 
+                className={`w-full flex items-center justify-center gap-3 py-4 border border-green-600/30 text-green-600 hover:bg-green-50 transition-all rounded-sm uppercase tracking-widest text-xs font-bold ${getFontClass()}`}
+              >
                 <MessageSquare size={16} /> {t('reservation.bookWechat')}
               </button>
             </div>
@@ -2445,7 +2466,7 @@ export default ReservationPage;
 
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { Plus, Check, X, Phone } from 'lucide-react';
+import { Plus, Check, X, Phone, Edit } from 'lucide-react';
 import ReservationForm from '../../../components/reservations/ReservationForm';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
@@ -2455,6 +2476,11 @@ const BookingManager = () => {
   const [filter, setFilter] = useState('ALL'); 
   const [dateFilter, setDateFilter] = useState('');
   const [showManualForm, setShowManualForm] = useState(false);
+  
+  // Edit Modal State
+  const [editingBooking, setEditingBooking] = useState(null);
+  const [editRooms, setEditRooms] = useState([]);
+  const [isCheckingRooms, setIsCheckingRooms] = useState(false);
 
   const fetchBookings = async () => {
     const token = localStorage.getItem('accessToken'); 
@@ -2466,7 +2492,6 @@ const BookingManager = () => {
       const data = await res.json();
       setBookings(data);
     } catch (err) {
-      console.error("Failed to fetch bookings", err);
       toast.error("Failed to load reservations.");
     }
   };
@@ -2477,8 +2502,27 @@ const BookingManager = () => {
     return () => clearInterval(interval); 
   }, []);
 
-  const updateStatus = async (id, newStatus) => {
-    if (!window.confirm(`Are you sure you want to mark this as ${newStatus}?`)) return;
+  // Check rooms for the Edit Modal
+  const checkEditRooms = async (date, session) => {
+    setIsCheckingRooms(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/reservations/check/?date=${date}&session=${session}`);
+      const data = await res.json();
+      setEditRooms(data.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })));
+    } catch (err) {}
+    setIsCheckingRooms(false);
+  };
+
+  // Triggered when Admin clicks the "Edit" button
+  const handleOpenEdit = (booking) => {
+    setEditingBooking({
+        ...booking,
+        original_dining_area: booking.dining_area // Save original to prevent it from locking itself out
+    });
+    checkEditRooms(booking.date, booking.session);
+  };
+
+  const updateStatus = async (id, payload, successMsg) => {
     const token = localStorage.getItem('accessToken'); 
     const updatePromise = fetch(`${BACKEND_URL}/api/reservations/manage/${id}/`, {
         method: 'PATCH',
@@ -2486,21 +2530,22 @@ const BookingManager = () => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify(payload)
     }).then(async (res) => {
-        if (res.status === 401) { 
-            window.location.href = '/login';
-            throw new Error("Unauthorized");
+        if (res.status === 401) throw new Error("Unauthorized");
+        if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.non_field_errors ? errData.non_field_errors[0] : "Failed to update");
         }
-        if (!res.ok) throw new Error("Failed to update");
         fetchBookings(); 
+        setEditingBooking(null);
         return res.json();
     });
 
     toast.promise(updatePromise, {
         loading: 'Updating...',
-        success: `Marked as ${newStatus}!`,
-        error: 'Failed to update.',
+        success: successMsg,
+        error: (err) => err.message,
     });
   };
 
@@ -2509,63 +2554,54 @@ const BookingManager = () => {
       const matchesDate = dateFilter === '' ? true : b.date === dateFilter;
       return matchesStatus && matchesDate;
   });
+
   const isStale = (bookingDate, status) => {
     if (status !== 'PENDING') return false;
     const diffInHours = (new Date() - new Date(bookingDate)) / 1000 / 60 / 60;
     return diffInHours > 2; 
   };
 
+  const generateTimeSlots = (sessionType) => {
+      const slots = [];
+      const startHour = sessionType === 'LUNCH' ? 11 : 17; 
+      const endHour = sessionType === 'LUNCH' ? 14 : 21;     
+      for (let hour = startHour; hour <= endHour; hour++) {
+          const displayHour = hour > 12 ? hour - 12 : hour;
+          const ampm = hour >= 12 ? 'PM' : 'AM';
+          slots.push({ value: `${hour}:00:00`, label: `${displayHour}:00 ${ampm}` });
+          if (hour !== endHour) slots.push({ value: `${hour}:30:00`, label: `${displayHour}:30 ${ampm}` });
+      }
+      return slots;
+  };
+
   return (
     <div className="space-y-4">
-      
-      {/* 1. COMPACT HEADER */}
+      {/* HEADER */}
       <div className="flex justify-between items-end border-b border-gray-200 pb-3">
         <div>
             <h1 className="text-xl font-bold text-gray-900 font-serif">Booking Management</h1>
-            <p className="text-gray-500 text-xs">Manage, confirm, and track all reservations.</p>
+            <p className="text-gray-500 text-xs">Manage, confirm, and transfer reservations.</p>
         </div>
-        <button 
-          onClick={() => setShowManualForm(true)}
-          className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-all flex items-center gap-1.5"
-        >
+        <button onClick={() => setShowManualForm(true)} className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-all flex items-center gap-1.5">
           <Plus size={14} /> Manual Booking
         </button>
       </div>
 
-      {/* 2. FILTERS */}
+      {/* FILTERS */}
       <div className="flex flex-col sm:flex-row justify-between gap-4">
           <div className="flex flex-wrap gap-1.5">
             {['ALL', 'PENDING', 'CONFIRMED', 'CANCELLED'].map(f => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded transition-all border ${
-                  filter === f ? 'bg-gray-900 text-white border-gray-900 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50 hover:text-gray-900'
-                }`}
-              >
-                {f}
-              </button>
+              <button key={f} onClick={() => setFilter(f)} className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded transition-all border ${filter === f ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200'}`}>{f}</button>
             ))}
           </div>
-          
-          {/* NEW DATE FILTER */}
           <div className="flex items-center gap-2">
               <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Date:</span>
-              <input 
-                  type="date" 
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  className="text-xs border border-gray-200 rounded p-1.5 outline-none focus:border-gold-500 text-gray-700"
-              />
-              {dateFilter && (
-                  <button onClick={() => setDateFilter('')} className="text-[10px] text-gray-400 hover:text-red-500 font-bold uppercase">Clear</button>
-              )}
+              <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="text-xs border border-gray-200 rounded p-1.5 outline-none focus:border-gold-500 text-gray-700" />
+              {dateFilter && <button onClick={() => setDateFilter('')} className="text-[10px] text-gray-400 hover:text-red-500 font-bold uppercase">Clear</button>}
           </div>
       </div>
 
-      {/* 3. RESPONSIVE DATA DISPLAY */}
-      
-      {/* --- DESKTOP VIEW (TABLE) --- */}
+      {/* DESKTOP TABLE */}
       <div className="hidden md:block bg-white border border-gray-200 rounded overflow-hidden shadow-sm">
         <table className="w-full text-left">
           <thead className="bg-gray-50 border-b border-gray-200 text-gray-400 uppercase tracking-widest text-[10px] font-bold">
@@ -2573,14 +2609,14 @@ const BookingManager = () => {
               <th className="px-4 py-2.5">ID</th>
               <th className="px-4 py-2.5">Customer</th>
               <th className="px-4 py-2.5">Date / Time</th>
-              <th className="px-4 py-2.5">Details</th>
+              <th className="px-4 py-2.5">Room & Pax</th>
               <th className="px-4 py-2.5">Status</th>
               <th className="px-4 py-2.5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-xs">
             {filteredBookings.length === 0 ? (
-                <tr><td colSpan="6" className="px-4 py-8 text-center text-gray-400">No bookings found in this category.</td></tr>
+                <tr><td colSpan="6" className="px-4 py-8 text-center text-gray-400">No bookings found.</td></tr>
             ) : (
                 filteredBookings.map((b) => (
                 <tr key={b.id} className={`transition-colors ${isStale(b.created_at, b.status) ? 'bg-red-50/50' : 'hover:bg-gray-50'}`}>
@@ -2600,23 +2636,18 @@ const BookingManager = () => {
                     <td className="px-4 py-2">
                         <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border inline-block ${
                             b.status === 'PENDING' ? 'text-yellow-700 bg-yellow-50 border-yellow-200' :
-                            b.status === 'CONFIRMED' ? 'text-green-700 bg-green-50 border-green-200' :
-                            'text-red-700 bg-red-50 border-red-200'
-                        }`}>
-                            {b.status}
-                        </span>
+                            b.status === 'CONFIRMED' ? 'text-green-700 bg-green-50 border-green-200' : 'text-red-700 bg-red-50 border-red-200'
+                        }`}>{b.status}</span>
                     </td>
                     <td className="px-4 py-2 text-right">
                     {b.status !== 'CANCELLED' && (
                         <div className="flex justify-end gap-1.5">
-                        {b.status === 'PENDING' && (
-                            <button onClick={() => updateStatus(b.id, 'CONFIRMED')} className="bg-green-50 text-green-600 p-1.5 rounded border border-green-200 hover:bg-green-100" title="Confirm">
-                                <Check size={14} />
-                            </button>
-                        )}
-                        <button onClick={() => updateStatus(b.id, 'CANCELLED')} className="bg-red-50 text-red-600 p-1.5 rounded border border-red-200 hover:bg-red-100" title="Cancel">
-                            <X size={14} />
-                        </button>
+                            {b.status === 'PENDING' && (
+                                <button onClick={() => updateStatus(b.id, {status: 'CONFIRMED'}, "Confirmed!")} className="bg-green-50 text-green-600 p-1.5 rounded border border-green-200 hover:bg-green-100" title="Confirm"><Check size={14} /></button>
+                            )}
+                            {/* NEW EDIT BUTTON */}
+                            <button onClick={() => handleOpenEdit(b)} className="bg-blue-50 text-blue-600 p-1.5 rounded border border-blue-200 hover:bg-blue-100" title="Transfer Room / Edit Details"><Edit size={14} /></button>
+                            <button onClick={() => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!")} className="bg-red-50 text-red-600 p-1.5 rounded border border-red-200 hover:bg-red-100" title="Cancel"><X size={14} /></button>
                         </div>
                     )}
                     </td>
@@ -2627,60 +2658,118 @@ const BookingManager = () => {
         </table>
       </div>
 
-      {/* --- MOBILE VIEW (CARDS) --- */}
+      {/* MOBILE CARDS (Also updated with Edit button) */}
       <div className="md:hidden flex flex-col gap-4">
-        {filteredBookings.length === 0 ? (
-            <div className="p-8 text-center text-gray-400 bg-white border border-gray-200 rounded">No bookings found.</div>
-        ) : (
-            filteredBookings.map((b) => (
-                <div key={b.id} className={`bg-white border rounded-lg p-5 shadow-sm relative overflow-hidden ${isStale(b.created_at, b.status) ? 'border-red-300' : 'border-gray-200'}`}>
-                    {/* Left Red Indicator for Stale Bookings */}
-                    {isStale(b.created_at, b.status) && <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>}
-                    
-                    <div className="flex justify-between items-start mb-3">
-                        <div>
-                            <h3 className="font-bold text-gray-900 text-lg">{b.customer_name}</h3>
-                            <span className="text-xs text-gray-500 font-mono flex items-center gap-1.5 mt-1"><Phone size={12}/> {b.customer_contact}</span>
-                        </div>
-                        <span className={`px-2 py-1 rounded text-[9px] font-bold uppercase tracking-widest border inline-block ${
-                            b.status === 'PENDING' ? 'text-yellow-700 bg-yellow-50 border-yellow-200' :
-                            b.status === 'CONFIRMED' ? 'text-green-700 bg-green-50 border-green-200' :
-                            'text-red-700 bg-red-50 border-red-200'
-                        }`}>
-                            {b.status}
-                        </span>
+        {filteredBookings.map((b) => (
+            <div key={b.id} className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+                <div className="flex justify-between items-start mb-3">
+                    <div>
+                        <h3 className="font-bold text-gray-900 text-lg">{b.customer_name}</h3>
+                        <span className="text-xs text-gray-500 font-mono flex items-center gap-1.5 mt-1"><Phone size={12}/> {b.customer_contact}</span>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-3 my-4 text-sm bg-gray-50 p-3 rounded border border-gray-100">
-                        <div>
-                            <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Date & Time</p>
-                            <p className="font-bold text-gray-900">{b.date}</p>
-                            <p className="text-xs text-gray-600">{b.time} ({b.session})</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Details</p>
-                            <p className="font-bold text-gray-900 line-clamp-1">{b.room_name || 'Main Hall'}</p>
-                            <p className="text-xs text-gray-600">{b.pax} Guests</p>
-                        </div>
-                    </div>
-
-                    {b.status !== 'CANCELLED' && (
-                        <div className="flex gap-2 mt-4">
-                            {b.status === 'PENDING' && (
-                                <button onClick={() => updateStatus(b.id, 'CONFIRMED')} className="flex-1 bg-green-600 text-white py-3 rounded-md text-xs font-bold uppercase tracking-widest hover:bg-green-700 flex justify-center items-center gap-2 shadow-sm transition-colors">
-                                    <Check size={16} /> Confirm
-                                </button>
-                            )}
-                            <button onClick={() => updateStatus(b.id, 'CANCELLED')} className="flex-1 bg-red-50 text-red-700 py-3 rounded-md text-xs font-bold uppercase tracking-widest border border-red-200 hover:bg-red-100 flex justify-center items-center gap-2 transition-colors">
-                                <X size={16} /> Cancel
-                            </button>
-                        </div>
-                    )}
+                    <span className="px-2 py-1 rounded text-[9px] font-bold uppercase tracking-widest border">{b.status}</span>
                 </div>
-            ))
-        )}
+                <div className="grid grid-cols-2 gap-3 my-4 text-sm bg-gray-50 p-3 rounded border border-gray-100">
+                    <div><p className="font-bold text-gray-900">{b.date}</p><p className="text-xs text-gray-600">{b.time}</p></div>
+                    <div><p className="font-bold text-gray-900 line-clamp-1">{b.room_name}</p><p className="text-xs text-gray-600">{b.pax} Guests</p></div>
+                </div>
+                {b.status !== 'CANCELLED' && (
+                    <div className="flex gap-2 mt-4">
+                        {b.status === 'PENDING' && <button onClick={() => updateStatus(b.id, {status: 'CONFIRMED'}, "Confirmed!")} className="flex-1 bg-green-600 text-white py-2 rounded-md text-xs font-bold uppercase tracking-widest"><Check size={14} className="inline mr-1"/> Confirm</button>}
+                        <button onClick={() => handleOpenEdit(b)} className="flex-1 bg-blue-50 text-blue-700 py-2 rounded-md text-xs font-bold uppercase tracking-widest border border-blue-200"><Edit size={14} className="inline mr-1"/> Edit</button>
+                        <button onClick={() => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!")} className="flex-1 bg-red-50 text-red-700 py-2 rounded-md text-xs font-bold uppercase tracking-widest border border-red-200"><X size={14} className="inline mr-1"/> Cancel</button>
+                    </div>
+                )}
+            </div>
+        ))}
       </div>
 
+      {/* --- RE-ASSIGNMENT MODAL --- */}
+      {editingBooking && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white p-6 rounded shadow-2xl w-full max-w-lg">
+                  <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
+                    <h2 className="text-xl font-serif text-gray-900 font-bold">Transfer / Edit Booking</h2>
+                    <button onClick={() => setEditingBooking(null)} className="text-gray-400 hover:text-red-500"><X size={20}/></button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-[10px] font-bold uppercase text-gray-500 mb-1">Date</label>
+                              <input type="date" className="w-full border p-2 text-sm rounded" 
+                                value={editingBooking.date} 
+                                onChange={e => {
+                                    setEditingBooking({...editingBooking, date: e.target.value});
+                                    checkEditRooms(e.target.value, editingBooking.session);
+                                }} 
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-[10px] font-bold uppercase text-gray-500 mb-1">Session</label>
+                              <select className="w-full border p-2 text-sm rounded" 
+                                value={editingBooking.session} 
+                                onChange={e => {
+                                    setEditingBooking({...editingBooking, session: e.target.value});
+                                    checkEditRooms(editingBooking.date, e.target.value);
+                                }}>
+                                  <option value="LUNCH">Lunch</option>
+                                  <option value="DINNER">Dinner</option>
+                              </select>
+                          </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-[10px] font-bold uppercase text-gray-500 mb-1">Time</label>
+                              <select className="w-full border p-2 text-sm rounded" value={editingBooking.time} onChange={e => setEditingBooking({...editingBooking, time: e.target.value})}>
+                                  {generateTimeSlots(editingBooking.session).map(slot => (
+                                      <option key={slot.value} value={slot.value}>{slot.label}</option>
+                                  ))}
+                              </select>
+                          </div>
+                          <div>
+                              <label className="block text-[10px] font-bold uppercase text-gray-500 mb-1">Guests (Pax)</label>
+                              <input type="number" min="1" className="w-full border p-2 text-sm rounded" value={editingBooking.pax} onChange={e => setEditingBooking({...editingBooking, pax: e.target.value})} />
+                          </div>
+                      </div>
+
+                      <div>
+                          <label className="block text-[10px] font-bold uppercase text-gray-500 mb-1">Assign Room {isCheckingRooms && <span className="text-gold-500 normal-case">(Checking...)</span>}</label>
+                          <select className="w-full border p-2 text-sm rounded" value={editingBooking.dining_area} onChange={e => setEditingBooking({...editingBooking, dining_area: e.target.value})}>
+                              {editRooms.map(room => {
+                                  // It is disabled if it's not available AND it's not the room they currently have selected
+                                  const isDisabled = !room.is_available && room.id !== editingBooking.original_dining_area;
+                                  let label = room.name;
+                                  if (room.area_type === 'HALL') label += ` (${room.remaining_capacity} seats left)`;
+                                  else if (isDisabled) label += " [BOOKED]";
+                                  
+                                  return (
+                                      <option key={room.id} value={room.id} disabled={isDisabled} className={isDisabled ? 'text-gray-300' : ''}>
+                                          {label}
+                                      </option>
+                                  );
+                              })}
+                          </select>
+                      </div>
+
+                      <button 
+                        onClick={() => updateStatus(editingBooking.id, {
+                            date: editingBooking.date,
+                            session: editingBooking.session,
+                            time: editingBooking.time,
+                            pax: editingBooking.pax,
+                            dining_area: editingBooking.dining_area
+                        }, "Booking Transferred & Notified!")} 
+                        className="w-full bg-gold-600 text-white font-bold uppercase tracking-widest py-3 text-xs rounded shadow hover:bg-black transition-colors mt-4">
+                          Save & Notify Customer
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* CREATE MANUAL MODAL */}
       {showManualForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white p-6 rounded shadow-2xl w-full max-w-lg">
@@ -5233,6 +5322,8 @@ export default PostEditor;
                             <p style="color: #555555; font-size: 15px; line-height: 26px; margin-bottom: 30px;">
                                 {% if status == 'CONFIRMED' %}
                                     We are pleased to confirm your reservation. We look forward to welcoming you.
+                                {% elif status == 'UPDATED' %}
+                                    Your reservation details have been updated by our concierge. Please review your new room assignment and schedule below.
                                 {% elif status == 'PENDING' %}
                                     We have received your request. Our team is currently reviewing availability for your chosen date and time. You will receive a final confirmation shortly.
                                 {% elif status == 'CANCELLED' %}
@@ -6304,6 +6395,8 @@ import { useLanguage } from '../../../context/LanguageContext';
 import heroimage from '../../../assets/images/heroimage3.webp'; 
 import diningImg from '../../../assets/images/dining_area.webp';
 import wechatQr from '../../../assets/images/qrcode.svg'; 
+// MAKE SURE YOU ADD A WHATSAPP QR IMAGE TO YOUR FOLDER OR IT WILL BREAK
+import whatsappQr from '../../../assets/images/qrcode.svg'; 
 
 const EventInquiriesPage = () => {
   const [showWeChat, setShowWeChat] = useState(false);
@@ -6574,7 +6667,14 @@ const EventInquiriesPage = () => {
                   <ArrowRight size={16} className="text-gray-600 group-hover:text-gold-500 transition-colors transform group-hover:translate-x-1" />
                 </a>
                 
-                <button onClick={() => setShowWeChat(true)} className="w-full flex items-center justify-between group py-5 border-b border-transparent hover:border-green-500 transition-colors text-left">
+                {/* FORCED SCROLL TO TOP ON CLICK */}
+                <button 
+                  onClick={() => {
+                      setShowWeChat(true);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }} 
+                  className="w-full flex items-center justify-between group py-5 border-b border-transparent hover:border-green-500 transition-colors text-left"
+                >
                   <div className="flex items-center gap-6">
                       <MessageSquare size={20} strokeWidth={1.5} className="text-green-500" />
                       <div>
@@ -6590,22 +6690,32 @@ const EventInquiriesPage = () => {
         </div>
       </div>
 
-      {/* --- WECHAT / VIBER MODAL --- */}
+      {/* --- WECHAT / WHATSAPP MODAL --- */}
       <AnimatePresence>
         {showWeChat && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[100] p-4" onClick={() => setShowWeChat(false)}>
-            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-white p-12 rounded-sm shadow-2xl max-w-sm w-full text-center relative" onClick={(e) => e.stopPropagation()}>
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-gold-400 to-green-500"></div>
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-white p-12 rounded-sm shadow-2xl max-w-2xl w-full text-center relative" onClick={(e) => e.stopPropagation()}>
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#07c160] to-[#25D366]"></div>
               
               <button onClick={() => setShowWeChat(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-900 transition-colors">
                 <X size={24} strokeWidth={1.5} />
               </button>
               
-              <h3 className={`text-2xl font-serif text-gray-900 mb-2 mt-2 ${getFontClass()}`}>WeChat / Viber</h3>
-              <p className={`text-xs text-gray-500 font-light mb-6 ${getFontClass()}`}>{t('events.scanQR')}</p>
+              <h3 className={`text-2xl font-serif text-gray-900 mb-2 mt-2 ${getFontClass()}`}>WeChat / WhatsApp</h3>
+              <p className={`text-xs text-gray-500 font-light mb-8 ${getFontClass()}`}>{t('events.scanQR')}</p>
               
-              <div className="bg-gray-50 p-6 rounded-sm border border-gray-100 mb-8 inline-block">
-                <img src={wechatQr} alt="Golden Bay WeChat QR" className="w-40 h-40 object-contain" />
+              <div className="flex flex-col md:flex-row justify-center items-center gap-8 mb-8">
+                  {/* WeChat QR */}
+                  <div className="bg-gray-50 p-6 rounded-sm border border-gray-100 flex flex-col items-center">
+                    <img src={wechatQr} alt="WeChat QR" className="w-40 h-40 object-contain mb-4" />
+                    <p className="font-bold text-[10px] text-[#07c160] uppercase tracking-widest">WeChat</p>
+                  </div>
+
+                  {/* WhatsApp QR */}
+                  <div className="bg-gray-50 p-6 rounded-sm border border-gray-100 flex flex-col items-center">
+                    <img src={whatsappQr} alt="WhatsApp QR" className="w-40 h-40 object-contain mb-4" />
+                    <p className="font-bold text-[10px] text-[#25D366] uppercase tracking-widest">WhatsApp</p>
+                  </div>
               </div>
               
               <div className="space-y-1 pt-6 border-t border-gray-100">
@@ -6788,6 +6898,9 @@ const FloatingWidget = () => {
         href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={() => {
+            if (window.fbq) window.fbq('track', 'Contact'); // <-- ADD THIS LINE
+        }}
         className="pointer-events-auto flex items-center justify-center w-[52px] h-[52px] md:w-14 md:h-14 bg-[#25D366] text-white rounded-full shadow-[0_8px_30px_rgba(37,211,102,0.4)] hover:scale-110 active:scale-95 transition-all duration-300 group relative"
         title="Chat with us on WhatsApp"
       >
@@ -6944,11 +7057,11 @@ export const translations = {
             consultation: "Consultation",
             connect: "Start Planning Your Event", 
             cDesc: "Our dedicated event specialists are ready to help you curate the perfect menu and logistical plan for your big day.", 
-            direct: "Events Hotlines", emailInq: "Email Proposals", instant: "Instant Assistance", via: "Chat via WeChat or Viber",
+            direct: "Events Hotlines", emailInq: "Email Proposals", instant: "Instant Assistance", via: "Chat via WeChat or WhatsApp",
             scanQR: "Scan QR or save our number", coordinator: "Events Coordinator"
         },
         contact: { title: "Location & Contact", getTouch: "Get in Touch", cDesc: "Whether you have a question about our menu, need assistance finding us, or wish to inquire about corporate partnerships, our team is at your service.", addrLabel: "Address", resInq: "Reservations & Inquiries", emailLabel: "Email", hoursLabel: "Operating Hours" },
-        reservation: { title: "Reservations", details: "Details", selectPref: "Select your preferred date and experience.", bookWechat: "Book via WeChat", vipRooms: "VIP Private Rooms", alaCarte: "Ala Carte Dining", checking: "Checking availability...", confirmTitle: "Confirm Details", fName: "Full Name", fContact: "Contact / Viber", fEmail: "Email (Optional)", fGuests: "Number of Guests", fTime: "Arrival Time", selTime: "Select Preferred Time", fNotes: "Special Request / Menu Preferences", proc: "Processing Request...", reqRes: "Request Reservation", wechatTitle: "Book via WeChat", scan: "Scan this code to chat directly with our reservation specialist.", retWeb: "Return to Web Booking", reqPend: "Request Pending", rev: "We are reviewing your details", allow: "Please allow up to 30 minutes for confirmation during operating hours. Requests made after hours will be confirmed the following morning.", retHome: "Return to Home" }
+        reservation: { title: "Reservations", details: "Details", selectPref: "Select your preferred date and experience.", bookWechat: "Book via WeChat / WhatsApp", vipRooms: "VIP Private Rooms", alaCarte: "Ala Carte Dining", checking: "Checking availability...", confirmTitle: "Confirm Details", fName: "Full Name", fContact: "Contact / WhatsApp", fEmail: "Email (Optional)", fGuests: "Number of Guests", fTime: "Arrival Time", selTime: "Select Preferred Time", fNotes: "Special Request / Menu Preferences", proc: "Processing Request...", reqRes: "Request Reservation", wechatTitle: "WeChat / WhatsApp", scan: "Scan a code to chat directly with our reservation specialist.", retWeb: "Return to Web Booking", reqPend: "Request Pending", rev: "We are reviewing your details", allow: "Please allow up to 30 minutes for confirmation during operating hours. Requests made after hours will be confirmed the following morning.", retHome: "Return to Home" }
     },
     zh: {
         nav: { menu: "菜单", events: "活动", news: "新闻与优惠", rooms: "贵宾包厢", about: "关于我们", contact: "联系我们", book: "预订餐桌" },
@@ -6982,11 +7095,11 @@ export const translations = {
             consultation: "专属咨询",
             connect: "开始策划您的活动", 
             cDesc: "我们的专属活动专家已准备就绪，为您的大日子定制完美的菜单和执行方案。", 
-            direct: "活动专线", emailInq: "策划方案咨询", instant: "即时通讯服务", via: "通过微信或Viber联系",
+            direct: "活动专线", emailInq: "策划方案咨询", instant: "即时通讯服务", via: "通过微信或WhatsApp联系",
             scanQR: "扫码或保存我们的号码", coordinator: "活动协调员"
         },
         contact: { title: "位置与联系方式", getTouch: "联系我们", cDesc: "无论您对菜单有疑问、需要寻路指引，还是希望咨询企业合作，我们的团队随时为您服务。", addrLabel: "地址", resInq: "预订与咨询", emailLabel: "电子邮件", hoursLabel: "营业时间" },
-        reservation: { title: "预订座位", details: "预订详情", selectPref: "选择您的首选日期和体验。", bookWechat: "通过微信预订", vipRooms: "贵宾包厢", alaCarte: "大厅散座", checking: "正在查询...", confirmTitle: "确认详情", fName: "全名", fContact: "联系电话 / Viber", fEmail: "电子邮件 (选填)", fGuests: "就餐人数", fTime: "预计到达时间", selTime: "选择时间", fNotes: "特殊要求 / 饮食偏好", proc: "处理中...", reqRes: "提交预订", wechatTitle: "微信预订", scan: "扫描此二维码，直接与我们的预订专员沟通。", retWeb: "返回网页预订", reqPend: "预订已提交", rev: "我们正在审核您的预订信息", allow: "营业时间内请预留最多30分钟以便我们确认。非营业时间的预订将在次日上午处理。", retHome: "返回首页" }
+        reservation: { title: "预订座位", details: "预订详情", selectPref: "选择您的首选日期和体验。", bookWechat: "通过微信 / WhatsApp预订", vipRooms: "贵宾包厢", alaCarte: "大厅散座", checking: "正在查询...", confirmTitle: "确认详情", fName: "全名", fContact: "联系电话 / WhatsApp", fEmail: "电子邮件 (选填)", fGuests: "就餐人数", fTime: "预计到达时间", selTime: "选择时间", fNotes: "特殊要求 / 饮食偏好", proc: "处理中...", reqRes: "提交预订", wechatTitle: "微信 / WhatsApp", scan: "扫描二维码，直接与我们的预订专员沟通。", retWeb: "返回网页预订", reqPend: "预订已提交", rev: "我们正在审核您的预订信息", allow: "营业时间内请预留最多30分钟以便我们确认。非营业时间的预订将在次日上午处理。", retHome: "返回首页" }
     },
     zh_hant: {
         nav: { menu: "菜單", events: "活動", news: "新聞與優惠", rooms: "貴賓包廂", about: "關於我們", contact: "聯繫我們", book: "預訂餐桌" },
@@ -7020,11 +7133,11 @@ export const translations = {
             consultation: "專屬諮詢",
             connect: "開始策劃您的活動", 
             cDesc: "我們的專屬活動專家已準備就緒，為您的大日子定制完美的菜單和執行方案。", 
-            direct: "活動專線", emailInq: "策劃方案諮詢", instant: "即時通訊服務", via: "通過微信或Viber聯繫",
+            direct: "活動專線", emailInq: "策劃方案諮詢", instant: "即時通訊服務", via: "通過微信或WhatsApp聯繫",
             scanQR: "掃碼或保存我們的號碼", coordinator: "活動協調員"
         },
         contact: { title: "位置與聯繫方式", getTouch: "聯繫我們", cDesc: "無論您對菜單有疑問、需要尋路指引，還是希望諮詢企業合作，我們的團隊隨時為您服務。", addrLabel: "地址", resInq: "預訂與諮詢", emailLabel: "電子郵件", hoursLabel: "營業時間" },
-        reservation: { title: "預訂座位", details: "預訂詳情", selectPref: "選擇您的首選日期和體驗。", bookWechat: "通過微信預訂", vipRooms: "貴賓包廂", alaCarte: "大廳散座", checking: "正在查詢...", confirmTitle: "確認詳情", fName: "全名", fContact: "聯繫電話 / Viber", fEmail: "電子郵件 (選填)", fGuests: "就餐人數", fTime: "預計到達時間", selTime: "選擇時間", fNotes: "特殊要求 / 飲食偏好", proc: "處理中...", reqRes: "提交預訂", wechatTitle: "微信預訂", scan: "掃描此二維碼，直接與我們的預訂專員溝通。", retWeb: "返回網頁預訂", reqPend: "預訂已提交", rev: "我們正在審核您的預訂信息", allow: "營業時間內請預留最多30分鐘以便我們確認。非營業時間的預訂將在次日上午處理。", retHome: "返回首頁" }
+        reservation: { title: "預訂座位", details: "預訂詳情", selectPref: "選擇您的首選日期和體驗。", bookWechat: "通過微信 / WhatsApp預訂", vipRooms: "貴賓包廂", alaCarte: "大廳散座", checking: "正在查詢...", confirmTitle: "確認詳情", fName: "全名", fContact: "聯繫電話 / WhatsApp", fEmail: "電子郵件 (選填)", fGuests: "就餐人數", fTime: "預計到達時間", selTime: "選擇時間", fNotes: "特殊要求 / 飲食偏好", proc: "處理中...", reqRes: "提交預訂", wechatTitle: "微信 / WhatsApp", scan: "掃描此二維碼，直接與我們的預訂專員溝通。", retWeb: "返回網頁預訂", reqPend: "預訂已提交", rev: "我們正在審核您的預訂信息", allow: "營業時間內請預留最多30分鐘以便我們確認。非營業時間的預訂將在次日上午處理。", retHome: "返回首頁" }
     },
     ja: {
         nav: { menu: "メニュー", events: "イベント", news: "ニュース＆プロモ", rooms: "個室", about: "私たちについて", contact: "お問い合わせ", book: "予約する" },
@@ -7058,11 +7171,11 @@ export const translations = {
             consultation: "ご相談",
             connect: "イベントの計画を始める", 
             cDesc: "カスタマイズされたイベントの性質上、専任のイベントチームが空き状況、メニュー、ロジスティクスについてご相談を承ります。", 
-            direct: "イベント専用ダイヤル", emailInq: "メールでのご提案", instant: "インスタントメッセージ", via: "WeChatまたはViber経由でチャット",
+            direct: "イベント専用ダイヤル", emailInq: "メールでのご提案", instant: "インスタントメッセージ", via: "WeChatまたはWhatsApp経由でチャット",
             scanQR: "QRをスキャンするか、番号を保存してください", coordinator: "イベントコーディネーター"
         },
         contact: { title: "場所と連絡先", getTouch: "お問い合わせ", cDesc: "メニューに関するご質問、道案内が必要な場合、または企業パートナーシップに関するお問い合わせなど、私たちのチームが対応いたします。", addrLabel: "住所", resInq: "予約と問い合わせ", emailLabel: "メール", hoursLabel: "営業時間" },
-        reservation: { title: "ご予約", details: "詳細", selectPref: "ご希望の日付と体験を選択してください。", bookWechat: "WeChatで予約", vipRooms: "VIP個室", alaCarte: "アラカルトダイニング", checking: "空き状況を確認中...", confirmTitle: "詳細を確認", fName: "フルネーム", fContact: "連絡先 / Viber", fEmail: "メールアドレス (任意)", fGuests: "ゲストの数", fTime: "到着時間", selTime: "希望の時間を選択", fNotes: "特別なご要望 / メニューの好み", proc: "リクエストを処理中...", reqRes: "予約をリクエストする", wechatTitle: "WeChatで予約", scan: "このコードをスキャンして、予約スペシャリストと直接チャットしてください。", retWeb: "Web予約に戻る", reqPend: "リクエスト保留中", rev: "詳細を確認しています", allow: "営業時間内のご予約は、確認まで最大30分ほどお待ちください。営業時間外のリクエストは翌朝処理されます。", retHome: "ホームに戻る" }
+        reservation: { title: "ご予約", details: "詳細", selectPref: "ご希望の日付と体験を選択してください。", bookWechat: "WeChat / WhatsApp で予約", vipRooms: "VIP個室", alaCarte: "アラカルトダイニング", checking: "空き状況を確認中...", confirmTitle: "詳細を確認", fName: "フルネーム", fContact: "連絡先 / WhatsApp", fEmail: "メールアドレス (任意)", fGuests: "ゲストの数", fTime: "到着時間", selTime: "希望の時間を選択", fNotes: "特別なご要望 / メニューの好み", proc: "リクエストを処理中...", reqRes: "予約をリクエストする", wechatTitle: "WeChat / WhatsApp", scan: "このコードをスキャンして、予約スペシャリストと直接チャットしてください。", retWeb: "Web予約に戻る", reqPend: "リクエスト保留中", rev: "詳細を確認しています", allow: "営業時間内のご予約は、確認まで最大30分ほどお待ちください。営業時間外のリクエストは翌朝処理されます。", retHome: "ホームに戻る" }
     },
     ko: {
         nav: { menu: "메뉴", events: "이벤트", news: "뉴스 및 프로모션", rooms: "프라이빗 룸", about: "소개", contact: "연락처", book: "테이블 예약" },
@@ -7096,10 +7209,10 @@ export const translations = {
             consultation: "상담",
             connect: "이벤트 기획 시작하기", 
             cDesc: "맞춤형 이벤트의 특성상, 전담 이벤트 팀이 일정, 맞춤 메뉴 및 세부 사항에 대해 논의할 준비가 되어 있습니다.", 
-            direct: "이벤트 직통 전화", emailInq: "이메일 제안서 요청", instant: "빠른 상담", via: "WeChat 또는 Viber를 통한 채팅",
+            direct: "이벤트 직통 전화", emailInq: "이메일 제안서 요청", instant: "빠른 상담", via: "WeChat 또는 WhatsApp을 통한 채팅",
             scanQR: "QR을 스캔하거나 번호를 저장하세요", coordinator: "이벤트 코디네이터"
         },
         contact: { title: "위치 및 연락처", getTouch: "연락하기", cDesc: "메뉴에 대한 질문이 있거나, 길 안내가 필요하거나, 기업 파트너십에 대해 문의하고 싶으시다면 저희 팀이 도와드리겠습니다.", addrLabel: "주소", resInq: "예약 및 문의", emailLabel: "이메일", hoursLabel: "영업 시간" },
-        reservation: { title: "예약", details: "세부 정보", selectPref: "원하는 날짜와 경험을 선택하십시오.", bookWechat: "WeChat을 통한 예약", vipRooms: "VIP 프라이빗 룸", alaCarte: "알라카르트 다이닝", checking: "예약 가능 여부 확인 중...", confirmTitle: "세부 정보 확인", fName: "성명", fContact: "연락처 / Viber", fEmail: "이메일 (선택 사항)", fGuests: "게스트 수", fTime: "도착 시간", selTime: "원하는 시간 선택", fNotes: "특별 요청 / 메뉴 기본 설정", proc: "요청 처리 중...", reqRes: "예약 요청", wechatTitle: "WeChat을 통한 예약", scan: "이 코드를 스캔하여 예약 전문가와 직접 채팅하십시오.", retWeb: "웹 예약으로 돌아가기", reqPend: "요청 대기 중", rev: "세부 정보를 검토 중입니다", allow: "영업 시간 중 예약 확인에는 최대 30분이 소요됩니다. 영업 시간 외 요청은 다음 날 아침에 처리됩니다.", retHome: "홈으로 돌아가기" }
+        reservation: { title: "예약", details: "세부 정보", selectPref: "원하는 날짜와 경험을 선택하십시오.", bookWechat: "WeChat / WhatsApp 예약", vipRooms: "VIP 프라이빗 룸", alaCarte: "알라카르트 다이닝", checking: "예약 가능 여부 확인 중...", confirmTitle: "세부 정보 확인", fName: "성명", fContact: "연락처 / WhatsApp", fEmail: "이메일 (선택 사항)", fGuests: "게스트 수", fTime: "도착 시간", selTime: "원하는 시간 선택", fNotes: "특별 요청 / 메뉴 기본 설정", proc: "요청 처리 중...", reqRes: "예약 요청", wechatTitle: "WeChat / WhatsApp", scan: "이 코드를 스캔하여 예약 전문가와 직접 채팅하십시오.", retWeb: "웹 예약으로 돌아가기", reqPend: "요청 대기 중", rev: "세부 정보를 검토 중입니다", allow: "영업 시간 중 예약 확인에는 최대 30분이 소요됩니다. 영업 시간 외 요청은 다음 날 아침에 처리됩니다.", retHome: "홈으로 돌아가기" }
     }
 };
