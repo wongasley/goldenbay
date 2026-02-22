@@ -15,9 +15,14 @@ class DiningAreaSerializer(serializers.ModelSerializer):
 
 class ReservationSerializer(serializers.ModelSerializer):
     room_name = serializers.CharField(source='dining_area.name', read_only=True)
+    customer_no_show_count = serializers.SerializerMethodField()
     class Meta:
         model = Reservation
         fields = '__all__'
+    
+    def get_customer_no_show_count(self, obj):
+        customer = Customer.objects.filter(phone=obj.customer_contact).first()
+        return customer.no_show_count if customer else 0
     
     def validate(self, data):
         # 1. Setup variables: Use incoming data, otherwise fall back to existing DB instance

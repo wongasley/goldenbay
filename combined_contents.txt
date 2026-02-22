@@ -243,9 +243,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from marketing.views import dynamic_sitemap
+from users.serializers import CustomTokenObtainPairSerializer
 
 class ThrottledTokenObtainPairView(TokenObtainPairView):
     throttle_scope = 'burst'
+    serializer_class = CustomTokenObtainPairSerializer
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -636,6 +638,7 @@ class Customer(models.Model):
     whatsapp = models.CharField(max_length=100, blank=True, null=True)
     telegram = models.CharField(max_length=100, blank=True, null=True)
     
+    no_show_count = models.IntegerField(default=0, help_text="Automatically calculated no-shows")
     notes = models.TextField(blank=True, null=True, help_text="VVIP status, allergies, preferences")
     created_at = models.DateTimeField(auto_now_add=True)
     last_visit = models.DateField(auto_now=True)
@@ -690,9 +693,14 @@ class DiningAreaSerializer(serializers.ModelSerializer):
 
 class ReservationSerializer(serializers.ModelSerializer):
     room_name = serializers.CharField(source='dining_area.name', read_only=True)
+    customer_no_show_count = serializers.SerializerMethodField()
     class Meta:
         model = Reservation
         fields = '__all__'
+    
+    def get_customer_no_show_count(self, obj):
+        customer = Customer.objects.filter(phone=obj.customer_contact).first()
+        return customer.no_show_count if customer else 0
     
     def validate(self, data):
         # 1. Setup variables: Use incoming data, otherwise fall back to existing DB instance
@@ -880,6 +888,18 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
         old_date = old_instance.date
         old_time = old_instance.time
 
+        new_status = request.data.get('status', old_status)
+        
+        # Prevent Receptionists from Cancelling
+        if new_status == 'CANCELLED' and old_status != 'CANCELLED':
+            if not (request.user.is_superuser or request.user.groups.filter(name__in=['Supervisor', 'Admin']).exists()):
+                raise PermissionDenied("Only Supervisors and Admins can cancel bookings.")
+        
+        # Prevent Receptionists from changing a Completed or Cancelled booking back to active
+        if old_status in ['COMPLETED', 'CANCELLED'] and new_status not in ['COMPLETED', 'CANCELLED']:
+            if not (request.user.is_superuser or request.user.groups.filter(name__in=['Supervisor', 'Admin']).exists()):
+                 raise PermissionDenied("Only Supervisors and Admins can reopen finalized bookings.")
+            
         # 2. Perform the save (this automatically runs your collision validations)
         response = super().update(request, *args, **kwargs)
 
@@ -911,6 +931,11 @@ class CustomerDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = CustomerSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = 'id'
+
+    def delete(self, request, *args, **kwargs):
+         if not (request.user.is_superuser or request.user.groups.filter(name='Admin').exists()):
+             raise PermissionDenied("Only Admins can delete customer records.")
+         return super().delete(request, *args, **kwargs)
 
 class VIPRoomListView(generics.ListAPIView):
     serializer_class = DiningAreaSerializer
@@ -1235,6 +1260,7 @@ from .models import Post
 from .serializers import PostSerializer
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
+from core.permissions import IsAdminUserOnly
 
 class PublicPostListView(generics.ListAPIView):
     serializer_class = PostSerializer
@@ -1257,13 +1283,15 @@ class PostDetailView(generics.RetrieveAPIView):
 class AdminPostListCreateView(generics.ListCreateAPIView):
     queryset = Post.objects.all().order_by('-created_at')
     serializer_class = PostSerializer
-    permission_classes = [IsAuthenticated] # Secure this!
+    # RECEPTIONISTS CANNOT MANAGE MARKETING
+    permission_classes = [IsAdminUserOnly] 
     parser_classes = [MultiPartParser, FormParser]
 
 class AdminPostDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
-    permission_classes = [IsAuthenticated]
+    # RECEPTIONISTS CANNOT MANAGE MARKETING
+    permission_classes = [IsAdminUserOnly]
     lookup_field = 'id'
     parser_classes = [MultiPartParser, FormParser]
 
@@ -1325,6 +1353,31 @@ from django.db import models
 
 # Create your models here.
 
+
+# backend/users/serializers.py
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+
+        # Add custom claims
+        token['username'] = user.username
+        
+        # Determine the user's highest role. 
+        # Default to 'Receptionist' if no group is assigned.
+        role = 'Receptionist'
+        if user.is_superuser:
+            role = 'Admin'
+        elif user.groups.filter(name='Supervisor').exists():
+            role = 'Supervisor'
+        elif user.groups.filter(name='Admin').exists():
+            role = 'Admin'
+            
+        token['role'] = role
+
+        return token
 
 from django.shortcuts import render
 
@@ -2548,6 +2601,7 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Plus, Check, X, Phone, Edit, UserCheck, Flag, CheckCircle2 } from 'lucide-react';
 import ReservationForm from '../../../components/reservations/ReservationForm';
+import { canCancelBooking } from '../../../utils/auth';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
@@ -2556,6 +2610,7 @@ const BookingManager = () => {
   const [filter, setFilter] = useState('ALL'); 
   const [dateFilter, setDateFilter] = useState('');
   const [showManualForm, setShowManualForm] = useState(false);
+  const hasCancelPermission = canCancelBooking();
   
   // Edit Modal State
   const [editingBooking, setEditingBooking] = useState(null);
@@ -2713,7 +2768,15 @@ const BookingManager = () => {
                 <tr key={b.id} className={`transition-colors ${isStale(b.created_at, b.status) ? 'bg-red-50/50' : 'hover:bg-gray-50'}`}>
                     <td className="px-4 py-2 text-gray-400 font-mono">#{b.id}</td>
                     <td className="px-4 py-2">
-                        <div className="font-bold text-gray-900">{b.customer_name}</div>
+                        <div className="font-bold text-gray-900 flex items-center gap-2">
+                            {b.customer_name}
+                            {/* --- NEW FLAG LOGIC --- */}
+                            {b.customer_no_show_count > 0 && (
+                                <span className="text-red-500 bg-red-50 px-1.5 rounded flex items-center gap-1 text-[9px] uppercase tracking-widest border border-red-200" title={`${b.customer_no_show_count} previous No-Shows`}>
+                                    <Flag size={10} /> {b.customer_no_show_count} No-Show
+                                </span>
+                            )}
+                        </div>
                         <div className="text-[10px] text-gray-500 flex gap-1 mt-0.5 font-mono items-center"><Phone size={10}/> {b.customer_contact}</div>
                     </td>
                     <td className="px-4 py-2">
@@ -2749,7 +2812,7 @@ const BookingManager = () => {
                         )}
                         
                         {/* Only allow Cancel on active states */}
-                        {['PENDING', 'CONFIRMED'].includes(b.status) && (
+                        {['PENDING', 'CONFIRMED'].includes(b.status) && hasCancelPermission && (
                             <button onClick={() => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!")} className="bg-red-50 text-red-600 p-1.5 rounded border border-red-200 hover:bg-red-100" title="Cancel"><X size={14} /></button>
                         )}
                     </div>
@@ -2767,7 +2830,15 @@ const BookingManager = () => {
             <div key={b.id} className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
                 <div className="flex justify-between items-start mb-3">
                     <div>
-                        <h3 className="font-bold text-gray-900 text-lg">{b.customer_name}</h3>
+                        <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-gray-900 text-lg">{b.customer_name}</h3>
+                            {/* --- NEW FLAG LOGIC --- */}
+                            {b.customer_no_show_count > 0 && (
+                                <span className="text-red-500 bg-red-50 px-1.5 py-0.5 rounded flex items-center gap-1 text-[9px] uppercase tracking-widest border border-red-200">
+                                    <Flag size={10} /> {b.customer_no_show_count}
+                                </span>
+                            )}
+                        </div>
                         <span className="text-xs text-gray-500 font-mono flex items-center gap-1.5 mt-1"><Phone size={12}/> {b.customer_contact}</span>
                     </div>
                     <span className={`px-2 py-1 rounded text-[9px] font-bold uppercase tracking-widest border ${getStatusBadge(b.status)}`}>{b.status.replace('_', '-')}</span>
@@ -2796,7 +2867,7 @@ const BookingManager = () => {
                         <button onClick={() => handleOpenEdit(b)} className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-md text-xs font-bold uppercase tracking-widest border border-gray-200"><Edit size={14} className="inline mr-1"/> Edit</button>
                     )}
                     
-                    {['PENDING', 'CONFIRMED'].includes(b.status) && (
+                    {['PENDING', 'CONFIRMED'].includes(b.status) && hasCancelPermission && (
                         <button onClick={() => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!")} className="flex-1 bg-red-50 text-red-700 py-2 rounded-md text-xs font-bold uppercase tracking-widest border border-red-200"><X size={14} className="inline mr-1"/> Cancel</button>
                     )}
                 </div>
@@ -5899,10 +5970,13 @@ import {
 } from 'lucide-react';
 import LogoutButton from '../auth/LogoutButton';
 import logo from '../../assets/images/goldenbaylogo.svg'; 
+import { getUserRole, canManageMarketing } from '../../utils/auth';
 
 const AdminLayout = () => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const role = getUserRole(); // Get user role
+  const isMarketingAdmin = canManageMarketing();
 
   // Close mobile menu when navigating
   useEffect(() => {
@@ -5910,11 +5984,11 @@ const AdminLayout = () => {
   }, [location.pathname]);
 
   const navItems = [
-    { path: '/staff', label: 'Overview', icon: LayoutDashboard },
-    { path: '/staff/bookings', label: 'Reservations', icon: CalendarDays },
-    { path: '/staff/customers', label: 'Phone Book', icon: Users },
-    { path: '/staff/marketing', label: 'Marketing', icon: Megaphone },
-  ];
+    { path: '/staff', label: 'Overview', icon: LayoutDashboard, show: true },
+    { path: '/staff/bookings', label: 'Reservations', icon: CalendarDays, show: true },
+    { path: '/staff/customers', label: 'Phone Book', icon: Users, show: true },
+    { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: isMarketingAdmin }, // Only show to Admins
+  ].filter(item => item.show);
 
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900 font-sans overflow-hidden">
@@ -5976,19 +6050,10 @@ const AdminLayout = () => {
         
         {/* Top Header */}
         <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4 z-10 flex justify-between items-center shadow-sm shrink-0">
-           <div className="flex items-center gap-3">
-              <button 
-                onClick={() => setIsMobileMenuOpen(true)} 
-                className="md:hidden text-gray-600 hover:text-gray-900 p-1 -ml-2"
-              >
-                <Menu size={24} />
-              </button>
-              <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest hidden sm:block">
-                {location.pathname.split('/')[2] || 'Dashboard'}
-              </h2>
-           </div>
+           {/* ... */}
            <div className="flex items-center gap-3 md:gap-4">
-              <span className="text-[10px] md:text-xs font-medium text-gray-500 uppercase tracking-widest">Admin</span>
+              {/* Display the actual role */}
+              <span className="text-[10px] md:text-xs font-medium text-gray-500 uppercase tracking-widest">{role}</span>
               <div className="w-8 h-8 rounded-full bg-gold-100 flex items-center justify-center text-gold-700 font-bold text-xs border border-gold-200">
                  GB
               </div>

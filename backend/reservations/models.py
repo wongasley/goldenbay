@@ -97,6 +97,7 @@ class Customer(models.Model):
     whatsapp = models.CharField(max_length=100, blank=True, null=True)
     telegram = models.CharField(max_length=100, blank=True, null=True)
     
+    no_show_count = models.IntegerField(default=0, help_text="Automatically calculated no-shows")
     notes = models.TextField(blank=True, null=True, help_text="VVIP status, allergies, preferences")
     created_at = models.DateTimeField(auto_now_add=True)
     last_visit = models.DateField(auto_now=True)

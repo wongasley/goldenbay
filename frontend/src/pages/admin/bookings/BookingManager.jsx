@@ -169,7 +169,15 @@ const BookingManager = () => {
                 <tr key={b.id} className={`transition-colors ${isStale(b.created_at, b.status) ? 'bg-red-50/50' : 'hover:bg-gray-50'}`}>
                     <td className="px-4 py-2 text-gray-400 font-mono">#{b.id}</td>
                     <td className="px-4 py-2">
-                        <div className="font-bold text-gray-900">{b.customer_name}</div>
+                        <div className="font-bold text-gray-900 flex items-center gap-2">
+                            {b.customer_name}
+                            {/* --- NEW FLAG LOGIC --- */}
+                            {b.customer_no_show_count > 0 && (
+                                <span className="text-red-500 bg-red-50 px-1.5 rounded flex items-center gap-1 text-[9px] uppercase tracking-widest border border-red-200" title={`${b.customer_no_show_count} previous No-Shows`}>
+                                    <Flag size={10} /> {b.customer_no_show_count} No-Show
+                                </span>
+                            )}
+                        </div>
                         <div className="text-[10px] text-gray-500 flex gap-1 mt-0.5 font-mono items-center"><Phone size={10}/> {b.customer_contact}</div>
                     </td>
                     <td className="px-4 py-2">
@@ -223,7 +231,15 @@ const BookingManager = () => {
             <div key={b.id} className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
                 <div className="flex justify-between items-start mb-3">
                     <div>
-                        <h3 className="font-bold text-gray-900 text-lg">{b.customer_name}</h3>
+                        <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-gray-900 text-lg">{b.customer_name}</h3>
+                            {/* --- NEW FLAG LOGIC --- */}
+                            {b.customer_no_show_count > 0 && (
+                                <span className="text-red-500 bg-red-50 px-1.5 py-0.5 rounded flex items-center gap-1 text-[9px] uppercase tracking-widest border border-red-200">
+                                    <Flag size={10} /> {b.customer_no_show_count}
+                                </span>
+                            )}
+                        </div>
                         <span className="text-xs text-gray-500 font-mono flex items-center gap-1.5 mt-1"><Phone size={12}/> {b.customer_contact}</span>
                     </div>
                     <span className={`px-2 py-1 rounded text-[9px] font-bold uppercase tracking-widest border ${getStatusBadge(b.status)}`}>{b.status.replace('_', '-')}</span>
