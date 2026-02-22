@@ -56,6 +56,7 @@ export const translations = {
         events: { 
             title: "Event Inquiries", 
             subtitle: "Exquisite Venues for Life's Greatest Moments", 
+            headline: "A Spectacular Stage for Your Legacy.",
             desc: "From intimate tea ceremonies to grand corporate galas, Golden Bay provides a spectacular stage for your milestones. Experience unrivaled elegance and world-class Chinese cuisine.", 
             f1Title: "Grand Banquet Hall", f1Desc: "A vast, pillar-less architectural marvel designed for grand celebrations of up to 1,200 guests.", 
             f2Title: "Versatile Function Rooms", f2Desc: "Private, sophisticated spaces perfect for business meetings, intimate weddings, or family reunions.", 
@@ -63,14 +64,17 @@ export const translations = {
             milestones: "Milestones We Celebrate", 
             milestonesDesc: "Bespoke service and curated menus tailored perfectly to your specific occasion.",
             m1: "Weddings", m2: "Corporate", m3: "Birthdays", m4: "Banquets",
+            capacities: "Capacities",
             venueSpecs: "Venue Specifications",
             space: "Function Space", banquet: "Banquet", cocktail: "Cocktail", amenities: "Amenities",
             hallName: "Grand Banquet Hall", hallDesc: "Stage, LED Wall, Full Audio",
             miniHall: "Main Dining (Bespoke)", miniDesc: "AV Ready, Buffet Area",
             vipManila: "Manila VIP Suite", vipDesc: "Private Restroom, KTV",
+            consultation: "Consultation",
             connect: "Start Planning Your Event", 
             cDesc: "Our dedicated event specialists are ready to help you curate the perfect menu and logistical plan for your big day.", 
-            direct: "Events Hotlines", emailInq: "Email Proposals", instant: "Instant Assistance", via: "Chat via WeChat or Viber" 
+            direct: "Events Hotlines", emailInq: "Email Proposals", instant: "Instant Assistance", via: "Chat via WeChat or Viber",
+            scanQR: "Scan QR or save our number", coordinator: "Events Coordinator"
         },
         contact: { title: "Location & Contact", getTouch: "Get in Touch", cDesc: "Whether you have a question about our menu, need assistance finding us, or wish to inquire about corporate partnerships, our team is at your service.", addrLabel: "Address", resInq: "Reservations & Inquiries", emailLabel: "Email", hoursLabel: "Operating Hours" },
         reservation: { title: "Reservations", details: "Details", selectPref: "Select your preferred date and experience.", bookWechat: "Book via WeChat", vipRooms: "VIP Private Rooms", alaCarte: "Ala Carte Dining", checking: "Checking availability...", confirmTitle: "Confirm Details", fName: "Full Name", fContact: "Contact / Viber", fEmail: "Email (Optional)", fGuests: "Number of Guests", fTime: "Arrival Time", selTime: "Select Preferred Time", fNotes: "Special Request / Menu Preferences", proc: "Processing Request...", reqRes: "Request Reservation", wechatTitle: "Book via WeChat", scan: "Scan this code to chat directly with our reservation specialist.", retWeb: "Return to Web Booking", reqPend: "Request Pending", rev: "We are reviewing your details", allow: "Please allow up to 30 minutes for confirmation during operating hours. Requests made after hours will be confirmed the following morning.", retHome: "Return to Home" }
@@ -86,6 +90,7 @@ export const translations = {
         events: { 
             title: "活动咨询", 
             subtitle: "为生命中最重要的时刻提供顶级场地", 
+            headline: "为您传承打造的壮丽舞台。",
             desc: "从私密茶道到盛大企业年会，金海湾为您提供最辉煌的舞台。体验无与伦比的优雅和世界级的中华美食。", 
             f1Title: "豪华大宴会厅", f1Desc: "宏伟的无柱空间，专为容纳多达1200位贵宾的盛大庆典而设计。", 
             f2Title: "多功能宴会厅", f2Desc: "精致的私人空间，非常适合商务会议、小型婚礼或家庭聚会。", 
@@ -93,14 +98,17 @@ export const translations = {
             milestones: "我们举办的盛事", 
             milestonesDesc: "为您的特殊场合量身定制的专属服务和精选菜单。",
             m1: "梦幻婚礼", m2: "企业盛典", m3: "生日寿宴", m4: "豪华宴会",
+            capacities: "场地容量",
             venueSpecs: "场地详细规格",
             space: "宴会空间", banquet: "晚宴人数", cocktail: "鸡尾酒会", amenities: "配套设施",
             hallName: "豪华大宴会厅", hallDesc: "舞台、LED墙、全套音响",
             miniHall: "主餐厅（定制空间）", miniDesc: "视听设备、自助餐区",
             vipManila: "马尼拉顶级贵宾房", vipDesc: "私人卫生间、KTV系统",
+            consultation: "专属咨询",
             connect: "开始策划您的活动", 
             cDesc: "我们的专属活动专家已准备就绪，为您的大日子定制完美的菜单和执行方案。", 
-            direct: "活动专线", emailInq: "策划方案咨询", instant: "即时通讯服务", via: "通过微信或Viber联系" 
+            direct: "活动专线", emailInq: "策划方案咨询", instant: "即时通讯服务", via: "通过微信或Viber联系",
+            scanQR: "扫码或保存我们的号码", coordinator: "活动协调员"
         },
         contact: { title: "位置与联系方式", getTouch: "联系我们", cDesc: "无论您对菜单有疑问、需要寻路指引，还是希望咨询企业合作，我们的团队随时为您服务。", addrLabel: "地址", resInq: "预订与咨询", emailLabel: "电子邮件", hoursLabel: "营业时间" },
         reservation: { title: "预订座位", details: "预订详情", selectPref: "选择您的首选日期和体验。", bookWechat: "通过微信预订", vipRooms: "贵宾包厢", alaCarte: "大厅散座", checking: "正在查询...", confirmTitle: "确认详情", fName: "全名", fContact: "联系电话 / Viber", fEmail: "电子邮件 (选填)", fGuests: "就餐人数", fTime: "预计到达时间", selTime: "选择时间", fNotes: "特殊要求 / 饮食偏好", proc: "处理中...", reqRes: "提交预订", wechatTitle: "微信预订", scan: "扫描此二维码，直接与我们的预订专员沟通。", retWeb: "返回网页预订", reqPend: "预订已提交", rev: "我们正在审核您的预订信息", allow: "营业时间内请预留最多30分钟以便我们确认。非营业时间的预订将在次日上午处理。", retHome: "返回首页" }
@@ -116,6 +124,7 @@ export const translations = {
         events: { 
             title: "活動諮詢", 
             subtitle: "為生命中最重要的時刻提供頂級場地", 
+            headline: "為您傳承打造的壯麗舞台。",
             desc: "從私密茶道到盛大企業年會，金海灣為您提供最輝煌的舞台。體驗無與倫比的優雅和世界級的中華美食。", 
             f1Title: "豪華大宴會廳", f1Desc: "宏偉的無柱空間，專為容納多達1200位貴賓的盛大慶典而設計。", 
             f2Title: "多功能宴會廳", f2Desc: "精緻的私人空間，非常適合商務會議、小型婚禮或家庭聚會。", 
@@ -123,14 +132,17 @@ export const translations = {
             milestones: "我們舉辦的盛事", 
             milestonesDesc: "為您的特殊場合量身定制的專屬服務和精選菜單。",
             m1: "夢幻婚禮", m2: "企業盛典", m3: "生日壽宴", m4: "豪華宴會",
+            capacities: "場地容量",
             venueSpecs: "場地詳細規格",
             space: "宴會空間", banquet: "晚宴人數", cocktail: "雞尾酒會", amenities: "配套設施",
             hallName: "豪華大宴會廳", hallDesc: "舞台、LED牆、全套音響",
             miniHall: "主餐廳（定制空間）", miniDesc: "視聽設備、自助餐區",
             vipManila: "馬尼拉頂級貴賓房", vipDesc: "私人衛生間、KTV系統",
+            consultation: "專屬諮詢",
             connect: "開始策劃您的活動", 
             cDesc: "我們的專屬活動專家已準備就緒，為您的大日子定制完美的菜單和執行方案。", 
-            direct: "活動專線", emailInq: "策劃方案諮詢", instant: "即時通訊服務", via: "通過微信或Viber聯繫" 
+            direct: "活動專線", emailInq: "策劃方案諮詢", instant: "即時通訊服務", via: "通過微信或Viber聯繫",
+            scanQR: "掃碼或保存我們的號碼", coordinator: "活動協調員"
         },
         contact: { title: "位置與聯繫方式", getTouch: "聯繫我們", cDesc: "無論您對菜單有疑問、需要尋路指引，還是希望諮詢企業合作，我們的團隊隨時為您服務。", addrLabel: "地址", resInq: "預訂與諮詢", emailLabel: "電子郵件", hoursLabel: "營業時間" },
         reservation: { title: "預訂座位", details: "預訂詳情", selectPref: "選擇您的首選日期和體驗。", bookWechat: "通過微信預訂", vipRooms: "貴賓包廂", alaCarte: "大廳散座", checking: "正在查詢...", confirmTitle: "確認詳情", fName: "全名", fContact: "聯繫電話 / Viber", fEmail: "電子郵件 (選填)", fGuests: "就餐人數", fTime: "預計到達時間", selTime: "選擇時間", fNotes: "特殊要求 / 飲食偏好", proc: "處理中...", reqRes: "提交預訂", wechatTitle: "微信預訂", scan: "掃描此二維碼，直接與我們的預訂專員溝通。", retWeb: "返回網頁預訂", reqPend: "預訂已提交", rev: "我們正在審核您的預訂信息", allow: "營業時間內請預留最多30分鐘以便我們確認。非營業時間的預訂將在次日上午處理。", retHome: "返回首頁" }
@@ -146,6 +158,7 @@ export const translations = {
         events: { 
             title: "イベントのお問い合わせ", 
             subtitle: "人生の最高の瞬間を祝うための会場", 
+            headline: "あなたのレガシーのための壮大なステージ。",
             desc: "親密なお茶会から壮大な企業のガラパーティーまで、ゴールデンベイは比類のない優雅さと世界クラスの中華料理を提供します。", 
             f1Title: "グランドバンケットホール", f1Desc: "最大1,200名様までの壮大なお祝いのために設計された、広大で柱のない建築の驚異。", 
             f2Title: "多目的なファンクションルーム", f2Desc: "ビジネスミーティング、少人数の結婚式、家族の再会に最適な、プライベートで洗練された空間。", 
@@ -153,14 +166,17 @@ export const translations = {
             milestones: "私たちが祝うマイルストーン", 
             milestonesDesc: "特別な機会に合わせて完璧に調整された特注のサービスと厳選されたメニュー。",
             m1: "ウェディング", m2: "コーポレート", m3: "お誕生日", m4: "バンケット",
+            capacities: "収容人数",
             venueSpecs: "会場の仕様",
             space: "ファンクションスペース", banquet: "バンケット (着席)", cocktail: "カクテル (立食)", amenities: "主な設備",
             hallName: "グランドバンケットホール", hallDesc: "ステージ、LEDウォール、フルオーディオ",
             miniHall: "メインダイニング (ミニバンケット)", miniDesc: "AV機器対応、ビュッフェエリア",
             vipManila: "VIPマニラスイート", vipDesc: "専用トイレ、KTVシステム",
+            consultation: "ご相談",
             connect: "イベントの計画を始める", 
             cDesc: "カスタマイズされたイベントの性質上、専任のイベントチームが空き状況、メニュー、ロジスティクスについてご相談を承ります。", 
-            direct: "イベント専用ダイヤル", emailInq: "メールでのご提案", instant: "インスタントメッセージ", via: "WeChatまたはViber経由でチャット" 
+            direct: "イベント専用ダイヤル", emailInq: "メールでのご提案", instant: "インスタントメッセージ", via: "WeChatまたはViber経由でチャット",
+            scanQR: "QRをスキャンするか、番号を保存してください", coordinator: "イベントコーディネーター"
         },
         contact: { title: "場所と連絡先", getTouch: "お問い合わせ", cDesc: "メニューに関するご質問、道案内が必要な場合、または企業パートナーシップに関するお問い合わせなど、私たちのチームが対応いたします。", addrLabel: "住所", resInq: "予約と問い合わせ", emailLabel: "メール", hoursLabel: "営業時間" },
         reservation: { title: "ご予約", details: "詳細", selectPref: "ご希望の日付と体験を選択してください。", bookWechat: "WeChatで予約", vipRooms: "VIP個室", alaCarte: "アラカルトダイニング", checking: "空き状況を確認中...", confirmTitle: "詳細を確認", fName: "フルネーム", fContact: "連絡先 / Viber", fEmail: "メールアドレス (任意)", fGuests: "ゲストの数", fTime: "到着時間", selTime: "希望の時間を選択", fNotes: "特別なご要望 / メニューの好み", proc: "リクエストを処理中...", reqRes: "予約をリクエストする", wechatTitle: "WeChatで予約", scan: "このコードをスキャンして、予約スペシャリストと直接チャットしてください。", retWeb: "Web予約に戻る", reqPend: "リクエスト保留中", rev: "詳細を確認しています", allow: "営業時間内のご予約は、確認まで最大30分ほどお待ちください。営業時間外のリクエストは翌朝処理されます。", retHome: "ホームに戻る" }
@@ -176,6 +192,7 @@ export const translations = {
         events: { 
             title: "이벤트 문의", 
             subtitle: "인생 최고의 순간을 위한 장소", 
+            headline: "당신의 레거시를 위한 장엄한 무대.",
             desc: "소규모 다과회부터 대규모 기업 행사까지, 골든 베이는 당신의 마일스톤을 위한 완벽한 무대를 제공합니다. 타의 추종을 불허하는 우아함과 세계적인 중화 요리를 경험하세요.", 
             f1Title: "그랜드 연회장", f1Desc: "최대 1,200명의 하객을 수용할 수 있도록 설계된 기둥 없는 웅장한 연회장.", 
             f2Title: "다목적 연회룸", f2Desc: "비즈니스 미팅, 소규모 웨딩, 가족 모임에 완벽하게 어울리는 프라이빗하고 세련된 공간.", 
@@ -183,14 +200,17 @@ export const translations = {
             milestones: "우리가 기념하는 마일스톤", 
             milestonesDesc: "특별한 행사를 위해 완벽하게 맞춤화된 서비스와 엄선된 메뉴.",
             m1: "웨딩", m2: "기업 행사", m3: "생일 및 파티", m4: "대규모 연회",
+            capacities: "수용 인원",
             venueSpecs: "행사장 사양",
             space: "행사 공간", banquet: "연회 (착석)", cocktail: "칵테일 (스탠딩)", amenities: "주요 시설",
             hallName: "그랜드 연회장", hallDesc: "무대, LED 월, 풀 오디오 시스템",
             miniHall: "메인 다이닝 (미니 연회)", miniDesc: "AV 장비 완비, 뷔페 구역",
             vipManila: "VIP 마닐라 스위트", vipDesc: "전용 화장실, KTV 시스템",
+            consultation: "상담",
             connect: "이벤트 기획 시작하기", 
             cDesc: "맞춤형 이벤트의 특성상, 전담 이벤트 팀이 일정, 맞춤 메뉴 및 세부 사항에 대해 논의할 준비가 되어 있습니다.", 
-            direct: "이벤트 직통 전화", emailInq: "이메일 제안서 요청", instant: "빠른 상담", via: "WeChat 또는 Viber를 통한 채팅" 
+            direct: "이벤트 직통 전화", emailInq: "이메일 제안서 요청", instant: "빠른 상담", via: "WeChat 또는 Viber를 통한 채팅",
+            scanQR: "QR을 스캔하거나 번호를 저장하세요", coordinator: "이벤트 코디네이터"
         },
         contact: { title: "위치 및 연락처", getTouch: "연락하기", cDesc: "메뉴에 대한 질문이 있거나, 길 안내가 필요하거나, 기업 파트너십에 대해 문의하고 싶으시다면 저희 팀이 도와드리겠습니다.", addrLabel: "주소", resInq: "예약 및 문의", emailLabel: "이메일", hoursLabel: "영업 시간" },
         reservation: { title: "예약", details: "세부 정보", selectPref: "원하는 날짜와 경험을 선택하십시오.", bookWechat: "WeChat을 통한 예약", vipRooms: "VIP 프라이빗 룸", alaCarte: "알라카르트 다이닝", checking: "예약 가능 여부 확인 중...", confirmTitle: "세부 정보 확인", fName: "성명", fContact: "연락처 / Viber", fEmail: "이메일 (선택 사항)", fGuests: "게스트 수", fTime: "도착 시간", selTime: "원하는 시간 선택", fNotes: "특별 요청 / 메뉴 기본 설정", proc: "요청 처리 중...", reqRes: "예약 요청", wechatTitle: "WeChat을 통한 예약", scan: "이 코드를 스캔하여 예약 전문가와 직접 채팅하십시오.", retWeb: "웹 예약으로 돌아가기", reqPend: "요청 대기 중", rev: "세부 정보를 검토 중입니다", allow: "영업 시간 중 예약 확인에는 최대 30분이 소요됩니다. 영업 시간 외 요청은 다음 날 아침에 처리됩니다.", retHome: "홈으로 돌아가기" }

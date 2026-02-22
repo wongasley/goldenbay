@@ -19,9 +19,9 @@ const EventInquiriesPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-cream-50 text-gray-900 font-sans selection:bg-gold-500 selection:text-white pb-10">
+    <div className="min-h-screen bg-cream-50 text-gray-900 font-sans selection:bg-gold-500 selection:text-white">
       
-      {/* --- HERO BANNER (Kept exactly the same per your request) --- */}
+      {/* --- HERO BANNER (Matches Menu/Reservation Style) --- */}
       <div className="relative h-[40vh] w-full flex items-center justify-center pt-24 bg-black">
         <div className="absolute inset-0 opacity-60">
           <img src={heroimage} className="w-full h-full object-cover" alt="Golden Bay Grand Events" />
@@ -48,7 +48,7 @@ const EventInquiriesPage = () => {
                 {t('events.subtitle')}
             </span>
             <h2 className={`text-3xl md:text-4xl font-serif text-gray-900 mb-6 leading-tight ${getFontClass()}`}>
-              A Spectacular Stage for Your Legacy.
+              {t('events.headline')}
             </h2>
             <p className={`text-sm text-gray-500 font-light leading-relaxed ${getFontClass()}`}>
                 {t('events.desc')}
@@ -63,7 +63,7 @@ const EventInquiriesPage = () => {
               </div>
               <div>
                 <h3 className={`text-lg font-serif font-bold text-gray-900 mb-2 ${getFontClass()}`}>{t('events.f1Title')}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed font-light">{t('events.f1Desc')}</p>
+                <p className={`text-sm text-gray-500 leading-relaxed font-light ${getFontClass()}`}>{t('events.f1Desc')}</p>
               </div>
             </motion.div>
 
@@ -73,7 +73,7 @@ const EventInquiriesPage = () => {
               </div>
               <div>
                 <h3 className={`text-lg font-serif font-bold text-gray-900 mb-2 ${getFontClass()}`}>{t('events.f2Title')}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed font-light">{t('events.f2Desc')}</p>
+                <p className={`text-sm text-gray-500 leading-relaxed font-light ${getFontClass()}`}>{t('events.f2Desc')}</p>
               </div>
             </motion.div>
 
@@ -83,7 +83,7 @@ const EventInquiriesPage = () => {
               </div>
               <div>
                 <h3 className={`text-lg font-serif font-bold text-gray-900 mb-2 ${getFontClass()}`}>{t('events.f3Title')}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed font-light">{t('events.f3Desc')}</p>
+                <p className={`text-sm text-gray-500 leading-relaxed font-light ${getFontClass()}`}>{t('events.f3Desc')}</p>
               </div>
             </motion.div>
           </div>
@@ -130,7 +130,7 @@ const EventInquiriesPage = () => {
       <div className="bg-white py-24 md:py-32">
           <div className="max-w-5xl mx-auto px-6">
               <div className="mb-16">
-                 <span className={`text-gold-600 text-[10px] font-bold uppercase tracking-[0.3em] mb-4 block ${getFontClass()}`}>Capacities</span>
+                 <span className={`text-gold-600 text-[10px] font-bold uppercase tracking-[0.3em] mb-4 block ${getFontClass()}`}>{t('events.capacities')}</span>
                  <h2 className={`text-3xl md:text-4xl font-serif text-gray-900 ${getFontClass()}`}>{t('events.venueSpecs')}</h2>
               </div>
               
@@ -202,8 +202,8 @@ const EventInquiriesPage = () => {
       </div>
 
       {/* --- SECTION 4: THE CONCIERGE (CTA) --- */}
-      <div className="max-w-7xl mx-auto px-6 mb-24">
-        <div className="bg-neutral-900 overflow-hidden flex flex-col lg:flex-row shadow-2xl">
+      <div className="max-w-7xl mx-auto px-6 py-24">
+        <div className="bg-neutral-900 overflow-hidden flex flex-col lg:flex-row shadow-2xl rounded-sm">
           
           {/* Image Panel */}
           <div className="w-full lg:w-1/2 h-[400px] lg:h-auto relative">
@@ -214,7 +214,7 @@ const EventInquiriesPage = () => {
           {/* Contact Panel */}
           <div className="w-full lg:w-1/2 p-10 md:p-16 lg:p-24 flex flex-col justify-center">
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}>
-              <span className={`text-gold-500 text-[10px] font-bold uppercase tracking-[0.3em] mb-4 block ${getFontClass()}`}>Consultation</span>
+              <span className={`text-gold-500 text-[10px] font-bold uppercase tracking-[0.3em] mb-4 block ${getFontClass()}`}>{t('events.consultation')}</span>
               <h2 className={`text-3xl md:text-5xl font-serif text-white mb-6 leading-tight ${getFontClass()}`}>{t('events.connect')}</h2>
               <p className={`text-gray-400 text-sm leading-loose mb-12 font-light ${getFontClass()}`}>{t('events.cDesc')}</p>
 
@@ -270,14 +270,14 @@ const EventInquiriesPage = () => {
               </button>
               
               <h3 className={`text-2xl font-serif text-gray-900 mb-2 mt-2 ${getFontClass()}`}>WeChat / Viber</h3>
-              <p className="text-xs text-gray-500 font-light mb-6">Scan QR or save our number</p>
+              <p className={`text-xs text-gray-500 font-light mb-6 ${getFontClass()}`}>{t('events.scanQR')}</p>
               
               <div className="bg-gray-50 p-6 rounded-sm border border-gray-100 mb-8 inline-block">
                 <img src={wechatQr} alt="Golden Bay WeChat QR" className="w-40 h-40 object-contain" />
               </div>
               
               <div className="space-y-1 pt-6 border-t border-gray-100">
-                <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-sans">Events Coordinator</p>
+                <p className={`text-[10px] text-gray-400 uppercase tracking-[0.2em] font-sans ${getFontClass()}`}>{t('events.coordinator')}</p>
                 <p className="text-xl font-serif font-bold text-gray-900 tracking-wider">+63 917 580 7166</p>
               </div>
             </motion.div>
