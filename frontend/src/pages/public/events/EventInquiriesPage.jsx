@@ -280,7 +280,14 @@ const EventInquiriesPage = () => {
                   <ArrowRight size={16} className="text-gray-600 group-hover:text-gold-500 transition-colors transform group-hover:translate-x-1" />
                 </a>
                 
-                <button onClick={() => setShowWeChat(true)} className="w-full flex items-center justify-between group py-5 border-b border-transparent hover:border-green-500 transition-colors text-left">
+                {/* FORCED SCROLL TO TOP ON CLICK */}
+                <button 
+                  onClick={() => {
+                      setShowWeChat(true);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }} 
+                  className="w-full flex items-center justify-between group py-5 border-b border-transparent hover:border-green-500 transition-colors text-left"
+                >
                   <div className="flex items-center gap-6">
                       <MessageSquare size={20} strokeWidth={1.5} className="text-green-500" />
                       <div>

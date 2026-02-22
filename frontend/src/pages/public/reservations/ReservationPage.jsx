@@ -84,6 +84,7 @@ const ReservationPage = () => {
     } catch (error) { setSubmitStatus('error'); }
   };
 
+  // --- WECHAT / WHATSAPP VIEW ---
   if (isWeChat) {
     return (
       <div className="min-h-screen bg-cream-50 text-gray-900 flex flex-col items-center justify-center p-8 text-center pt-32">
@@ -104,7 +105,14 @@ const ReservationPage = () => {
 
         <p className="text-xl font-bold text-gray-900 tracking-wider mt-8">+63 917 580 7166</p>
 
-        <button onClick={() => setIsWeChat(false)} className={`mt-10 text-sm font-bold tracking-widest uppercase border-b border-gold-600 pb-1 hover:text-gold-600 transition-colors ${getFontClass()}`}>
+        {/* FORCED SCROLL TO TOP ON RETURN */}
+        <button 
+          onClick={() => { 
+            setIsWeChat(false); 
+            window.scrollTo({ top: 0, behavior: 'instant' }); 
+          }} 
+          className={`mt-10 text-sm font-bold tracking-widest uppercase border-b border-gold-600 pb-1 hover:text-gold-600 transition-colors ${getFontClass()}`}
+        >
           {t('reservation.retWeb')}
         </button>
       </div>
@@ -166,7 +174,14 @@ const ReservationPage = () => {
                 ))}
               </div>
               
-              <button onClick={() => setIsWeChat(true)} className={`w-full flex items-center justify-center gap-3 py-4 border border-green-600/30 text-green-600 hover:bg-green-50 transition-all rounded-sm uppercase tracking-widest text-xs font-bold ${getFontClass()}`}>
+              {/* FORCED SCROLL TO TOP ON CLICK */}
+              <button 
+                onClick={() => {
+                  setIsWeChat(true);
+                  window.scrollTo({ top: 0, behavior: 'instant' });
+                }} 
+                className={`w-full flex items-center justify-center gap-3 py-4 border border-green-600/30 text-green-600 hover:bg-green-50 transition-all rounded-sm uppercase tracking-widest text-xs font-bold ${getFontClass()}`}
+              >
                 <MessageSquare size={16} /> {t('reservation.bookWechat')}
               </button>
             </div>
