@@ -4,6 +4,8 @@ from django.db import transaction
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied
 from datetime import date, timedelta
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
@@ -56,8 +58,10 @@ class ReservationCreateView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
+        
         # 1. Save data to DB first
-        reservation = serializer.save(encoded_by=user, _history_user=user)
+        # FIX: Removed `_history_user=user`. The middleware handles history tracking automatically.
+        reservation = serializer.save(encoded_by=user)
         
         # 2. Fire notifications ASYNCHRONOUSLY
         try:
@@ -106,8 +110,8 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
 
     def perform_update(self, serializer):
-        # Inject the staff member modifying the record
-        serializer.save(last_modified_by=self.request.user, _history_user=self.request.user)
+        # FIX: Removed `_history_user=self.request.user`
+        serializer.save(last_modified_by=self.request.user)
 
     def update(self, request, *args, **kwargs):
         # 1. Capture the old data BEFORE saving
