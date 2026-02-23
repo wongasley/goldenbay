@@ -199,3 +199,67 @@ class VIPRoomListView(generics.ListAPIView):
 
     def get_queryset(self):
         return DiningArea.objects.filter(area_type='VIP', is_active=True).order_by('name')
+    
+
+class ChatbotBookingWebhook(APIView):
+    permission_classes = [] 
+
+    def post(self, request):
+        bot_token = request.headers.get('X-Bot-Token')
+        if bot_token != os.getenv('BOT_SECRET_TOKEN', 'GoldenBaySecureBot2026!'):
+            return Response({"bot_reply": "Unauthorized"}, status=401)
+
+        data = request.data
+        
+        try:
+            name = data.get('name')
+            contact = data.get('contact')
+            date_str = data.get('date') 
+            time_str = data.get('time') 
+            pax = int(data.get('pax', 2))
+            
+            hour = int(time_str.split(':')[0])
+            session = 'LUNCH' if hour < 15 else 'DINNER'
+
+            main_hall = DiningArea.objects.filter(area_type='HALL', is_active=True).first()
+            if not main_hall:
+                # Notice we return status=200 so AhaChat can read the error message easily
+                return Response({"bot_reply": "Sorry, online booking is currently disabled."}, status=200)
+
+            # --- NEW: CHECK CAPACITY BEFORE BOOKING ---
+            total_pax_query = Reservation.objects.filter(
+                dining_area=main_hall, 
+                date=date_str, 
+                session=session
+            ).exclude(status__in=['CANCELLED', 'NO_SHOW'])
+
+            current_pax = total_pax_query.aggregate(Sum('pax'))['pax__sum'] or 0
+            
+            if (current_pax + pax) > main_hall.capacity:
+                seats_left = main_hall.capacity - current_pax
+                if seats_left <= 0:
+                    msg = f"Sorry! We are fully booked for {session} on {date_str}. Please try another date."
+                else:
+                    msg = f"Sorry! We only have {seats_left} seats left for {session} on {date_str}. Please adjust your guest count."
+                
+                return Response({"success": False, "bot_reply": msg}, status=200)
+            # ------------------------------------------
+
+            # Create the Reservation
+            reservation = Reservation.objects.create(
+                customer_name=name, customer_contact=contact, date=date_str,
+                session=session, time=time_str, pax=pax, dining_area=main_hall,
+                source='SOCIAL', status='PENDING' 
+            )
+
+            # Trigger Celery notifications
+            from .tasks import send_new_booking_notifications
+            send_new_booking_notifications.delay(reservation.id)
+
+            return Response({
+                "success": True,
+                "bot_reply": f"Success! 🎉 Your table for {pax} on {date_str} at {time_str} is reserved under {name}. Ref: #{reservation.id}"
+            }, status=200)
+
+        except Exception as e:
+            return Response({"success": False, "bot_reply": "Sorry, an error occurred with the date/time format. Please try again."}, status=200)

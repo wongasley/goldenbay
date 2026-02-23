@@ -796,7 +796,7 @@ class CustomerSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 from django.urls import path
-from .views import AdminReservationDetailView, AdminReservationListView, AvailableRoomsView, CustomerDetailView, CustomerListView, DashboardStatsView, ReservationCreateView, VIPRoomListView
+from .views import AdminReservationDetailView, AdminReservationListView, AvailableRoomsView, ChatbotBookingWebhook, CustomerDetailView, CustomerListView, DashboardStatsView, ReservationCreateView, VIPRoomListView
 
 urlpatterns = [
     path('check/', AvailableRoomsView.as_view(), name='check_availability'),
@@ -807,6 +807,7 @@ urlpatterns = [
     path('customers/', CustomerListView.as_view()),
     path('customers/<int:id>/', CustomerDetailView.as_view()),
     path('rooms/', VIPRoomListView.as_view(), name='vip_room_list'),
+    path('bot-webhook/', ChatbotBookingWebhook.as_view(), name='bot_webhook'),
 ]
 
 import requests
@@ -1010,6 +1011,64 @@ class VIPRoomListView(generics.ListAPIView):
 
     def get_queryset(self):
         return DiningArea.objects.filter(area_type='VIP', is_active=True).order_by('name')
+    
+
+class ChatbotBookingWebhook(APIView):
+    permission_classes = [] # Allow the bot platform to hit this endpoint
+
+    def post(self, request):
+        # 1. Basic Security: Check for a secret token in headers to prevent spam
+        bot_token = request.headers.get('X-Bot-Token')
+        if bot_token != os.getenv('BOT_SECRET_TOKEN', 'your_secret_bot_token'):
+            return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        data = request.data
+        
+        try:
+            # 2. Extract data sent by ManyChat/Dialogflow
+            name = data.get('name')
+            contact = data.get('contact')
+            date_str = data.get('date') # Format: YYYY-MM-DD
+            time_str = data.get('time') # Format: HH:MM:SS
+            pax = int(data.get('pax', 2))
+            
+            # 3. Determine Session based on time
+            hour = int(time_str.split(':')[0])
+            session = 'LUNCH' if hour < 15 else 'DINNER'
+
+            # 4. Auto-Assign to the Main Hall (Since bots can't easily show VIP room layouts)
+            main_hall = DiningArea.objects.filter(area_type='HALL', is_active=True).first()
+            
+            if not main_hall:
+                return Response({"message": "Booking failed. Main hall unavailable."}, status=400)
+
+            # (Optional) Add your capacity check here just like in your serializer
+
+            # 5. Create the Reservation
+            reservation = Reservation.objects.create(
+                customer_name=name,
+                customer_contact=contact,
+                date=date_str,
+                session=session,
+                time=time_str,
+                pax=pax,
+                dining_area=main_hall,
+                source='SOCIAL', # Tags it as coming from FB/IG/TikTok
+                status='PENDING' # Or 'CONFIRMED' depending on your business logic
+            )
+
+            # 6. Trigger your existing Celery notifications
+            from .tasks import send_new_booking_notifications
+            send_new_booking_notifications.delay(reservation.id)
+
+            # 7. Return success message back to the Bot Platform
+            return Response({
+                "success": True,
+                "bot_reply": f"Success! Your table for {pax} on {date_str} at {time_str} is reserved under {name}. Ref: #{reservation.id}"
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({"success": False, "bot_reply": "Sorry, an error occurred while booking. Please call us."}, status=400)
 
 import requests
 import os
@@ -2805,7 +2864,21 @@ const ReservationPage = () => {
                             <div key={room.id} onClick={() => room.is_available && setSelectedRoom(room.id)} className={`p-6 border rounded-sm cursor-pointer transition-all flex justify-between items-center ${selectedRoom === room.id ? 'border-gold-500 bg-gold-50 ring-1 ring-gold-500' : room.is_available ? 'border-gray-200 hover:border-gold-400/50 bg-white shadow-sm' : 'bg-gray-100 opacity-40 cursor-not-allowed grayscale'}`}>
                                 <div>
                                     <h4 className="font-serif text-lg text-gray-900">{room.name}</h4>
-                                    <p className={`text-[10px] text-gray-400 uppercase tracking-widest mt-1 ${getFontClass()}`}>{t('vip.maxCap')} {room.capacity}</p>
+                                    
+                                    {/* Display PAX and Price visually distinct */}
+                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                        <span className={`text-[10px] text-gray-400 uppercase tracking-widest ${getFontClass()}`}>
+                                            {t('vip.maxCap')} {room.capacity}
+                                        </span>
+                                        {Number(room.price) > 0 && (
+                                            <>
+                                                <span className="text-gray-300">•</span>
+                                                <span className={`text-[10px] font-bold text-gold-600 uppercase tracking-widest ${getFontClass()}`}>
+                                                    ₱{Number(room.price).toLocaleString()} Consumable
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                                 {selectedRoom === room.id ? <CheckCircle className="text-gold-600" size={24}/> : !room.is_available && <span className={`text-[9px] font-bold text-red-500 border border-red-200 px-2 py-1 bg-red-50 rounded-sm ${getFontClass()}`}>{t('vip.booked')}</span>}
                             </div>
@@ -3869,12 +3942,12 @@ class Command(BaseCommand):
             "VIP Room 15": "vip_15.webp",
         }
 
-        # Updated mapping matching exactly what you requested
+        # Updated descriptions based on pax and exact amenities/prices
         areas = [
             {
                 "name": "Main Dining Hall", "area_type": "HALL", "capacity": 200, "price": 0, 
                 "has_tv": False, "has_ktv": False, "has_restroom": False, "has_couch": False, 
-                "description": "Versatile bespoke space perfect for medium-scale banquets, corporate gatherings, and large family reunions."
+                "description": "Versatile open space perfect for casual dining and large gatherings."
             },
             {
                 "name": "MANILA VIP Room", "area_type": "VIP", "capacity": 60, "price": 120000, 
@@ -3884,17 +3957,17 @@ class Command(BaseCommand):
             {
                 "name": "VIP Room 1", "area_type": "VIP", "capacity": 20, "price": 40000, 
                 "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
-                "description": "A sophisticated, spacious room ideal for mid-sized family reunions or corporate milestones."
+                "description": "A sophisticated, spacious room ideal for mid-sized family reunions or corporate gatherings."
             },
             {
                 "name": "VIP Room 2", "area_type": "VIP", "capacity": 8, "price": 20000, 
                 "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
-                "description": "An intimate, exclusive setting perfect for private tea ceremonies or small family dinners."
+                "description": "An intimate, exclusive setting perfect for private meetings or small family dinners."
             },
             {
                 "name": "VIP Room 3", "area_type": "VIP", "capacity": 8, "price": 20000, 
                 "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
-                "description": "An intimate, exclusive setting perfect for private tea ceremonies or small family dinners."
+                "description": "An intimate, exclusive setting perfect for private meetings or small family dinners."
             },
             {
                 "name": "VIP Room 5", "area_type": "VIP", "capacity": 8, "price": 30000, 
@@ -3909,12 +3982,12 @@ class Command(BaseCommand):
             {
                 "name": "VIP Room 7", "area_type": "VIP", "capacity": 8, "price": 20000, 
                 "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
-                "description": "An intimate, exclusive setting perfect for private tea ceremonies or small family dinners."
+                "description": "An intimate, exclusive setting perfect for private meetings or small family dinners."
             },
             {
                 "name": "VIP Room 8", "area_type": "VIP", "capacity": 8, "price": 20000, 
                 "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
-                "description": "An intimate, exclusive setting perfect for private tea ceremonies or small family dinners."
+                "description": "An intimate, exclusive setting perfect for private meetings or small family dinners."
             },
             {
                 "name": "VIP Room 9", "area_type": "VIP", "capacity": 10, "price": 40000, 
@@ -3958,7 +4031,7 @@ class Command(BaseCommand):
                     'price': area_data['price'],
                     'description': area_data['description'],
                     'is_active': True,
-                    'has_ktv': True if area_data['area_type'] == 'VIP' else False,
+                    'has_ktv': area_data['has_ktv'],
                     'has_restroom': area_data['has_restroom'],
                     'has_tv': area_data['has_tv'],
                     'has_couch': area_data['has_couch']
@@ -5432,6 +5505,8 @@ ADMIN_PHONE_NUMBERS=09778103650,09175807166,09778098741
 # # ────────────────────────────────
 CELERY_BROKER_URL=redis://localhost:6379/0
 CELERY_RESULT_BACKEND=redis://localhost:6379/0
+
+BOT_SECRET_TOKEN=GoldenBaySecureBot2026!
 
 # # ────────────────────────────────
 # # 🌐 CORS / CSRF CONFIGURATION
