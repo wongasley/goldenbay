@@ -22,13 +22,13 @@ const ReservationForm = ({
     const [manualTime, setManualTime] = useState(selectedTime || '');
     const [rooms, setRooms] = useState([]); 
     const [manualRoomId, setManualRoomId] = useState(''); 
-    const [manualSource, setManualSource] = useState('PHONE'); // <-- NEW: Default to Phone for manual entry
+    const [manualSource, setManualSource] = useState('PHONE'); 
     const [submitStatus, setSubmitStatus] = useState(null);
 
     const generateTimeSlots = (sessionType) => {
         const slots = [];
         const startHour = sessionType === 'LUNCH' ? 11 : 17; 
-        const endHour = sessionType === 'LUNCH' ? 14 : 22;     
+        const endHour = sessionType === 'LUNCH' ? 14 : 22;      
 
         for (let hour = startHour; hour <= endHour; hour++) {
             const displayHour = hour > 12 ? hour - 12 : hour;
@@ -81,6 +81,7 @@ const ReservationForm = ({
 
         setSubmitStatus('loading');
 
+        // Strictly enforce data types before sending to Django
         const payload = {
             customer_name: formData.name,
             customer_contact: formData.contact,
@@ -88,11 +89,11 @@ const ReservationForm = ({
             date: isManualEntry ? manualDate : format(date, 'yyyy-MM-dd'),
             session: isManualEntry ? manualSession : session,
             time: finalTime,
-            pax: formData.pax,
-            dining_area: finalRoomId,
+            pax: parseInt(formData.pax, 10),
+            dining_area: parseInt(finalRoomId, 10),
             special_request: formData.message,
             status: isManualEntry ? 'CONFIRMED' : 'PENDING',
-            source: isManualEntry ? manualSource : 'WEB' // <-- NEW: Passes source to backend
+            source: isManualEntry ? manualSource : 'WEB' 
         };
 
         const token = localStorage.getItem('accessToken');
@@ -113,15 +114,28 @@ const ReservationForm = ({
                 setSubmitStatus('success');
                 if (onSuccess) onSuccess();
             } else {
-                const errData = await res.json();
-                const errorMessage = errData.non_field_errors 
-                    ? errData.non_field_errors[0] 
-                    : "Booking failed. Please check details.";
+                // Bulletproof error parsing
+                let errorMessage = "Booking failed. Please check details.";
+                try {
+                    const errData = await res.json();
+                    if (errData.non_field_errors) {
+                        errorMessage = errData.non_field_errors[0];
+                    } else if (errData.detail) {
+                        errorMessage = errData.detail;
+                    } else {
+                        // Dynamically grab the first field error sent by Django
+                        const firstKey = Object.keys(errData)[0];
+                        errorMessage = `${firstKey}: ${errData[firstKey][0]}`;
+                    }
+                } catch (parseErr) {
+                    errorMessage = `Server Error (${res.status}).`;
+                }
+                
                 toast.error(errorMessage);
                 setSubmitStatus('error');
             }
         } catch (error) {
-            toast.error("Network error. Please try again.");
+            toast.error("Network connection refused. Check your internet or CORS settings.");
             setSubmitStatus('error');
         }
     };
@@ -217,7 +231,6 @@ const ReservationForm = ({
                         </div>
                     </div>
 
-                    {/* NEW: Booking Source Selection */}
                     <div>
                         <label className={labelClass}>Booking Source</label>
                         <select 

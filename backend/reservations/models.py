@@ -64,7 +64,9 @@ class Reservation(models.Model):
     time = models.TimeField(help_text="Specific arrival time")
     pax = models.IntegerField()
     special_request = models.TextField(blank=True, null=True)
-    
+        
+    # ADD THIS LINE RIGHT HERE:
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='WEB')
     # System Fields
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     created_at = models.DateTimeField(auto_now_add=True)
