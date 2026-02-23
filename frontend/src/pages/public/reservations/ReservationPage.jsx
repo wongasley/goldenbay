@@ -89,7 +89,7 @@ const ReservationPage = () => {
             <div className="bg-white p-6 rounded-sm shadow-xl border-t-4 border-[#07c160]"><img src={wechatQr} className="w-48 h-48 mb-2"/><p className="font-bold text-[#07c160]">WeChat</p></div>
             <div className="bg-white p-6 rounded-sm shadow-xl border-t-4 border-[#25D366]"><img src={whatsappQr} className="w-48 h-48 mb-2"/><p className="font-bold text-[#25D366]">WhatsApp</p></div>
         </div>
-        <button onClick={() => setIsWeChat(false)} className="mt-12 uppercase tracking-widest text-xs font-bold border-b border-gold-600 pb-1">{t('reservation.retWeb')}</button>
+        <button onClick={() => setIsWeChat(false)} className={`mt-12 uppercase tracking-widest text-xs font-bold border-b border-gold-600 pb-1 ${getFontClass()}`}>{t('reservation.retWeb')}</button>
       </div>
     );
   }
@@ -162,17 +162,17 @@ const ReservationPage = () => {
                         <div className="grid grid-cols-1 gap-3">
                             {['VIP', 'HALL'].map((type) => (
                                 <button key={type} onClick={() => setBookingType(type)} className={`p-5 text-left border rounded-sm transition-all flex items-center justify-between ${bookingType === type ? 'border-gold-500 bg-gold-50 ring-1 ring-gold-500' : 'border-gray-200 hover:border-gold-400'}`}>
-                                    <span className={`text-sm tracking-widest uppercase font-bold ${bookingType === type ? 'text-gold-700' : 'text-gray-500'}`}>{type === 'VIP' ? t('reservation.vipRooms') : t('reservation.alaCarte')}</span>
+                                    <span className={`text-sm tracking-widest uppercase font-bold ${getFontClass()} ${bookingType === type ? 'text-gold-700' : 'text-gray-500'}`}>{type === 'VIP' ? t('reservation.vipRooms') : t('reservation.alaCarte')}</span>
                                     {bookingType === type && <CheckCircle className="text-gold-600" size={20} />}
                                 </button>
                             ))}
                         </div>
                     </div>
                     <div className="pt-6 space-y-4">
-                        <button onClick={() => setStep(2)} className="w-full bg-gold-600 text-white py-5 font-bold uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-3 shadow-lg group">
-                            Next: Select Table <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                        <button onClick={() => setStep(2)} className={`w-full bg-gold-600 text-white py-5 font-bold uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-3 shadow-lg group ${getFontClass()}`}>
+                            {t('reservation.nextSelectTable')} <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                         </button>
-                        <button onClick={() => setIsWeChat(true)} className="w-full text-green-600 flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest py-3 border border-green-600/10 hover:bg-green-50 transition-colors">
+                        <button onClick={() => setIsWeChat(true)} className={`w-full text-green-600 flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest py-3 border border-green-600/10 hover:bg-green-50 transition-colors ${getFontClass()}`}>
                             <MessageSquare size={16} /> {t('reservation.bookWechat')}
                         </button>
                     </div>
@@ -183,30 +183,30 @@ const ReservationPage = () => {
             {/* STEP 2: TABLE/ROOM SELECTION */}
             {step === 2 && (
               <motion.div key="step2" variants={stepVariants} initial="initial" animate="animate" exit="exit" className="p-8 md:p-12">
-                <button onClick={() => setStep(1)} className="flex items-center gap-2 text-gray-400 hover:text-gold-600 mb-8 uppercase tracking-widest text-[10px] font-bold"><ArrowLeft size={14}/> Back</button>
+                <button onClick={() => setStep(1)} className={`flex items-center gap-2 text-gray-400 hover:text-gold-600 mb-8 uppercase tracking-widest text-[10px] font-bold ${getFontClass()}`}><ArrowLeft size={14}/> {t('reservation.back')}</button>
                 <div className="mb-10 text-center">
                     <h2 className={`text-3xl font-serif text-gray-900 ${getFontClass()}`}>{bookingType === 'VIP' ? t('reservation.vipRooms') : t('reservation.alaCarte')}</h2>
-                    <p className="text-gold-600 text-sm mt-2 font-bold uppercase tracking-widest">{format(date, 'MMMM dd, yyyy')} — {session}</p>
+                    <p className={`text-gold-600 text-sm mt-2 font-bold uppercase tracking-widest ${getFontClass()}`}>{format(date, 'MMMM dd, yyyy')} — {session === 'LUNCH' ? t('footer.lunch') : t('footer.dinner')}</p>
                 </div>
 
                 {loading ? (
-                    <div className="h-64 flex flex-col items-center justify-center gap-4 text-gray-400"><div className="w-10 h-10 border-2 border-gold-500 border-t-transparent rounded-full animate-spin"></div>{t('reservation.checking')}</div>
+                    <div className={`h-64 flex flex-col items-center justify-center gap-4 text-gray-400 ${getFontClass()}`}><div className="w-10 h-10 border-2 border-gold-500 border-t-transparent rounded-full animate-spin"></div>{t('reservation.checking')}</div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
                         {rooms.filter(r => r.area_type === bookingType).map(room => (
                             <div key={room.id} onClick={() => room.is_available && setSelectedRoom(room.id)} className={`p-6 border rounded-sm cursor-pointer transition-all flex justify-between items-center ${selectedRoom === room.id ? 'border-gold-500 bg-gold-50 ring-1 ring-gold-500' : room.is_available ? 'border-gray-200 hover:border-gold-400/50 bg-white shadow-sm' : 'bg-gray-100 opacity-40 cursor-not-allowed grayscale'}`}>
                                 <div>
                                     <h4 className="font-serif text-lg text-gray-900">{room.name}</h4>
-                                    <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">{t('vip.maxCap')} {room.capacity}</p>
+                                    <p className={`text-[10px] text-gray-400 uppercase tracking-widest mt-1 ${getFontClass()}`}>{t('vip.maxCap')} {room.capacity}</p>
                                 </div>
-                                {selectedRoom === room.id ? <CheckCircle className="text-gold-600" size={24}/> : !room.is_available && <span className="text-[9px] font-bold text-red-500 border border-red-200 px-2 py-1 bg-red-50 rounded-sm">BOOKED</span>}
+                                {selectedRoom === room.id ? <CheckCircle className="text-gold-600" size={24}/> : !room.is_available && <span className={`text-[9px] font-bold text-red-500 border border-red-200 px-2 py-1 bg-red-50 rounded-sm ${getFontClass()}`}>{t('vip.booked')}</span>}
                             </div>
                         ))}
                     </div>
                 )}
                 
-                <button disabled={!selectedRoom} onClick={() => setStep(3)} className="w-full max-w-md mx-auto block bg-gold-600 text-white py-5 font-bold uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-3 shadow-xl disabled:opacity-30">
-                    Next: Final Details <ArrowRight size={18} />
+                <button disabled={!selectedRoom} onClick={() => setStep(3)} className={`w-full max-w-md mx-auto flex bg-gold-600 text-white py-5 font-bold uppercase tracking-widest hover:bg-black transition-all items-center justify-center gap-3 shadow-xl disabled:opacity-30 ${getFontClass()}`}>
+                    {t('reservation.nextFinalDetails')} <ArrowRight size={18} />
                 </button>
               </motion.div>
             )}
@@ -214,7 +214,7 @@ const ReservationPage = () => {
             {/* STEP 3: CONTACT FORM */}
             {step === 3 && (
               <motion.div key="step3" variants={stepVariants} initial="initial" animate="animate" exit="exit" className="p-8 md:p-12">
-                 <button onClick={() => setStep(2)} className="flex items-center gap-2 text-gray-400 hover:text-gold-600 mb-8 uppercase tracking-widest text-[10px] font-bold"><ArrowLeft size={14}/> Back to Floor Plan</button>
+                 <button onClick={() => setStep(2)} className={`flex items-center gap-2 text-gray-400 hover:text-gold-600 mb-8 uppercase tracking-widest text-[10px] font-bold ${getFontClass()}`}><ArrowLeft size={14}/> {t('reservation.backToFloorPlan')}</button>
                  
                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
                     <div className="lg:col-span-8">
@@ -222,46 +222,46 @@ const ReservationPage = () => {
                         <form onSubmit={handleSubmit} className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-bold uppercase text-gray-400 tracking-widest">{t('reservation.fName')}</label>
+                                    <label className={`text-[10px] font-bold uppercase text-gray-400 tracking-widest ${getFontClass()}`}>{t('reservation.fName')}</label>
                                     <input required className="w-full bg-gray-50 border-b-2 border-gray-200 p-4 focus:border-gold-500 outline-none transition-colors" type="text" onChange={e => setFormData({...formData, name: e.target.value})} />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-bold uppercase text-gray-400 tracking-widest">{t('reservation.fContact')}</label>
+                                    <label className={`text-[10px] font-bold uppercase text-gray-400 tracking-widest ${getFontClass()}`}>{t('reservation.fContact')}</label>
                                     <input required className="w-full bg-gray-50 border-b-2 border-gray-200 p-4 focus:border-gold-500 outline-none transition-colors" type="text" onChange={e => setFormData({...formData, contact: e.target.value})} />
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-bold uppercase text-gray-400 tracking-widest">{t('reservation.fTime')} ({session})</label>
-                                    <select required className="w-full bg-gray-50 border-b-2 border-gray-200 p-4 focus:border-gold-500 outline-none transition-colors appearance-none" value={selectedTime} onChange={e => setSelectedTime(e.target.value)}>
+                                    <label className={`text-[10px] font-bold uppercase text-gray-400 tracking-widest ${getFontClass()}`}>{t('reservation.fTime')} ({session === 'LUNCH' ? t('footer.lunch') : t('footer.dinner')})</label>
+                                    <select required className={`w-full bg-gray-50 border-b-2 border-gray-200 p-4 focus:border-gold-500 outline-none transition-colors appearance-none ${getFontClass()}`} value={selectedTime} onChange={e => setSelectedTime(e.target.value)}>
                                         <option value="">{t('reservation.selTime')}</option>
                                         {generateTimeSlots(session).map(slot => <option key={slot.value} value={slot.value}>{slot.label}</option>)}
                                     </select>
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-bold uppercase text-gray-400 tracking-widest">{t('reservation.fGuests')}</label>
+                                    <label className={`text-[10px] font-bold uppercase text-gray-400 tracking-widest ${getFontClass()}`}>{t('reservation.fGuests')}</label>
                                     <input required className="w-full bg-gray-50 border-b-2 border-gray-200 p-4 focus:border-gold-500 outline-none transition-colors" type="number" min="1" onChange={e => setFormData({...formData, pax: e.target.value})} />
                                 </div>
                             </div>
                             <div className="space-y-1">
-                                <label className="text-[10px] font-bold uppercase text-gray-400 tracking-widest">{t('reservation.fNotes')}</label>
+                                <label className={`text-[10px] font-bold uppercase text-gray-400 tracking-widest ${getFontClass()}`}>{t('reservation.fNotes')}</label>
                                 <textarea className="w-full bg-gray-50 border-b-2 border-gray-200 p-4 focus:border-gold-500 outline-none transition-colors h-24 resize-none" onChange={e => setFormData({...formData, message: e.target.value})}></textarea>
                             </div>
-                            <button type="submit" disabled={submitStatus === 'loading'} className="w-full bg-gold-600 text-white py-6 font-bold uppercase tracking-[0.3em] hover:bg-black transition-all shadow-xl disabled:opacity-50">
+                            <button type="submit" disabled={submitStatus === 'loading'} className={`w-full bg-gold-600 text-white py-6 font-bold uppercase tracking-[0.3em] hover:bg-black transition-all shadow-xl disabled:opacity-50 ${getFontClass()}`}>
                                 {submitStatus === 'loading' ? t('reservation.proc') : t('reservation.reqRes')}
                             </button>
                         </form>
                     </div>
 
                     <div className="lg:col-span-4 bg-cream-50 p-8 rounded-sm space-y-6 self-start border border-gold-400/20">
-                        <h3 className="text-xs font-bold uppercase tracking-widest text-gold-600 border-b border-gold-200 pb-2">Booking Summary</h3>
+                        <h3 className={`text-xs font-bold uppercase tracking-widest text-gold-600 border-b border-gold-200 pb-2 ${getFontClass()}`}>{t('reservation.bookingSummary')}</h3>
                         <div className="space-y-5">
                             <div className="flex gap-4 items-center text-gray-600"><CalendarIcon size={18} className="text-gold-500 shrink-0"/><span className="text-sm font-bold">{format(date, 'MMMM dd, yyyy')}</span></div>
-                            <div className="flex gap-4 items-center text-gray-600"><Clock size={18} className="text-gold-500 shrink-0"/><span className="text-sm font-bold capitalize">{session.toLowerCase()} Session</span></div>
+                            <div className="flex gap-4 items-center text-gray-600"><Clock size={18} className="text-gold-500 shrink-0"/><span className={`text-sm font-bold capitalize ${getFontClass()}`}>{session === 'LUNCH' ? t('footer.lunch') : t('footer.dinner')} {t('reservation.session')}</span></div>
                             <div className="flex gap-4 items-center text-gray-600"><MapPin size={18} className="text-gold-500 shrink-0"/><span className="text-sm font-bold">{rooms.find(r => r.id === selectedRoom)?.name}</span></div>
                         </div>
                         <div className="pt-6 border-t border-gold-200">
-                             <p className="text-[10px] text-gray-400 leading-relaxed italic">{t('reservation.rev')}. {t('reservation.allow')}</p>
+                             <p className={`text-[10px] text-gray-400 leading-relaxed italic ${getFontClass()}`}>{t('reservation.rev')}. {t('reservation.allow')}</p>
                         </div>
                     </div>
                  </div>
