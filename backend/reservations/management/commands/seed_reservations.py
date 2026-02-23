@@ -27,12 +27,12 @@ class Command(BaseCommand):
             "VIP Room 15": "vip_15.webp",
         }
 
-        # Updated mapping matching exactly what you requested
+        # Updated descriptions based on pax and exact amenities/prices
         areas = [
             {
                 "name": "Main Dining Hall", "area_type": "HALL", "capacity": 200, "price": 0, 
                 "has_tv": False, "has_ktv": False, "has_restroom": False, "has_couch": False, 
-                "description": "Versatile bespoke space perfect for medium-scale banquets, corporate gatherings, and large family reunions."
+                "description": "Versatile open space perfect for casual dining and large gatherings."
             },
             {
                 "name": "MANILA VIP Room", "area_type": "VIP", "capacity": 60, "price": 120000, 
@@ -42,17 +42,17 @@ class Command(BaseCommand):
             {
                 "name": "VIP Room 1", "area_type": "VIP", "capacity": 20, "price": 40000, 
                 "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
-                "description": "A sophisticated, spacious room ideal for mid-sized family reunions or corporate milestones."
+                "description": "A sophisticated, spacious room ideal for mid-sized family reunions or corporate gatherings."
             },
             {
                 "name": "VIP Room 2", "area_type": "VIP", "capacity": 8, "price": 20000, 
                 "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
-                "description": "An intimate, exclusive setting perfect for private tea ceremonies or small family dinners."
+                "description": "An intimate, exclusive setting perfect for private meetings or small family dinners."
             },
             {
                 "name": "VIP Room 3", "area_type": "VIP", "capacity": 8, "price": 20000, 
                 "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
-                "description": "An intimate, exclusive setting perfect for private tea ceremonies or small family dinners."
+                "description": "An intimate, exclusive setting perfect for private meetings or small family dinners."
             },
             {
                 "name": "VIP Room 5", "area_type": "VIP", "capacity": 8, "price": 30000, 
@@ -67,12 +67,12 @@ class Command(BaseCommand):
             {
                 "name": "VIP Room 7", "area_type": "VIP", "capacity": 8, "price": 20000, 
                 "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
-                "description": "An intimate, exclusive setting perfect for private tea ceremonies or small family dinners."
+                "description": "An intimate, exclusive setting perfect for private meetings or small family dinners."
             },
             {
                 "name": "VIP Room 8", "area_type": "VIP", "capacity": 8, "price": 20000, 
                 "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
-                "description": "An intimate, exclusive setting perfect for private tea ceremonies or small family dinners."
+                "description": "An intimate, exclusive setting perfect for private meetings or small family dinners."
             },
             {
                 "name": "VIP Room 9", "area_type": "VIP", "capacity": 10, "price": 40000, 
@@ -116,7 +116,7 @@ class Command(BaseCommand):
                     'price': area_data['price'],
                     'description': area_data['description'],
                     'is_active': True,
-                    'has_ktv': True if area_data['area_type'] == 'VIP' else False,
+                    'has_ktv': area_data['has_ktv'],
                     'has_restroom': area_data['has_restroom'],
                     'has_tv': area_data['has_tv'],
                     'has_couch': area_data['has_couch']

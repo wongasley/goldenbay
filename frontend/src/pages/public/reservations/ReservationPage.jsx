@@ -197,7 +197,21 @@ const ReservationPage = () => {
                             <div key={room.id} onClick={() => room.is_available && setSelectedRoom(room.id)} className={`p-6 border rounded-sm cursor-pointer transition-all flex justify-between items-center ${selectedRoom === room.id ? 'border-gold-500 bg-gold-50 ring-1 ring-gold-500' : room.is_available ? 'border-gray-200 hover:border-gold-400/50 bg-white shadow-sm' : 'bg-gray-100 opacity-40 cursor-not-allowed grayscale'}`}>
                                 <div>
                                     <h4 className="font-serif text-lg text-gray-900">{room.name}</h4>
-                                    <p className={`text-[10px] text-gray-400 uppercase tracking-widest mt-1 ${getFontClass()}`}>{t('vip.maxCap')} {room.capacity}</p>
+                                    
+                                    {/* Display PAX and Price visually distinct */}
+                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                        <span className={`text-[10px] text-gray-400 uppercase tracking-widest ${getFontClass()}`}>
+                                            {t('vip.maxCap')} {room.capacity}
+                                        </span>
+                                        {Number(room.price) > 0 && (
+                                            <>
+                                                <span className="text-gray-300">•</span>
+                                                <span className={`text-[10px] font-bold text-gold-600 uppercase tracking-widest ${getFontClass()}`}>
+                                                    ₱{Number(room.price).toLocaleString()} Consumable
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                                 {selectedRoom === room.id ? <CheckCircle className="text-gold-600" size={24}/> : !room.is_available && <span className={`text-[9px] font-bold text-red-500 border border-red-200 px-2 py-1 bg-red-50 rounded-sm ${getFontClass()}`}>{t('vip.booked')}</span>}
                             </div>

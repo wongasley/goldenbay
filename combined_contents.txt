@@ -557,6 +557,7 @@ class DiningArea(models.Model):
     area_type = models.CharField(max_length=10, choices=TYPE_CHOICES)
     capacity = models.IntegerField(help_text="Max pax for this room/area")
     min_pax = models.IntegerField(default=1, help_text="Minimum pax required to book")
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Consumable price in PHP")
     description = models.TextField(blank=True, help_text="e.g., 'Ocean View'")
     
     # Primary Cover Image (Thumbnail)
@@ -708,7 +709,7 @@ class DiningAreaSerializer(serializers.ModelSerializer):
     class Meta:
         model = DiningArea
         fields = [
-            'id', 'name', 'area_type', 'capacity', 'description', 'image',
+            'id', 'name', 'area_type', 'capacity', 'price', 'description', 'image', # Added 'price' here
             'has_ktv', 'has_restroom', 'has_tv', 'has_couch',
         ]
 
@@ -3846,19 +3847,14 @@ from django.conf import settings
 from reservations.models import DiningArea
 
 class Command(BaseCommand):
-    help = 'Seeds the database with VIP Rooms and attaches images'
+    help = 'Seeds the database with VIP Rooms, Prices, and attaches images'
 
     def handle(self, *args, **options):
-        self.stdout.write("Seeding Dining Areas with Images...")
+        self.stdout.write("Seeding Dining Areas with Pricing and Images...")
 
-        # ---------------------------------------------------------
-        # IMAGE MAPPING
-        # Key = Room Name (must match exactly)
-        # Value = Filename in backend/seed_images/rooms/
-        # ---------------------------------------------------------
         ROOM_IMAGES = {
             "MANILA VIP Room": "vip_manila.webp",
-            "Main Dining Hall": "vip_manila.webp", # Reusing Manila image if no dedicated Hall image exists, or set to None
+            "Main Dining Hall": "vip_manila.webp", 
             "VIP Room 1": "vip_1.webp",
             "VIP Room 2": "vip_2.webp",
             "VIP Room 3": "vip_3.webp",
@@ -3871,63 +3867,108 @@ class Command(BaseCommand):
             "VIP Room 11": "vip_11.webp",
             "VIP Room 12": "vip_12.webp",
             "VIP Room 15": "vip_15.webp",
-            "VIP Room 301": "vip_301.webp",
-            "VIP Room 303": "vip_303.webp",
-            "VIP Room 308": "vip_308.webp",
-            "VIP Room 309": "vip_309.webp",
         }
 
-        # List of areas to create/update
+        # Updated mapping matching exactly what you requested
         areas = [
-            {"name": "Main Dining Hall", "area_type": "HALL", "capacity": 250, "min_pax": 1, "description": "Perfect for casual dining."},
-            {"name": "MANILA VIP Room", "area_type": "VIP", "capacity": 60, "min_pax": 1, "description": "Intimate setting for business meetings or family dinners."},
-            {"name": "VIP Room 1", "area_type": "VIP", "capacity": 20, "min_pax": 1, "description": "Private dining with exclusive service and KTV."},
-            {"name": "VIP Room 2", "area_type": "VIP", "capacity": 10, "min_pax": 1, "description": "Private dining with exclusive service and KTV."},
-            {"name": "VIP Room 3", "area_type": "VIP", "capacity": 10, "min_pax": 1, "description": "Spacious private room with ocean view."},
-            {"name": "VIP Room 5", "area_type": "VIP", "capacity": 10, "min_pax": 1, "description": "Our most luxurious room for large private gatherings."},
-            {"name": "VIP Room 6", "area_type": "VIP", "capacity": 24, "min_pax": 1, "description": "Intimate setting for business meetings or family dinners."},
-            {"name": "VIP Room 7", "area_type": "VIP", "capacity": 10, "min_pax": 1, "description": "Private dining with exclusive service and KTV."},
-            {"name": "VIP Room 8", "area_type": "VIP", "capacity": 10, "min_pax": 1, "description": "Private dining with exclusive service and KTV."},
-            {"name": "VIP Room 9", "area_type": "VIP", "capacity": 20, "min_pax": 1, "description": "Spacious private room with ocean view."},
-            {"name": "VIP Room 10", "area_type": "VIP", "capacity": 18, "min_pax": 1, "description": "Our most luxurious room for large private gatherings."},
-            {"name": "VIP Room 11", "area_type": "VIP", "capacity": 10, "min_pax": 1, "description": "Intimate setting for business meetings or family dinners."},
-            {"name": "VIP Room 12", "area_type": "VIP", "capacity": 10, "min_pax": 1, "description": "Private dining with exclusive service and KTV."},
-            {"name": "VIP Room 15", "area_type": "VIP", "capacity": 10, "min_pax": 1, "description": "Private dining with exclusive service and KTV."},
-            {"name": "VIP Room 301", "area_type": "VIP", "capacity": 20, "min_pax": 1, "description": "Spacious private room with ocean view."},
-            {"name": "VIP Room 303", "area_type": "VIP", "capacity": 20, "min_pax": 1, "description": "Our most luxurious room for large private gatherings."},
-            {"name": "VIP Room 308", "area_type": "VIP", "capacity": 10, "min_pax": 1, "description": "Intimate setting for business meetings or family dinners."},
-            {"name": "VIP Room 309", "area_type": "VIP", "capacity": 70, "min_pax": 1, "description": "Intimate setting for business meetings or family dinners."},
+            {
+                "name": "Main Dining Hall", "area_type": "HALL", "capacity": 200, "price": 0, 
+                "has_tv": False, "has_ktv": False, "has_restroom": False, "has_couch": False, 
+                "description": "Versatile bespoke space perfect for medium-scale banquets, corporate gatherings, and large family reunions."
+            },
+            {
+                "name": "MANILA VIP Room", "area_type": "VIP", "capacity": 60, "price": 120000, 
+                "has_tv": True, "has_ktv": True, "has_restroom": True, "has_couch": True, 
+                "description": "Our grandest VIP suite, perfectly proportioned for large business meetings, corporate galas, and intimate weddings."
+            },
+            {
+                "name": "VIP Room 1", "area_type": "VIP", "capacity": 20, "price": 40000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
+                "description": "A sophisticated, spacious room ideal for mid-sized family reunions or corporate milestones."
+            },
+            {
+                "name": "VIP Room 2", "area_type": "VIP", "capacity": 8, "price": 20000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
+                "description": "An intimate, exclusive setting perfect for private tea ceremonies or small family dinners."
+            },
+            {
+                "name": "VIP Room 3", "area_type": "VIP", "capacity": 8, "price": 20000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
+                "description": "An intimate, exclusive setting perfect for private tea ceremonies or small family dinners."
+            },
+            {
+                "name": "VIP Room 5", "area_type": "VIP", "capacity": 8, "price": 30000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": True, "has_couch": False, 
+                "description": "An intimate, exclusive setting with a dedicated restroom for added privacy."
+            },
+            {
+                "name": "VIP Room 6", "area_type": "VIP", "capacity": 20, "price": 50000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": True, "has_couch": False, 
+                "description": "A luxurious, spacious room with a private restroom, ideal for mid-sized family reunions or corporate milestones."
+            },
+            {
+                "name": "VIP Room 7", "area_type": "VIP", "capacity": 8, "price": 20000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
+                "description": "An intimate, exclusive setting perfect for private tea ceremonies or small family dinners."
+            },
+            {
+                "name": "VIP Room 8", "area_type": "VIP", "capacity": 8, "price": 20000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
+                "description": "An intimate, exclusive setting perfect for private tea ceremonies or small family dinners."
+            },
+            {
+                "name": "VIP Room 9", "area_type": "VIP", "capacity": 10, "price": 40000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
+                "description": "A refined, intimate space suited for private business meetings or milestone celebrations."
+            },
+            {
+                "name": "VIP Room 10", "area_type": "VIP", "capacity": 16, "price": 40000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": True, "has_couch": True, 
+                "description": "An elegant setting perfectly proportioned for medium-sized business meetings or family banquets."
+            },
+            {
+                "name": "VIP Room 11", "area_type": "VIP", "capacity": 12, "price": 30000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": True, 
+                "description": "A refined, intimate space with a lounge area, suited for private business meetings or milestone celebrations."
+            },
+            {
+                "name": "VIP Room 12", "area_type": "VIP", "capacity": 12, "price": 35000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
+                "description": "A refined, intimate space suited for private business meetings, family dinners, or milestone celebrations."
+            },
+            {
+                "name": "VIP Room 15", "area_type": "VIP", "capacity": 12, "price": 35000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": True, "has_couch": True, 
+                "description": "A premium space with an exclusive lounge and restroom, suited for private business meetings or milestone celebrations."
+            },
         ]
 
         DiningArea.objects.all().delete()
-
         BASE_IMAGE_PATH = os.path.join(settings.BASE_DIR, 'seed_images', 'rooms')
 
         for area_data in areas:
             room_name = area_data['name']
             
-            # Create or Get the Room
             area, created = DiningArea.objects.get_or_create(
                 name=room_name,
                 defaults={
                     'area_type': area_data['area_type'],
                     'capacity': area_data['capacity'],
-                    'min_pax': area_data['min_pax'],
+                    'min_pax': 1,
+                    'price': area_data['price'],
                     'description': area_data['description'],
                     'is_active': True,
-                    'has_ktv': True if area_data['area_type'] == 'VIP' else False, # Default logic
-                    'has_restroom': True if area_data['capacity'] > 20 else False 
+                    'has_ktv': True if area_data['area_type'] == 'VIP' else False,
+                    'has_restroom': area_data['has_restroom'],
+                    'has_tv': area_data['has_tv'],
+                    'has_couch': area_data['has_couch']
                 }
             )
 
-            # Image Attachment Logic
             if room_name in ROOM_IMAGES:
                 filename = ROOM_IMAGES[room_name]
                 file_path = os.path.join(BASE_IMAGE_PATH, filename)
 
-                # We attach the image if:
-                # 1. It was just created OR
-                # 2. It currently has no image
                 if (created or not area.image) and os.path.exists(file_path):
                     self.stdout.write(f"  --> Attaching image to {room_name}: {filename}")
                     with open(file_path, 'rb') as f:
@@ -6875,6 +6916,7 @@ const VIPRoomsPage = () => {
         const res = await fetch(`${BACKEND_URL}/api/reservations/rooms/`);
         if (res.ok) {
           const data = await res.json();
+          // Sort numerically so VIP 1, VIP 2... VIP 15 appear in the correct order
           const sortedData = data.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
           setRooms(sortedData);
         }
@@ -6920,11 +6962,19 @@ const VIPRoomsPage = () => {
 
                 <div className="p-6 flex-1 flex flex-col">
                 <div className="mb-4">
-                    {/* Note: If you want room names translated, you must update backend model similar to Post */}
                     <h3 className={`text-xl font-bold text-gray-900 uppercase tracking-wider group-hover:text-gold-600 transition-colors leading-tight ${getFontClass()}`}>
                         {room.name}
                     </h3>
-                    <p className={`text-xs text-gray-400 mt-1 uppercase tracking-widest ${getFontClass()}`}>{room.area_type === 'VIP' ? t('vip.roomType1') : t('vip.roomType2')}</p>
+                    
+                    {/* Display Room Type and Consumable Price side by side */}
+                    <div className="flex justify-between items-center mt-2">
+                        <p className={`text-xs text-gray-400 uppercase tracking-widest ${getFontClass()}`}>{room.area_type === 'VIP' ? t('vip.roomType1') : t('vip.roomType2')}</p>
+                        {Number(room.price) > 0 && (
+                            <p className={`text-sm font-bold text-gold-600 ${getFontClass()}`}>
+                                ₱{Number(room.price).toLocaleString()} Consumable
+                            </p>
+                        )}
+                    </div>
                 </div>
 
                 <p className={`text-sm text-gray-500 font-light mb-6 line-clamp-3 leading-relaxed ${getFontClass()}`}>
