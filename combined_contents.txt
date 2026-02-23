@@ -679,33 +679,32 @@ def save_customer_from_reservation(sender, instance, created, **kwargs):
     in the Phone Book based on the phone number.
     """
     if instance.customer_contact:
-        # Try to find customer by phone number
-        customer, created = Customer.objects.get_or_create(
-            phone=instance.customer_contact,
-            defaults={
-                'name': instance.customer_name,
-                'email': instance.customer_email
-            }
-        )
-        
-        # If customer exists, update the last visit
-        if not created:
-            # We rarely overwrite names automatically to prevent overriding 
-            # a formal name with a nickname used in a booking, 
-            # but we update the last_visit.
-            customer.last_visit = instance.date
-            if not customer.email and instance.customer_email:
-                customer.email = instance.customer_email
-            customer.save()
+        try:
+            # Try to find customer by phone number
+            customer, created = Customer.objects.get_or_create(
+                phone=instance.customer_contact,
+                defaults={
+                    'name': instance.customer_name,
+                    'email': instance.customer_email
+                }
+            )
+            
+            # If customer exists, update the last visit
+            if not created:
+                customer.last_visit = instance.date
+                if not customer.email and instance.customer_email:
+                    customer.email = instance.customer_email
+                customer.save()
+        except Exception as e:
+            # Prevents a 500 Server Error if the Phone Book has duplicate numbers or crashes
+            print(f"Failed to auto-save customer to phonebook: {e}")
 
 from rest_framework import serializers
 from django.db.models import Sum
 from .models import DiningArea, Reservation, Customer
 from django.db import transaction
 
-        
 class DiningAreaSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = DiningArea
         fields = [
@@ -716,8 +715,9 @@ class DiningAreaSerializer(serializers.ModelSerializer):
 class ReservationSerializer(serializers.ModelSerializer):
     room_name = serializers.CharField(source='dining_area.name', read_only=True)
     customer_no_show_count = serializers.SerializerMethodField()
-    encoded_by_name = serializers.CharField(source='encoded_by.username', read_only=True)
-    last_modified_by_name = serializers.CharField(source='last_modified_by.username', read_only=True)
+    # FIX: Safely retrieve usernames to prevent 500 errors if user is None
+    encoded_by_name = serializers.SerializerMethodField()
+    last_modified_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Reservation
@@ -727,7 +727,13 @@ class ReservationSerializer(serializers.ModelSerializer):
     def get_customer_no_show_count(self, obj):
         customer = Customer.objects.filter(phone=obj.customer_contact).first()
         return customer.no_show_count if customer else 0
-    
+        
+    def get_encoded_by_name(self, obj):
+        return obj.encoded_by.username if obj.encoded_by else None
+        
+    def get_last_modified_by_name(self, obj):
+        return obj.last_modified_by.username if obj.last_modified_by else None
+
     def validate(self, data):
         # 1. Setup variables: Use incoming data, otherwise fall back to existing DB instance
         instance = self.instance # This exists if we are Updating (PATCH/PUT)
@@ -748,7 +754,6 @@ class ReservationSerializer(serializers.ModelSerializer):
         # ATOMIC TRANSACTION: Locks the room until validation is finished
         with transaction.atomic():
             # We must fetch the area object to check type
-            # Note: dining_area is already a model object due to DRF internal handling
             area = DiningArea.objects.select_for_update().get(id=dining_area.id)
 
             if area.area_type == 'VIP':
@@ -783,7 +788,7 @@ class ReservationSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(f"Only {area.capacity - total_pax} seats left in the Hall.")
 
         return data
-    
+
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
@@ -802,8 +807,6 @@ urlpatterns = [
     path('customers/<int:id>/', CustomerDetailView.as_view()),
     path('rooms/', VIPRoomListView.as_view(), name='vip_room_list'),
 ]
-
-# backend/reservations/views.py
 
 import requests
 import os
@@ -865,8 +868,12 @@ class ReservationCreateView(generics.CreateAPIView):
         user = self.request.user if self.request.user.is_authenticated else None
         # 1. Save data to DB first
         reservation = serializer.save(encoded_by=user, _history_user=user)
-        # 2. Fire notifications ASYNCHRONOUSLY using Celery (.delay)
-        send_new_booking_notifications.delay(reservation.id)
+        
+        # 2. Fire notifications ASYNCHRONOUSLY
+        try:
+            send_new_booking_notifications.delay(reservation.id)
+        except Exception as e:
+            print(f"Warning: Could not queue celery task: {e}")
 
 class DashboardStatsView(APIView):
     def get(self, request):
@@ -894,7 +901,7 @@ class DashboardStatsView(APIView):
                 "vip_pax": Reservation.objects.filter(date=today, dining_area__area_type='VIP').aggregate(total=Sum('pax'))['total'] or 0,
                 "revenue": f"₱{expected_revenue:,}"
             },
-            "chart_data": chart_data,  # <--- New Chart Data
+            "chart_data": chart_data, 
             "recent_bookings": ReservationSerializer(Reservation.objects.all().order_by('-created_at')[:5], many=True).data
         })
     
@@ -953,15 +960,25 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
                         customer.is_vip = True
                     customer.save()
                 
-                # Trigger Post-Dining Feedback (Wait 7200 seconds / 2 Hours)
-                from .tasks import send_post_dining_feedback
-                send_post_dining_feedback.apply_async((reservation.id,), countdown=7200)
+                try:
+                    # Trigger Post-Dining Feedback (Wait 7200 seconds / 2 Hours)
+                    from .tasks import send_post_dining_feedback
+                    send_post_dining_feedback.apply_async((reservation.id,), countdown=7200)
+                except Exception as e:
+                    print(f"Warning: Could not queue celery task: {e}")
                 
             elif status_changed and reservation.status in ['CONFIRMED', 'CANCELLED']:
-                send_status_update_notifications.delay(reservation.id, reservation.status)
+                try:
+                    send_status_update_notifications.delay(reservation.id, reservation.status)
+                except Exception as e:
+                    print(f"Warning: Could not queue celery task: {e}")
+            
             elif details_changed and reservation.status != 'CANCELLED':
-                from .tasks import send_booking_modification_notifications
-                send_booking_modification_notifications.delay(reservation.id)
+                try:
+                    from .tasks import send_booking_modification_notifications
+                    send_booking_modification_notifications.delay(reservation.id)
+                except Exception as e:
+                    print(f"Warning: Could not queue celery task: {e}")
                 
         return response
     
@@ -3504,17 +3521,17 @@ const ReservationForm = ({
 
         setSubmitStatus('loading');
 
-        // Strictly enforce data types before sending to Django
+        // Strictly enforce data types before sending to Django to prevent 500 DB crashes
         const payload = {
-            customer_name: formData.name,
-            customer_contact: formData.contact,
-            customer_email: formData.email,
+            customer_name: formData.name.trim(),
+            customer_contact: formData.contact.trim(),
+            customer_email: formData.email ? formData.email.trim() : null,
             date: isManualEntry ? manualDate : format(date, 'yyyy-MM-dd'),
             session: isManualEntry ? manualSession : session,
             time: finalTime,
-            pax: parseInt(formData.pax, 10),
+            pax: parseInt(formData.pax, 10) || 1, // Fallback to 1 to prevent NaN/Null
             dining_area: parseInt(finalRoomId, 10),
-            special_request: formData.message,
+            special_request: formData.message ? formData.message.trim() : "",
             status: isManualEntry ? 'CONFIRMED' : 'PENDING',
             source: isManualEntry ? manualSource : 'WEB' 
         };
@@ -3537,28 +3554,35 @@ const ReservationForm = ({
                 setSubmitStatus('success');
                 if (onSuccess) onSuccess();
             } else {
-                // Bulletproof error parsing
-                let errorMessage = "Booking failed. Please check details.";
-                try {
-                    const errData = await res.json();
-                    if (errData.non_field_errors) {
-                        errorMessage = errData.non_field_errors[0];
-                    } else if (errData.detail) {
-                        errorMessage = errData.detail;
-                    } else {
-                        // Dynamically grab the first field error sent by Django
-                        const firstKey = Object.keys(errData)[0];
-                        errorMessage = `${firstKey}: ${errData[firstKey][0]}`;
+                // Check if the response is JSON (400) or HTML (500)
+                const contentType = res.headers.get("content-type");
+                let errorMessage = "Booking failed.";
+
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    try {
+                        const errData = await res.json();
+                        if (errData.non_field_errors) {
+                            errorMessage = errData.non_field_errors[0];
+                        } else if (errData.detail) {
+                            errorMessage = errData.error ? `${errData.detail}: ${errData.error}` : errData.detail;
+                        } else {
+                            const firstKey = Object.keys(errData)[0];
+                            const firstError = errData[firstKey];
+                            errorMessage = `${firstKey.toUpperCase()}: ${Array.isArray(firstError) ? firstError[0] : firstError}`;
+                        }
+                    } catch (parseErr) {
+                        errorMessage = `Server Error (${res.status}). Failed to parse error.`;
                     }
-                } catch (parseErr) {
-                    errorMessage = `Server Error (${res.status}).`;
+                } else {
+                    // This catches the 500 Internal Server Error HTML response
+                    errorMessage = `Fatal Server Error (${res.status}). Check server logs.`;
                 }
                 
                 toast.error(errorMessage);
                 setSubmitStatus('error');
             }
         } catch (error) {
-            toast.error("Network connection refused. Check your internet or CORS settings.");
+            toast.error("Network connection refused. Check your internet or backend status.");
             setSubmitStatus('error');
         }
     };
@@ -7034,6 +7058,7 @@ jobs:
           cd ../backend
           source ../env/bin/activate
           pip install -r requirements.txt
+          python manage.py makemigrations
           python manage.py migrate
           python manage.py collectstatic --noinput
           
