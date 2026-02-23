@@ -81,17 +81,17 @@ const ReservationForm = ({
 
         setSubmitStatus('loading');
 
-        // Strictly enforce data types before sending to Django
+        // Strictly enforce data types before sending to Django to prevent 500 DB crashes
         const payload = {
-            customer_name: formData.name,
-            customer_contact: formData.contact,
-            customer_email: formData.email,
+            customer_name: formData.name.trim(),
+            customer_contact: formData.contact.trim(),
+            customer_email: formData.email ? formData.email.trim() : null,
             date: isManualEntry ? manualDate : format(date, 'yyyy-MM-dd'),
             session: isManualEntry ? manualSession : session,
             time: finalTime,
-            pax: parseInt(formData.pax, 10),
+            pax: parseInt(formData.pax, 10) || 1, // Fallback to 1 to prevent NaN/Null
             dining_area: parseInt(finalRoomId, 10),
-            special_request: formData.message,
+            special_request: formData.message ? formData.message.trim() : "",
             status: isManualEntry ? 'CONFIRMED' : 'PENDING',
             source: isManualEntry ? manualSource : 'WEB' 
         };
@@ -114,28 +114,35 @@ const ReservationForm = ({
                 setSubmitStatus('success');
                 if (onSuccess) onSuccess();
             } else {
-                // Bulletproof error parsing
-                let errorMessage = "Booking failed. Please check details.";
-                try {
-                    const errData = await res.json();
-                    if (errData.non_field_errors) {
-                        errorMessage = errData.non_field_errors[0];
-                    } else if (errData.detail) {
-                        errorMessage = errData.detail;
-                    } else {
-                        // Dynamically grab the first field error sent by Django
-                        const firstKey = Object.keys(errData)[0];
-                        errorMessage = `${firstKey}: ${errData[firstKey][0]}`;
+                // Check if the response is JSON (400) or HTML (500)
+                const contentType = res.headers.get("content-type");
+                let errorMessage = "Booking failed.";
+
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    try {
+                        const errData = await res.json();
+                        if (errData.non_field_errors) {
+                            errorMessage = errData.non_field_errors[0];
+                        } else if (errData.detail) {
+                            errorMessage = errData.error ? `${errData.detail}: ${errData.error}` : errData.detail;
+                        } else {
+                            const firstKey = Object.keys(errData)[0];
+                            const firstError = errData[firstKey];
+                            errorMessage = `${firstKey.toUpperCase()}: ${Array.isArray(firstError) ? firstError[0] : firstError}`;
+                        }
+                    } catch (parseErr) {
+                        errorMessage = `Server Error (${res.status}). Failed to parse error.`;
                     }
-                } catch (parseErr) {
-                    errorMessage = `Server Error (${res.status}).`;
+                } else {
+                    // This catches the 500 Internal Server Error HTML response
+                    errorMessage = `Fatal Server Error (${res.status}). Check server logs.`;
                 }
                 
                 toast.error(errorMessage);
                 setSubmitStatus('error');
             }
         } catch (error) {
-            toast.error("Network connection refused. Check your internet or CORS settings.");
+            toast.error("Network connection refused. Check your internet or backend status.");
             setSubmitStatus('error');
         }
     };
