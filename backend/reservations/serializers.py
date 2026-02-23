@@ -3,9 +3,7 @@ from django.db.models import Sum
 from .models import DiningArea, Reservation, Customer
 from django.db import transaction
 
-        
 class DiningAreaSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = DiningArea
         fields = [
@@ -16,8 +14,9 @@ class DiningAreaSerializer(serializers.ModelSerializer):
 class ReservationSerializer(serializers.ModelSerializer):
     room_name = serializers.CharField(source='dining_area.name', read_only=True)
     customer_no_show_count = serializers.SerializerMethodField()
-    encoded_by_name = serializers.CharField(source='encoded_by.username', read_only=True)
-    last_modified_by_name = serializers.CharField(source='last_modified_by.username', read_only=True)
+    # FIX: Safely retrieve usernames to prevent 500 errors if user is None
+    encoded_by_name = serializers.SerializerMethodField()
+    last_modified_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Reservation
@@ -27,7 +26,13 @@ class ReservationSerializer(serializers.ModelSerializer):
     def get_customer_no_show_count(self, obj):
         customer = Customer.objects.filter(phone=obj.customer_contact).first()
         return customer.no_show_count if customer else 0
-    
+        
+    def get_encoded_by_name(self, obj):
+        return obj.encoded_by.username if obj.encoded_by else None
+        
+    def get_last_modified_by_name(self, obj):
+        return obj.last_modified_by.username if obj.last_modified_by else None
+
     def validate(self, data):
         # 1. Setup variables: Use incoming data, otherwise fall back to existing DB instance
         instance = self.instance # This exists if we are Updating (PATCH/PUT)
@@ -48,7 +53,6 @@ class ReservationSerializer(serializers.ModelSerializer):
         # ATOMIC TRANSACTION: Locks the room until validation is finished
         with transaction.atomic():
             # We must fetch the area object to check type
-            # Note: dining_area is already a model object due to DRF internal handling
             area = DiningArea.objects.select_for_update().get(id=dining_area.id)
 
             if area.area_type == 'VIP':
@@ -83,7 +87,7 @@ class ReservationSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(f"Only {area.capacity - total_pax} seats left in the Hall.")
 
         return data
-    
+
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer

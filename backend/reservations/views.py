@@ -1,5 +1,3 @@
-# backend/reservations/views.py
-
 import requests
 import os
 from django.db import transaction
@@ -60,8 +58,13 @@ class ReservationCreateView(generics.CreateAPIView):
         user = self.request.user if self.request.user.is_authenticated else None
         # 1. Save data to DB first
         reservation = serializer.save(encoded_by=user, _history_user=user)
-        # 2. Fire notifications ASYNCHRONOUSLY using Celery (.delay)
-        send_new_booking_notifications.delay(reservation.id)
+        
+        # 2. Fire notifications ASYNCHRONOUSLY 
+        # FIX: Wrapped in try-except to prevent 500 error if Redis is down locally
+        try:
+            send_new_booking_notifications.delay(reservation.id)
+        except Exception as e:
+            print(f"Warning: Could not queue celery task: {e}")
 
 class DashboardStatsView(APIView):
     def get(self, request):
@@ -89,7 +92,7 @@ class DashboardStatsView(APIView):
                 "vip_pax": Reservation.objects.filter(date=today, dining_area__area_type='VIP').aggregate(total=Sum('pax'))['total'] or 0,
                 "revenue": f"₱{expected_revenue:,}"
             },
-            "chart_data": chart_data,  # <--- New Chart Data
+            "chart_data": chart_data, 
             "recent_bookings": ReservationSerializer(Reservation.objects.all().order_by('-created_at')[:5], many=True).data
         })
     
@@ -148,15 +151,25 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
                         customer.is_vip = True
                     customer.save()
                 
-                # Trigger Post-Dining Feedback (Wait 7200 seconds / 2 Hours)
-                from .tasks import send_post_dining_feedback
-                send_post_dining_feedback.apply_async((reservation.id,), countdown=7200)
+                try:
+                    # Trigger Post-Dining Feedback (Wait 7200 seconds / 2 Hours)
+                    from .tasks import send_post_dining_feedback
+                    send_post_dining_feedback.apply_async((reservation.id,), countdown=7200)
+                except Exception as e:
+                    print(f"Warning: Could not queue celery task: {e}")
                 
             elif status_changed and reservation.status in ['CONFIRMED', 'CANCELLED']:
-                send_status_update_notifications.delay(reservation.id, reservation.status)
+                try:
+                    send_status_update_notifications.delay(reservation.id, reservation.status)
+                except Exception as e:
+                    print(f"Warning: Could not queue celery task: {e}")
+            
             elif details_changed and reservation.status != 'CANCELLED':
-                from .tasks import send_booking_modification_notifications
-                send_booking_modification_notifications.delay(reservation.id)
+                try:
+                    from .tasks import send_booking_modification_notifications
+                    send_booking_modification_notifications.delay(reservation.id)
+                except Exception as e:
+                    print(f"Warning: Could not queue celery task: {e}")
                 
         return response
     
