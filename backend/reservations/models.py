@@ -136,21 +136,22 @@ def save_customer_from_reservation(sender, instance, created, **kwargs):
     in the Phone Book based on the phone number.
     """
     if instance.customer_contact:
-        # Try to find customer by phone number
-        customer, created = Customer.objects.get_or_create(
-            phone=instance.customer_contact,
-            defaults={
-                'name': instance.customer_name,
-                'email': instance.customer_email
-            }
-        )
-        
-        # If customer exists, update the last visit
-        if not created:
-            # We rarely overwrite names automatically to prevent overriding 
-            # a formal name with a nickname used in a booking, 
-            # but we update the last_visit.
-            customer.last_visit = instance.date
-            if not customer.email and instance.customer_email:
-                customer.email = instance.customer_email
-            customer.save()
+        try:
+            # Try to find customer by phone number
+            customer, created = Customer.objects.get_or_create(
+                phone=instance.customer_contact,
+                defaults={
+                    'name': instance.customer_name,
+                    'email': instance.customer_email
+                }
+            )
+            
+            # If customer exists, update the last visit
+            if not created:
+                customer.last_visit = instance.date
+                if not customer.email and instance.customer_email:
+                    customer.email = instance.customer_email
+                customer.save()
+        except Exception as e:
+            # Prevents a 500 Server Error if the Phone Book has duplicate numbers or crashes
+            print(f"Failed to auto-save customer to phonebook: {e}")

@@ -54,13 +54,25 @@ class ReservationCreateView(generics.CreateAPIView):
     serializer_class = ReservationSerializer
     permission_classes = [AllowAny] 
 
+    # --- MAGIC CRASH CATCHER ---
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            # If Django crashes, capture the exact error and send it to React
+            import traceback
+            print(traceback.format_exc())
+            return Response({
+                "detail": "Database Error", 
+                "error": str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
         # 1. Save data to DB first
         reservation = serializer.save(encoded_by=user, _history_user=user)
         
-        # 2. Fire notifications ASYNCHRONOUSLY 
-        # FIX: Wrapped in try-except to prevent 500 error if Redis is down locally
+        # 2. Fire notifications ASYNCHRONOUSLY
         try:
             send_new_booking_notifications.delay(reservation.id)
         except Exception as e:
