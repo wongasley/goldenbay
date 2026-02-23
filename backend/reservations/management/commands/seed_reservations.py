@@ -29,20 +29,76 @@ class Command(BaseCommand):
 
         # Updated mapping matching exactly what you requested
         areas = [
-            {"name": "Main Dining Hall", "area_type": "HALL", "capacity": 250, "price": 0, "has_tv": False, "has_restroom": False, "has_couch": False, "description": "Perfect for casual dining."},
-            {"name": "MANILA VIP Room", "area_type": "VIP", "capacity": 60, "price": 120000, "has_tv": True, "has_restroom": True, "has_couch": True, "description": "Our grandest intimate setting for large meetings or family dinners."},
-            {"name": "VIP Room 1", "area_type": "VIP", "capacity": 20, "price": 40000, "has_tv": True, "has_restroom": False, "has_couch": False, "description": "Private dining with exclusive service and KTV."},
-            {"name": "VIP Room 2", "area_type": "VIP", "capacity": 8, "price": 20000, "has_tv": True, "has_restroom": False, "has_couch": False, "description": "Private dining with exclusive service and KTV."},
-            {"name": "VIP Room 3", "area_type": "VIP", "capacity": 8, "price": 20000, "has_tv": True, "has_restroom": False, "has_couch": False, "description": "Spacious private room with ocean view."},
-            {"name": "VIP Room 5", "area_type": "VIP", "capacity": 8, "price": 30000, "has_tv": True, "has_restroom": True, "has_couch": False, "description": "Private gathering room with dedicated restroom."},
-            {"name": "VIP Room 6", "area_type": "VIP", "capacity": 20, "price": 50000, "has_tv": True, "has_restroom": True, "has_couch": False, "description": "Luxurious setting for business meetings or family dinners."},
-            {"name": "VIP Room 7", "area_type": "VIP", "capacity": 8, "price": 20000, "has_tv": True, "has_restroom": False, "has_couch": False, "description": "Private dining with exclusive service and KTV."},
-            {"name": "VIP Room 8", "area_type": "VIP", "capacity": 8, "price": 20000, "has_tv": True, "has_restroom": False, "has_couch": False, "description": "Private dining with exclusive service and KTV."},
-            {"name": "VIP Room 9", "area_type": "VIP", "capacity": 10, "price": 40000, "has_tv": True, "has_restroom": False, "has_couch": False, "description": "Spacious private room for intimate gatherings."},
-            {"name": "VIP Room 10", "area_type": "VIP", "capacity": 16, "price": 40000, "has_tv": True, "has_restroom": True, "has_couch": True, "description": "Our most luxurious room for large private gatherings."},
-            {"name": "VIP Room 11", "area_type": "VIP", "capacity": 12, "price": 30000, "has_tv": True, "has_restroom": False, "has_couch": True, "description": "Intimate setting equipped with a lounge area."},
-            {"name": "VIP Room 12", "area_type": "VIP", "capacity": 12, "price": 35000, "has_tv": True, "has_restroom": False, "has_couch": False, "description": "Private dining with exclusive service and KTV."},
-            {"name": "VIP Room 15", "area_type": "VIP", "capacity": 12, "price": 35000, "has_tv": True, "has_restroom": True, "has_couch": True, "description": "Private dining with exclusive lounge and restroom access."},
+            {
+                "name": "Main Dining Hall", "area_type": "HALL", "capacity": 200, "price": 0, 
+                "has_tv": False, "has_ktv": False, "has_restroom": False, "has_couch": False, 
+                "description": "Versatile bespoke space perfect for medium-scale banquets, corporate gatherings, and large family reunions."
+            },
+            {
+                "name": "MANILA VIP Room", "area_type": "VIP", "capacity": 60, "price": 120000, 
+                "has_tv": True, "has_ktv": True, "has_restroom": True, "has_couch": True, 
+                "description": "Our grandest VIP suite, perfectly proportioned for large business meetings, corporate galas, and intimate weddings."
+            },
+            {
+                "name": "VIP Room 1", "area_type": "VIP", "capacity": 20, "price": 40000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
+                "description": "A sophisticated, spacious room ideal for mid-sized family reunions or corporate milestones."
+            },
+            {
+                "name": "VIP Room 2", "area_type": "VIP", "capacity": 8, "price": 20000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
+                "description": "An intimate, exclusive setting perfect for private tea ceremonies or small family dinners."
+            },
+            {
+                "name": "VIP Room 3", "area_type": "VIP", "capacity": 8, "price": 20000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
+                "description": "An intimate, exclusive setting perfect for private tea ceremonies or small family dinners."
+            },
+            {
+                "name": "VIP Room 5", "area_type": "VIP", "capacity": 8, "price": 30000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": True, "has_couch": False, 
+                "description": "An intimate, exclusive setting with a dedicated restroom for added privacy."
+            },
+            {
+                "name": "VIP Room 6", "area_type": "VIP", "capacity": 20, "price": 50000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": True, "has_couch": False, 
+                "description": "A luxurious, spacious room with a private restroom, ideal for mid-sized family reunions or corporate milestones."
+            },
+            {
+                "name": "VIP Room 7", "area_type": "VIP", "capacity": 8, "price": 20000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
+                "description": "An intimate, exclusive setting perfect for private tea ceremonies or small family dinners."
+            },
+            {
+                "name": "VIP Room 8", "area_type": "VIP", "capacity": 8, "price": 20000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
+                "description": "An intimate, exclusive setting perfect for private tea ceremonies or small family dinners."
+            },
+            {
+                "name": "VIP Room 9", "area_type": "VIP", "capacity": 10, "price": 40000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
+                "description": "A refined, intimate space suited for private business meetings or milestone celebrations."
+            },
+            {
+                "name": "VIP Room 10", "area_type": "VIP", "capacity": 16, "price": 40000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": True, "has_couch": True, 
+                "description": "An elegant setting perfectly proportioned for medium-sized business meetings or family banquets."
+            },
+            {
+                "name": "VIP Room 11", "area_type": "VIP", "capacity": 12, "price": 30000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": True, 
+                "description": "A refined, intimate space with a lounge area, suited for private business meetings or milestone celebrations."
+            },
+            {
+                "name": "VIP Room 12", "area_type": "VIP", "capacity": 12, "price": 35000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": False, "has_couch": False, 
+                "description": "A refined, intimate space suited for private business meetings, family dinners, or milestone celebrations."
+            },
+            {
+                "name": "VIP Room 15", "area_type": "VIP", "capacity": 12, "price": 35000, 
+                "has_tv": True, "has_ktv": False, "has_restroom": True, "has_couch": True, 
+                "description": "A premium space with an exclusive lounge and restroom, suited for private business meetings or milestone celebrations."
+            },
         ]
 
         DiningArea.objects.all().delete()
