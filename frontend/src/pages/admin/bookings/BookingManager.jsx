@@ -127,6 +127,17 @@ const BookingManager = () => {
       }
   };
 
+  // ADD THIS NEW FUNCTION HERE:
+  const getSourceDisplay = (source) => {
+      switch(source) {
+          case 'WEB': return 'Website';
+          case 'WALK_IN': return 'Walk-in';
+          case 'PHONE': return 'Phone Call';
+          case 'SOCIAL': return 'Social Media';
+          default: return source || 'Unknown';
+      }
+  };
+
   return (
     <div className="space-y-4 pb-20">
       
