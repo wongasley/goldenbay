@@ -1,3 +1,4 @@
+// src/components/layout/PixelTracker.jsx
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
@@ -5,14 +6,13 @@ const PixelTracker = () => {
   const location = useLocation();
 
   useEffect(() => {
-    // Check if fbq exists (it should, from index.html)
+    // Fire a Facebook PageView event every time the URL changes
     if (window.fbq) {
-      // Fire a PageView event every time the route changes
       window.fbq('track', 'PageView');
     }
-  }, [location]);
+  }, [location.pathname]);
 
-  return null; // This component doesn't render anything
+  return null;
 };
 
 export default PixelTracker;

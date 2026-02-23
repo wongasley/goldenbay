@@ -1014,61 +1014,67 @@ class VIPRoomListView(generics.ListAPIView):
     
 
 class ChatbotBookingWebhook(APIView):
-    permission_classes = [] # Allow the bot platform to hit this endpoint
+    permission_classes = [] 
 
     def post(self, request):
-        # 1. Basic Security: Check for a secret token in headers to prevent spam
         bot_token = request.headers.get('X-Bot-Token')
-        if bot_token != os.getenv('BOT_SECRET_TOKEN', 'your_secret_bot_token'):
-            return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+        if bot_token != os.getenv('BOT_SECRET_TOKEN', 'GoldenBaySecureBot2026!'):
+            return Response({"bot_reply": "Unauthorized"}, status=401)
 
         data = request.data
         
         try:
-            # 2. Extract data sent by ManyChat/Dialogflow
             name = data.get('name')
             contact = data.get('contact')
-            date_str = data.get('date') # Format: YYYY-MM-DD
-            time_str = data.get('time') # Format: HH:MM:SS
+            date_str = data.get('date') 
+            time_str = data.get('time') 
             pax = int(data.get('pax', 2))
             
-            # 3. Determine Session based on time
             hour = int(time_str.split(':')[0])
             session = 'LUNCH' if hour < 15 else 'DINNER'
 
-            # 4. Auto-Assign to the Main Hall (Since bots can't easily show VIP room layouts)
             main_hall = DiningArea.objects.filter(area_type='HALL', is_active=True).first()
-            
             if not main_hall:
-                return Response({"message": "Booking failed. Main hall unavailable."}, status=400)
+                # Notice we return status=200 so AhaChat can read the error message easily
+                return Response({"bot_reply": "Sorry, online booking is currently disabled."}, status=200)
 
-            # (Optional) Add your capacity check here just like in your serializer
+            # --- NEW: CHECK CAPACITY BEFORE BOOKING ---
+            total_pax_query = Reservation.objects.filter(
+                dining_area=main_hall, 
+                date=date_str, 
+                session=session
+            ).exclude(status__in=['CANCELLED', 'NO_SHOW'])
 
-            # 5. Create the Reservation
+            current_pax = total_pax_query.aggregate(Sum('pax'))['pax__sum'] or 0
+            
+            if (current_pax + pax) > main_hall.capacity:
+                seats_left = main_hall.capacity - current_pax
+                if seats_left <= 0:
+                    msg = f"Sorry! We are fully booked for {session} on {date_str}. Please try another date."
+                else:
+                    msg = f"Sorry! We only have {seats_left} seats left for {session} on {date_str}. Please adjust your guest count."
+                
+                return Response({"success": False, "bot_reply": msg}, status=200)
+            # ------------------------------------------
+
+            # Create the Reservation
             reservation = Reservation.objects.create(
-                customer_name=name,
-                customer_contact=contact,
-                date=date_str,
-                session=session,
-                time=time_str,
-                pax=pax,
-                dining_area=main_hall,
-                source='SOCIAL', # Tags it as coming from FB/IG/TikTok
-                status='PENDING' # Or 'CONFIRMED' depending on your business logic
+                customer_name=name, customer_contact=contact, date=date_str,
+                session=session, time=time_str, pax=pax, dining_area=main_hall,
+                source='SOCIAL', status='PENDING' 
             )
 
-            # 6. Trigger your existing Celery notifications
+            # Trigger Celery notifications
             from .tasks import send_new_booking_notifications
             send_new_booking_notifications.delay(reservation.id)
 
-            # 7. Return success message back to the Bot Platform
             return Response({
                 "success": True,
-                "bot_reply": f"Success! Your table for {pax} on {date_str} at {time_str} is reserved under {name}. Ref: #{reservation.id}"
-            }, status=status.HTTP_201_CREATED)
+                "bot_reply": f"Success! 🎉 Your table for {pax} on {date_str} at {time_str} is reserved under {name}. Ref: #{reservation.id}"
+            }, status=200)
 
         except Exception as e:
-            return Response({"success": False, "bot_reply": "Sorry, an error occurred while booking. Please call us."}, status=400)
+            return Response({"success": False, "bot_reply": "Sorry, an error occurred with the date/time format. Please try again."}, status=200)
 
 import requests
 import os
@@ -1849,12 +1855,14 @@ h2 {
       t.src=v;s=b.getElementsByTagName(e)[0];
       s.parentNode.insertBefore(t,s)}(window, document,'script',
       'https://connect.facebook.net/en_US/fbevents.js');
-      fbq('init', 'YOUR_PIXEL_ID_HERE'); 
+      
+      // YOUR ID IS NOW HERE
+      fbq('init', '1592808188663904'); 
       fbq('track', 'PageView');
     </script>
-  </head>
+    </head>
   <body>
-    <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=YOUR_PIXEL_ID_HERE&ev=PageView&noscript=1" /></noscript>
+    <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1592808188663904&ev=PageView&noscript=1" /></noscript>
     
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
