@@ -19,6 +19,7 @@ const VIPRoomsPage = () => {
         const res = await fetch(`${BACKEND_URL}/api/reservations/rooms/`);
         if (res.ok) {
           const data = await res.json();
+          // Sort numerically so VIP 1, VIP 2... VIP 15 appear in the correct order
           const sortedData = data.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
           setRooms(sortedData);
         }
@@ -64,11 +65,19 @@ const VIPRoomsPage = () => {
 
                 <div className="p-6 flex-1 flex flex-col">
                 <div className="mb-4">
-                    {/* Note: If you want room names translated, you must update backend model similar to Post */}
                     <h3 className={`text-xl font-bold text-gray-900 uppercase tracking-wider group-hover:text-gold-600 transition-colors leading-tight ${getFontClass()}`}>
                         {room.name}
                     </h3>
-                    <p className={`text-xs text-gray-400 mt-1 uppercase tracking-widest ${getFontClass()}`}>{room.area_type === 'VIP' ? t('vip.roomType1') : t('vip.roomType2')}</p>
+                    
+                    {/* Display Room Type and Consumable Price side by side */}
+                    <div className="flex justify-between items-center mt-2">
+                        <p className={`text-xs text-gray-400 uppercase tracking-widest ${getFontClass()}`}>{room.area_type === 'VIP' ? t('vip.roomType1') : t('vip.roomType2')}</p>
+                        {Number(room.price) > 0 && (
+                            <p className={`text-sm font-bold text-gold-600 ${getFontClass()}`}>
+                                ₱{Number(room.price).toLocaleString()} Consumable
+                            </p>
+                        )}
+                    </div>
                 </div>
 
                 <p className={`text-sm text-gray-500 font-light mb-6 line-clamp-3 leading-relaxed ${getFontClass()}`}>

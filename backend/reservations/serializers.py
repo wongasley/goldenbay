@@ -7,7 +7,7 @@ class DiningAreaSerializer(serializers.ModelSerializer):
     class Meta:
         model = DiningArea
         fields = [
-            'id', 'name', 'area_type', 'capacity', 'description', 'image',
+            'id', 'name', 'area_type', 'capacity', 'price', 'description', 'image', # Added 'price' here
             'has_ktv', 'has_restroom', 'has_tv', 'has_couch',
         ]
 

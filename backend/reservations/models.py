@@ -14,6 +14,7 @@ class DiningArea(models.Model):
     area_type = models.CharField(max_length=10, choices=TYPE_CHOICES)
     capacity = models.IntegerField(help_text="Max pax for this room/area")
     min_pax = models.IntegerField(default=1, help_text="Minimum pax required to book")
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Consumable price in PHP")
     description = models.TextField(blank=True, help_text="e.g., 'Ocean View'")
     
     # Primary Cover Image (Thumbnail)
