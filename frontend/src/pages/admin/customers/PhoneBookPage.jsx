@@ -216,8 +216,8 @@ const PhoneBookPage = () => {
                             <div className="flex flex-col gap-1 text-left">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <h3 className="font-bold text-gray-900 text-base">{c.name}</h3>
-                                    {c.notes && c.notes.toLowerCase().includes('vip') && (
-                                        <span className="bg-gold-100 text-gold-700 text-[9px] font-bold px-2 py-0.5 rounded border border-gold-200 uppercase tracking-widest">VIP</span>
+                                    {c.is_vip && (
+                                        <span className="bg-gold-100 text-gold-700 text-[9px] font-bold px-2 py-0.5 rounded border border-gold-200 uppercase tracking-widest" title={`Visited ${c.visit_count} times`}>VIP</span>
                                     )}
                                 </div>
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs text-gray-500 font-mono">
