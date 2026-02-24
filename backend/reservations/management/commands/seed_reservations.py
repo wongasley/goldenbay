@@ -101,13 +101,13 @@ class Command(BaseCommand):
             },
         ]
 
-        DiningArea.objects.all().delete()
+        # DiningArea.objects.all().delete()
         BASE_IMAGE_PATH = os.path.join(settings.BASE_DIR, 'seed_images', 'rooms')
 
         for area_data in areas:
             room_name = area_data['name']
             
-            area, created = DiningArea.objects.get_or_create(
+            area, created = DiningArea.objects.update_or_create(
                 name=room_name,
                 defaults={
                     'area_type': area_data['area_type'],

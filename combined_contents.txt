@@ -522,7 +522,7 @@ class MenuListView(generics.ListAPIView):
         ).all().order_by('order')
 
 from django.contrib import admin
-from .models import DiningArea, Reservation
+from .models import Customer, DiningArea, Reservation
 
 @admin.register(DiningArea)
 class DiningAreaAdmin(admin.ModelAdmin):
@@ -533,6 +533,12 @@ class DiningAreaAdmin(admin.ModelAdmin):
 class ReservationAdmin(admin.ModelAdmin):
     list_display = ('customer_name', 'date', 'session', 'dining_area', 'status')
     list_filter = ('date', 'session', 'status', 'dining_area')
+
+@admin.register(Customer)
+class CustomerAdmin(admin.ModelAdmin):
+    list_display = ('name', 'phone', 'email', 'visit_count', 'is_vip')
+    search_fields = ('name', 'phone', 'email')
+    list_filter = ('is_vip',)
 
 from django.apps import AppConfig
 
@@ -4024,13 +4030,13 @@ class Command(BaseCommand):
             },
         ]
 
-        DiningArea.objects.all().delete()
+        # DiningArea.objects.all().delete()
         BASE_IMAGE_PATH = os.path.join(settings.BASE_DIR, 'seed_images', 'rooms')
 
         for area_data in areas:
             room_name = area_data['name']
             
-            area, created = DiningArea.objects.get_or_create(
+            area, created = DiningArea.objects.update_or_create(
                 name=room_name,
                 defaults={
                     'area_type': area_data['area_type'],
@@ -6593,8 +6599,8 @@ const PhoneBookPage = () => {
                             <div className="flex flex-col gap-1 text-left">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <h3 className="font-bold text-gray-900 text-base">{c.name}</h3>
-                                    {c.notes && c.notes.toLowerCase().includes('vip') && (
-                                        <span className="bg-gold-100 text-gold-700 text-[9px] font-bold px-2 py-0.5 rounded border border-gold-200 uppercase tracking-widest">VIP</span>
+                                    {c.is_vip && (
+                                        <span className="bg-gold-100 text-gold-700 text-[9px] font-bold px-2 py-0.5 rounded border border-gold-200 uppercase tracking-widest" title={`Visited ${c.visit_count} times`}>VIP</span>
                                     )}
                                 </div>
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs text-gray-500 font-mono">
@@ -7279,7 +7285,6 @@ jobs:
           cd ../backend
           source ../env/bin/activate
           pip install -r requirements.txt
-          python manage.py makemigrations
           python manage.py migrate
           python manage.py collectstatic --noinput
           
