@@ -209,7 +209,7 @@ class ChatbotBookingWebhook(APIView):
     def post(self, request):
         bot_token = request.headers.get('X-Bot-Token')
         if bot_token != os.getenv('BOT_SECRET_TOKEN', 'GoldenBaySecureBot2026!'):
-            return Response({"bot_reply": "Unauthorized"}, status=401)
+            return Response({"messages": [{"text": "Unauthorized"}]}, status=401)
 
         data = request.data
         
@@ -225,10 +225,9 @@ class ChatbotBookingWebhook(APIView):
 
             main_hall = DiningArea.objects.filter(area_type='HALL', is_active=True).first()
             if not main_hall:
-                # Notice we return status=200 so AhaChat can read the error message easily
-                return Response({"bot_reply": "Sorry, online booking is currently disabled."}, status=200)
+                return Response({"messages": [{"text": "Sorry, online booking is currently disabled."}]}, status=200)
 
-            # --- NEW: CHECK CAPACITY BEFORE BOOKING ---
+            # --- CHECK CAPACITY ---
             total_pax_query = Reservation.objects.filter(
                 dining_area=main_hall, 
                 date=date_str, 
@@ -244,8 +243,8 @@ class ChatbotBookingWebhook(APIView):
                 else:
                     msg = f"Sorry! We only have {seats_left} seats left for {session} on {date_str}. Please adjust your guest count."
                 
-                return Response({"success": False, "bot_reply": msg}, status=200)
-            # ------------------------------------------
+                return Response({"messages": [{"text": msg}]}, status=200)
+            # ----------------------
 
             # Create the Reservation
             reservation = Reservation.objects.create(
@@ -258,10 +257,14 @@ class ChatbotBookingWebhook(APIView):
             from .tasks import send_new_booking_notifications
             send_new_booking_notifications.delay(reservation.id)
 
+            success_msg = f"Success! 🎉 Your table for {pax} on {date_str} at {time_str} is reserved under {name}. Ref: #{reservation.id}"
+            
+            # THE MAGIC FORMAT AHACHAT READS AUTOMATICALLY
             return Response({
-                "success": True,
-                "bot_reply": f"Success! 🎉 Your table for {pax} on {date_str} at {time_str} is reserved under {name}. Ref: #{reservation.id}"
+                "messages": [
+                    {"text": success_msg}
+                ]
             }, status=200)
 
         except Exception as e:
-            return Response({"success": False, "bot_reply": "Sorry, an error occurred with the date/time format. Please try again."}, status=200)
+            return Response({"messages": [{"text": "Sorry, an error occurred with the date/time format. Please try again."}]}, status=200)
