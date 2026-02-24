@@ -7,17 +7,21 @@ class SystemSetting(models.Model):
     )
 
     def save(self, *args, **kwargs):
-        # Forces this model to only ever have ONE row (ID=1)
-        self.pk = 1
+        # If a setting row already exists and we are trying to create a new one, 
+        # force it to update the existing row instead.
+        if SystemSetting.objects.exists() and not self.pk:
+            self.pk = SystemSetting.objects.first().pk
         super(SystemSetting, self).save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        # Prevent accidental deletion of the settings row
-        pass
+        pass # Prevent accidental deletion
 
     @classmethod
     def load(cls):
-        obj, created = cls.objects.get_or_create(pk=1)
+        # Safely get the first object, regardless of what its Primary Key is
+        obj = cls.objects.first()
+        if not obj:
+            obj = cls.objects.create()
         return obj
 
     class Meta:
