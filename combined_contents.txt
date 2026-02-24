@@ -333,17 +333,21 @@ class SystemSetting(models.Model):
     )
 
     def save(self, *args, **kwargs):
-        # Forces this model to only ever have ONE row (ID=1)
-        self.pk = 1
+        # If a setting row already exists and we are trying to create a new one, 
+        # force it to update the existing row instead.
+        if SystemSetting.objects.exists() and not self.pk:
+            self.pk = SystemSetting.objects.first().pk
         super(SystemSetting, self).save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        # Prevent accidental deletion of the settings row
-        pass
+        pass # Prevent accidental deletion
 
     @classmethod
     def load(cls):
-        obj, created = cls.objects.get_or_create(pk=1)
+        # Safely get the first object, regardless of what its Primary Key is
+        obj = cls.objects.first()
+        if not obj:
+            obj = cls.objects.create()
         return obj
 
     class Meta:
@@ -1062,7 +1066,7 @@ class ChatbotBookingWebhook(APIView):
     def post(self, request):
         bot_token = request.headers.get('X-Bot-Token')
         if bot_token != os.getenv('BOT_SECRET_TOKEN', 'GoldenBaySecureBot2026!'):
-            return Response({"bot_reply": "Unauthorized"}, status=401)
+            return Response({"messages": [{"text": "Unauthorized"}]}, status=401)
 
         data = request.data
         
@@ -1073,37 +1077,62 @@ class ChatbotBookingWebhook(APIView):
             time_str = data.get('time') 
             pax = int(data.get('pax', 2))
             
-            hour = int(time_str.split(':')[0])
-            session = 'LUNCH' if hour < 15 else 'DINNER'
+            # Use the session from AhaChat, fallback to calculating it if missing
+            session = data.get('session')
+            if not session:
+                hour = int(time_str.split(':')[0])
+                session = 'LUNCH' if hour < 15 else 'DINNER'
 
-            main_hall = DiningArea.objects.filter(area_type='HALL', is_active=True).first()
-            if not main_hall:
-                # Notice we return status=200 so AhaChat can read the error message easily
-                return Response({"bot_reply": "Sorry, online booking is currently disabled."}, status=200)
+            area_type_request = data.get('area_type', 'HALL') # 'HALL' or 'VIP'
+            assigned_area = None
 
-            # --- NEW: CHECK CAPACITY BEFORE BOOKING ---
-            total_pax_query = Reservation.objects.filter(
-                dining_area=main_hall, 
-                date=date_str, 
-                session=session
-            ).exclude(status__in=['CANCELLED', 'NO_SHOW'])
+            # --- VIP ROOM LOGIC ---
+            if area_type_request == 'VIP':
+                # Find all active VIP rooms big enough for the pax, ordered by smallest to largest
+                suitable_vip_rooms = DiningArea.objects.filter(
+                    area_type='VIP', 
+                    capacity__gte=pax, 
+                    is_active=True
+                ).order_by('capacity')
 
-            current_pax = total_pax_query.aggregate(Sum('pax'))['pax__sum'] or 0
-            
-            if (current_pax + pax) > main_hall.capacity:
-                seats_left = main_hall.capacity - current_pax
-                if seats_left <= 0:
-                    msg = f"Sorry! We are fully booked for {session} on {date_str}. Please try another date."
-                else:
-                    msg = f"Sorry! We only have {seats_left} seats left for {session} on {date_str}. Please adjust your guest count."
+                if not suitable_vip_rooms.exists():
+                    msg = f"Sorry! We don't have a VIP room large enough for {pax} guests."
+                    return Response({"messages": [{"text": msg}]}, status=200)
+
+                # Check which of these suitable rooms are available on this date/session
+                for room in suitable_vip_rooms:
+                    is_booked = Reservation.objects.filter(
+                        dining_area=room, date=date_str, session=session
+                    ).exclude(status__in=['CANCELLED', 'NO_SHOW']).exists()
+                    
+                    if not is_booked:
+                        assigned_area = room
+                        break # Found an available room!
+
+                if not assigned_area:
+                    msg = f"Sorry! All our VIP rooms are booked for {session} on {date_str}. Please try another date or the Main Hall."
+                    return Response({"messages": [{"text": msg}]}, status=200)
+
+            # --- MAIN HALL LOGIC ---
+            else:
+                assigned_area = DiningArea.objects.filter(area_type='HALL', is_active=True).first()
+                if not assigned_area:
+                    return Response({"messages": [{"text": "Sorry, online booking is currently disabled."}]}, status=200)
+
+                total_pax_query = Reservation.objects.filter(
+                    dining_area=assigned_area, date=date_str, session=session
+                ).exclude(status__in=['CANCELLED', 'NO_SHOW'])
+                current_pax = total_pax_query.aggregate(Sum('pax'))['pax__sum'] or 0
                 
-                return Response({"success": False, "bot_reply": msg}, status=200)
-            # ------------------------------------------
+                if (current_pax + pax) > assigned_area.capacity:
+                    seats_left = assigned_area.capacity - current_pax
+                    msg = f"Sorry! We only have {seats_left} seats left in the Main Hall for {session} on {date_str}."
+                    return Response({"messages": [{"text": msg}]}, status=200)
 
-            # Create the Reservation
+            # --- CREATE RESERVATION ---
             reservation = Reservation.objects.create(
                 customer_name=name, customer_contact=contact, date=date_str,
-                session=session, time=time_str, pax=pax, dining_area=main_hall,
+                session=session, time=time_str, pax=pax, dining_area=assigned_area,
                 source='SOCIAL', status='PENDING' 
             )
 
@@ -1111,13 +1140,14 @@ class ChatbotBookingWebhook(APIView):
             from .tasks import send_new_booking_notifications
             send_new_booking_notifications.delay(reservation.id)
 
-            return Response({
-                "success": True,
-                "bot_reply": f"Success! 🎉 Your table for {pax} on {date_str} at {time_str} is reserved under {name}. Ref: #{reservation.id}"
-            }, status=200)
+            # Format the success message dynamically
+            room_display = f"the {assigned_area.name}" if area_type_request == 'VIP' else "the Main Dining Hall"
+            success_msg = f"Success! 🎉 Your table for {pax} on {date_str} at {time_str} in {room_display} is reserved under {name}. Ref: #{reservation.id}"
+            
+            return Response({"messages": [{"text": success_msg}]}, status=200)
 
         except Exception as e:
-            return Response({"success": False, "bot_reply": "Sorry, an error occurred with the date/time format. Please try again."}, status=200)
+            return Response({"messages": [{"text": "Sorry, an error occurred with the date/time format. Please try again."}]}, status=200)
 
 import requests
 import os
@@ -7337,7 +7367,10 @@ jobs:
           echo "🔄 Restarting Services..."
           echo "${{ secrets.SUDO_PASSWORD }}" | sudo -S systemctl restart gunicorn
           
-          echo "✅ Deployment Complete! Site is live."
+          # Restart Celery safely via systemd
+          echo "${{ secrets.SUDO_PASSWORD }}" | sudo -S systemctl restart celery
+          
+          echo "✅ Deployment Complete! Site and Workers are live."
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';

@@ -217,54 +217,67 @@ class ChatbotBookingWebhook(APIView):
             name = data.get('name')
             contact = data.get('contact')
             date_str = data.get('date') 
-            time_str = data.get('time') 
             pax = int(data.get('pax', 2))
-            
-            hour = int(time_str.split(':')[0])
-            session = 'LUNCH' if hour < 15 else 'DINNER'
+            session = data.get('session', 'LUNCH')
+            area_type_request = data.get('area_type', 'HALL')
 
-            main_hall = DiningArea.objects.filter(area_type='HALL', is_active=True).first()
-            if not main_hall:
-                return Response({"messages": [{"text": "Sorry, online booking is currently disabled."}]}, status=200)
+            # LOGIC: Use time from bot, or default based on session
+            time_str = data.get('time')
+            if not time_str:
+                time_str = "11:00:00" if session == 'LUNCH' else "17:30:00"
 
-            # --- CHECK CAPACITY ---
-            total_pax_query = Reservation.objects.filter(
-                dining_area=main_hall, 
-                date=date_str, 
-                session=session
-            ).exclude(status__in=['CANCELLED', 'NO_SHOW'])
+            assigned_area = None
 
-            current_pax = total_pax_query.aggregate(Sum('pax'))['pax__sum'] or 0
-            
-            if (current_pax + pax) > main_hall.capacity:
-                seats_left = main_hall.capacity - current_pax
-                if seats_left <= 0:
-                    msg = f"Sorry! We are fully booked for {session} on {date_str}. Please try another date."
-                else:
-                    msg = f"Sorry! We only have {seats_left} seats left for {session} on {date_str}. Please adjust your guest count."
+            # --- VIP ROOM LOGIC ---
+            if area_type_request == 'VIP':
+                suitable_vip_rooms = DiningArea.objects.filter(
+                    area_type='VIP', 
+                    capacity__gte=pax, 
+                    is_active=True
+                ).order_by('capacity')
+
+                for room in suitable_vip_rooms:
+                    is_booked = Reservation.objects.filter(
+                        dining_area=room, date=date_str, session=session
+                    ).exclude(status__in=['CANCELLED', 'NO_SHOW']).exists()
+                    
+                    if not is_booked:
+                        assigned_area = room
+                        break
+
+                if not assigned_area:
+                    return Response({"messages": [{"text": f"Sorry! All VIP rooms are booked for {session} on {date_str}."}]}, status=200)
+
+            # --- MAIN HALL LOGIC ---
+            else:
+                assigned_area = DiningArea.objects.filter(area_type='HALL', is_active=True).first()
+                if not assigned_area:
+                    return Response({"messages": [{"text": "Sorry, online booking is currently disabled."}]}, status=200)
+
+                total_pax = Reservation.objects.filter(
+                    dining_area=assigned_area, date=date_str, session=session
+                ).exclude(status__in=['CANCELLED', 'NO_SHOW']).aggregate(Sum('pax'))['pax__sum'] or 0
                 
-                return Response({"messages": [{"text": msg}]}, status=200)
-            # ----------------------
+                if (total_pax + pax) > assigned_area.capacity:
+                    return Response({"messages": [{"text": f"Sorry! The Main Hall is full for {session} on {date_str}."}]}, status=200)
 
-            # Create the Reservation
+            # --- CREATE RESERVATION ---
             reservation = Reservation.objects.create(
                 customer_name=name, customer_contact=contact, date=date_str,
-                session=session, time=time_str, pax=pax, dining_area=main_hall,
+                session=session, time=time_str, pax=pax, dining_area=assigned_area,
                 source='SOCIAL', status='PENDING' 
             )
 
-            # Trigger Celery notifications
             from .tasks import send_new_booking_notifications
             send_new_booking_notifications.delay(reservation.id)
 
-            success_msg = f"Success! 🎉 Your table for {pax} on {date_str} at {time_str} is reserved under {name}. Ref: #{reservation.id}"
+            room_display = f"the {assigned_area.name}" if area_type_request == 'VIP' else "the Main Dining Hall"
+            # Format time for the reply message (HH:MM AM/PM)
+            display_time = "11:00 AM" if session == 'LUNCH' else "5:30 PM"
             
-            # THE MAGIC FORMAT AHACHAT READS AUTOMATICALLY
-            return Response({
-                "messages": [
-                    {"text": success_msg}
-                ]
-            }, status=200)
+            success_msg = f"Success! 🎉 Your table for {pax} on {date_str} at {display_time} in {room_display} is reserved under {name}. Ref: #{reservation.id}"
+            
+            return Response({"messages": [{"text": success_msg}]}, status=200)
 
         except Exception as e:
-            return Response({"messages": [{"text": "Sorry, an error occurred with the date/time format. Please try again."}]}, status=200)
+            return Response({"messages": [{"text": "Something went wrong. Please try again or call us at (02) 8804-0332."}]}, status=200)
