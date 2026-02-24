@@ -50,10 +50,7 @@ jobs:
           echo "🔄 Restarting Services..."
           echo "${{ secrets.SUDO_PASSWORD }}" | sudo -S systemctl restart gunicorn
           
-          # Nuke existing background celery workers and restart
-          pkill -f celery || true
-          cd ~/goldenbay/backend
-          source ../env/bin/activate
-          nohup celery -A goldenbay worker -l info > celery.log 2>&1 &
+          # Restart Celery safely via systemd
+          echo "${{ secrets.SUDO_PASSWORD }}" | sudo -S systemctl restart celery
           
           echo "✅ Deployment Complete! Site and Workers are live."
