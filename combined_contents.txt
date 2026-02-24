@@ -880,10 +880,11 @@ class ReservationCreateView(generics.CreateAPIView):
         # 1. Save data to DB first
         # FIX: Removed `_history_user=user`. The middleware handles history tracking automatically.
         reservation = serializer.save(encoded_by=user)
-        
+        send_sms_flag = str(self.request.data.get('send_sms', 'true')).lower() == 'true'
         # 2. Fire notifications ASYNCHRONOUSLY
         try:
-            send_new_booking_notifications.delay(reservation.id)
+            # 2. Pass flag to celery
+            send_new_booking_notifications.delay(reservation.id, send_sms_flag) 
         except Exception as e:
             print(f"Warning: Could not queue celery task: {e}")
 
@@ -951,6 +952,7 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
             if not (request.user.is_superuser or request.user.groups.filter(name__in=['Supervisor', 'Admin']).exists()):
                  raise PermissionDenied("Only Supervisors and Admins can reopen finalized bookings.")
             
+        send_sms_flag = str(request.data.get('send_sms', 'true')).lower() == 'true'    
         # 2. Perform the save (this automatically runs your collision validations)
         response = super().update(request, *args, **kwargs)
 
@@ -975,20 +977,20 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
                 try:
                     # Trigger Post-Dining Feedback (Wait 7200 seconds / 2 Hours)
                     from .tasks import send_post_dining_feedback
-                    send_post_dining_feedback.apply_async((reservation.id,), countdown=7200)
+                    send_post_dining_feedback.apply_async((reservation.id, send_sms_flag), countdown=7200)
                 except Exception as e:
                     print(f"Warning: Could not queue celery task: {e}")
                 
             elif status_changed and reservation.status in ['CONFIRMED', 'CANCELLED']:
                 try:
-                    send_status_update_notifications.delay(reservation.id, reservation.status)
+                    send_status_update_notifications.delay(reservation.id, reservation.status, send_sms_flag)
                 except Exception as e:
                     print(f"Warning: Could not queue celery task: {e}")
             
             elif details_changed and reservation.status != 'CANCELLED':
                 try:
                     from .tasks import send_booking_modification_notifications
-                    send_booking_modification_notifications.delay(reservation.id)
+                    send_booking_modification_notifications.delay(reservation.id, send_sms_flag)
                 except Exception as e:
                     print(f"Warning: Could not queue celery task: {e}")
                 
@@ -1125,7 +1127,7 @@ from .utils import send_sms
 from .models import Reservation 
 
 @shared_task
-def send_new_booking_notifications(reservation_id):
+def send_new_booking_notifications(reservation_id, send_sms_flag=True):
     """ ASYNCHRONOUS: Fired by Celery when a NEW booking is created """
     try:
         reservation = Reservation.objects.get(id=reservation_id)
@@ -1155,10 +1157,9 @@ def send_new_booking_notifications(reservation_id):
         )
 
         admin_numbers_env = os.getenv('ADMIN_PHONE_NUMBERS')
-        if admin_numbers_env:
+        if admin_numbers_env and send_sms_flag:  # <--- ADDED FLAG
             admin_numbers = [num.strip() for num in admin_numbers_env.split(',') if num.strip()]
             admin_sms_body = f"New Booking: {reservation.customer_name} ({reservation.pax} pax) for {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')}. Area: {area_name}. Check Dashboard."
-            
             for num in admin_numbers:
                 send_sms(num, admin_sms_body)
 
@@ -1186,7 +1187,7 @@ def send_new_booking_notifications(reservation_id):
             )
 
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
-        if len(contact_digits) >= 10:
+        if len(contact_digits) >= 10 and send_sms_flag:  # <--- ADDED FLAG
              sms_body = f"Hi {reservation.customer_name}, we received your booking request for {reservation.pax} pax on {reservation.date.strftime('%b %d')}. Our team is reviewing availability and will confirm during operating hours. - GOLDENBAY"
              send_sms(reservation.customer_contact, sms_body)
 
@@ -1194,7 +1195,7 @@ def send_new_booking_notifications(reservation_id):
         print(f"Celery Task Error (New Booking): {e}")
 
 @shared_task
-def send_status_update_notifications(reservation_id, new_status):
+def send_status_update_notifications(reservation_id, new_status, send_sms_flag=True):
     """ ASYNCHRONOUS: Fired by Celery when an ADMIN confirms or cancels a booking """
     try:
         reservation = Reservation.objects.get(id=reservation_id)
@@ -1224,7 +1225,7 @@ def send_status_update_notifications(reservation_id, new_status):
             )
             
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
-        if len(contact_digits) >= 10:
+        if len(contact_digits) >= 10 and send_sms_flag:
              if new_status == 'CONFIRMED':
                  sms_body = f"Great news, {reservation.customer_name}! Your table for {reservation.pax} on {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')} is CONFIRMED. See you soon! - GOLDENBAY"
                  send_sms(reservation.customer_contact, sms_body)
@@ -1236,7 +1237,7 @@ def send_status_update_notifications(reservation_id, new_status):
         print(f"Celery Task Error (Status Update): {e}")
 
 @shared_task
-def send_booking_modification_notifications(reservation_id):
+def send_booking_modification_notifications(reservation_id, send_sms_flag=True):
     """ ASYNCHRONOUS: Fired when an admin edits a booking's room, date, or time """
     try:
         reservation = Reservation.objects.get(id=reservation_id)
@@ -1267,7 +1268,7 @@ def send_booking_modification_notifications(reservation_id):
             
         # 2. SEND SMS
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
-        if len(contact_digits) >= 10:
+        if len(contact_digits) >= 10 and send_sms_flag:
              sms_body = f"Hi {reservation.customer_name}, your Golden Bay reservation has been UPDATED. You are now booked for {reservation.pax} pax on {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')} in the {area_name}. - GOLDENBAY"
              send_sms(reservation.customer_contact, sms_body)
 
@@ -1275,7 +1276,7 @@ def send_booking_modification_notifications(reservation_id):
         print(f"Celery Task Error (Modification): {e}")
 
 @shared_task
-def send_post_dining_feedback(reservation_id):
+def send_post_dining_feedback(reservation_id, send_sms_flag=True):
     """ ASYNCHRONOUS: Fired 2 hours after a reservation is marked COMPLETED """
     try:
         reservation = Reservation.objects.get(id=reservation_id)
@@ -1288,7 +1289,7 @@ def send_post_dining_feedback(reservation_id):
         
         # 1. SEND SMS
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
-        if len(contact_digits) >= 10:
+        if len(contact_digits) >= 10 and send_sms_flag:
              sms_body = f"Hi {reservation.customer_name}, thank you for dining at Golden Bay today! We hope you enjoyed your meal. If you have a moment, we'd love your feedback: {review_link} - GOLDENBAY"
              send_sms(reservation.customer_contact, sms_body)
 

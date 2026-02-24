@@ -8,7 +8,7 @@ from .utils import send_sms
 from .models import Reservation 
 
 @shared_task
-def send_new_booking_notifications(reservation_id):
+def send_new_booking_notifications(reservation_id, send_sms_flag=True):
     """ ASYNCHRONOUS: Fired by Celery when a NEW booking is created """
     try:
         reservation = Reservation.objects.get(id=reservation_id)
@@ -38,10 +38,9 @@ def send_new_booking_notifications(reservation_id):
         )
 
         admin_numbers_env = os.getenv('ADMIN_PHONE_NUMBERS')
-        if admin_numbers_env:
+        if admin_numbers_env and send_sms_flag:  # <--- ADDED FLAG
             admin_numbers = [num.strip() for num in admin_numbers_env.split(',') if num.strip()]
             admin_sms_body = f"New Booking: {reservation.customer_name} ({reservation.pax} pax) for {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')}. Area: {area_name}. Check Dashboard."
-            
             for num in admin_numbers:
                 send_sms(num, admin_sms_body)
 
@@ -69,7 +68,7 @@ def send_new_booking_notifications(reservation_id):
             )
 
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
-        if len(contact_digits) >= 10:
+        if len(contact_digits) >= 10 and send_sms_flag:  # <--- ADDED FLAG
              sms_body = f"Hi {reservation.customer_name}, we received your booking request for {reservation.pax} pax on {reservation.date.strftime('%b %d')}. Our team is reviewing availability and will confirm during operating hours. - GOLDENBAY"
              send_sms(reservation.customer_contact, sms_body)
 
@@ -77,7 +76,7 @@ def send_new_booking_notifications(reservation_id):
         print(f"Celery Task Error (New Booking): {e}")
 
 @shared_task
-def send_status_update_notifications(reservation_id, new_status):
+def send_status_update_notifications(reservation_id, new_status, send_sms_flag=True):
     """ ASYNCHRONOUS: Fired by Celery when an ADMIN confirms or cancels a booking """
     try:
         reservation = Reservation.objects.get(id=reservation_id)
@@ -107,7 +106,7 @@ def send_status_update_notifications(reservation_id, new_status):
             )
             
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
-        if len(contact_digits) >= 10:
+        if len(contact_digits) >= 10 and send_sms_flag:
              if new_status == 'CONFIRMED':
                  sms_body = f"Great news, {reservation.customer_name}! Your table for {reservation.pax} on {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')} is CONFIRMED. See you soon! - GOLDENBAY"
                  send_sms(reservation.customer_contact, sms_body)
@@ -119,7 +118,7 @@ def send_status_update_notifications(reservation_id, new_status):
         print(f"Celery Task Error (Status Update): {e}")
 
 @shared_task
-def send_booking_modification_notifications(reservation_id):
+def send_booking_modification_notifications(reservation_id, send_sms_flag=True):
     """ ASYNCHRONOUS: Fired when an admin edits a booking's room, date, or time """
     try:
         reservation = Reservation.objects.get(id=reservation_id)
@@ -150,7 +149,7 @@ def send_booking_modification_notifications(reservation_id):
             
         # 2. SEND SMS
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
-        if len(contact_digits) >= 10:
+        if len(contact_digits) >= 10 and send_sms_flag:
              sms_body = f"Hi {reservation.customer_name}, your Golden Bay reservation has been UPDATED. You are now booked for {reservation.pax} pax on {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')} in the {area_name}. - GOLDENBAY"
              send_sms(reservation.customer_contact, sms_body)
 
@@ -158,7 +157,7 @@ def send_booking_modification_notifications(reservation_id):
         print(f"Celery Task Error (Modification): {e}")
 
 @shared_task
-def send_post_dining_feedback(reservation_id):
+def send_post_dining_feedback(reservation_id, send_sms_flag=True):
     """ ASYNCHRONOUS: Fired 2 hours after a reservation is marked COMPLETED """
     try:
         reservation = Reservation.objects.get(id=reservation_id)
@@ -171,7 +170,7 @@ def send_post_dining_feedback(reservation_id):
         
         # 1. SEND SMS
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
-        if len(contact_digits) >= 10:
+        if len(contact_digits) >= 10 and send_sms_flag:
              sms_body = f"Hi {reservation.customer_name}, thank you for dining at Golden Bay today! We hope you enjoyed your meal. If you have a moment, we'd love your feedback: {review_link} - GOLDENBAY"
              send_sms(reservation.customer_contact, sms_body)
 

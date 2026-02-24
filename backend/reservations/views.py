@@ -62,10 +62,11 @@ class ReservationCreateView(generics.CreateAPIView):
         # 1. Save data to DB first
         # FIX: Removed `_history_user=user`. The middleware handles history tracking automatically.
         reservation = serializer.save(encoded_by=user)
-        
+        send_sms_flag = str(self.request.data.get('send_sms', 'true')).lower() == 'true'
         # 2. Fire notifications ASYNCHRONOUSLY
         try:
-            send_new_booking_notifications.delay(reservation.id)
+            # 2. Pass flag to celery
+            send_new_booking_notifications.delay(reservation.id, send_sms_flag) 
         except Exception as e:
             print(f"Warning: Could not queue celery task: {e}")
 
@@ -133,6 +134,7 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
             if not (request.user.is_superuser or request.user.groups.filter(name__in=['Supervisor', 'Admin']).exists()):
                  raise PermissionDenied("Only Supervisors and Admins can reopen finalized bookings.")
             
+        send_sms_flag = str(request.data.get('send_sms', 'true')).lower() == 'true'    
         # 2. Perform the save (this automatically runs your collision validations)
         response = super().update(request, *args, **kwargs)
 
@@ -157,20 +159,20 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
                 try:
                     # Trigger Post-Dining Feedback (Wait 7200 seconds / 2 Hours)
                     from .tasks import send_post_dining_feedback
-                    send_post_dining_feedback.apply_async((reservation.id,), countdown=7200)
+                    send_post_dining_feedback.apply_async((reservation.id, send_sms_flag), countdown=7200)
                 except Exception as e:
                     print(f"Warning: Could not queue celery task: {e}")
                 
             elif status_changed and reservation.status in ['CONFIRMED', 'CANCELLED']:
                 try:
-                    send_status_update_notifications.delay(reservation.id, reservation.status)
+                    send_status_update_notifications.delay(reservation.id, reservation.status, send_sms_flag)
                 except Exception as e:
                     print(f"Warning: Could not queue celery task: {e}")
             
             elif details_changed and reservation.status != 'CANCELLED':
                 try:
                     from .tasks import send_booking_modification_notifications
-                    send_booking_modification_notifications.delay(reservation.id)
+                    send_booking_modification_notifications.delay(reservation.id, send_sms_flag)
                 except Exception as e:
                     print(f"Warning: Could not queue celery task: {e}")
                 

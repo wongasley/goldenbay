@@ -1,7 +1,15 @@
 import requests
 import os
+from core.models import SystemSetting
 
 def send_sms(to_number, body):
+    # --- CHECK THE GLOBAL SWITCH FIRST ---
+    settings = SystemSetting.load()
+    if not settings.enable_sms_notifications:
+        print(f"🛑 SMS DISABLED BY ADMIN: Would have sent to {to_number} -> {body}")
+        return {"status": "disabled", "message": "SMS globally disabled in Admin"}
+    # -------------------------------------
+    
     api_key = os.getenv('SEMAPHORE_API_KEY')
     if not api_key:
         print(f"⚠️ SMS LOG (No API Key): To {to_number} - {body}")
