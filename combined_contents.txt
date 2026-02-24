@@ -307,7 +307,15 @@ def debug_task(self):
     print(f'Request: {self.request!r}')
 
 from django.contrib import admin
+from .models import SystemSetting
 
+@admin.register(SystemSetting)
+class SystemSettingAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'enable_sms_notifications')
+    
+    # This removes the "Add" button if the settings row already exists
+    def has_add_permission(self, request):
+        return not SystemSetting.objects.exists()
 
 from django.apps import AppConfig
 
@@ -317,6 +325,33 @@ class ApiConfig(AppConfig):
 
 
 from django.db import models
+
+class SystemSetting(models.Model):
+    enable_sms_notifications = models.BooleanField(
+        default=True,
+        help_text="Uncheck this to completely disable all SMS sending globally (useful for testing)."
+    )
+
+    def save(self, *args, **kwargs):
+        # Forces this model to only ever have ONE row (ID=1)
+        self.pk = 1
+        super(SystemSetting, self).save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        # Prevent accidental deletion of the settings row
+        pass
+
+    @classmethod
+    def load(cls):
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj
+
+    class Meta:
+        verbose_name = "System Setting"
+        verbose_name_plural = "System Settings"
+
+    def __str__(self):
+        return "Global System Settings"
 
 
 
@@ -1086,8 +1121,16 @@ class ChatbotBookingWebhook(APIView):
 
 import requests
 import os
+from core.models import SystemSetting
 
 def send_sms(to_number, body):
+    # --- CHECK THE GLOBAL SWITCH FIRST ---
+    settings = SystemSetting.load()
+    if not settings.enable_sms_notifications:
+        print(f"🛑 SMS DISABLED BY ADMIN: Would have sent to {to_number} -> {body}")
+        return {"status": "disabled", "message": "SMS globally disabled in Admin"}
+    # -------------------------------------
+    
     api_key = os.getenv('SEMAPHORE_API_KEY')
     if not api_key:
         print(f"⚠️ SMS LOG (No API Key): To {to_number} - {body}")
@@ -7286,6 +7329,7 @@ jobs:
           cd ../backend
           source ../env/bin/activate
           pip install -r requirements.txt
+          python manage.py makemigrations
           python manage.py migrate
           python manage.py collectstatic --noinput
           
