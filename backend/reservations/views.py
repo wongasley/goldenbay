@@ -220,23 +220,36 @@ class ChatbotBookingWebhook(APIView):
             pax = int(data.get('pax', 2))
             session = data.get('session', 'LUNCH')
             area_type_request = data.get('area_type', 'HALL')
-
-            # LOGIC: Use time from bot, or default based on session
+            
+            # Smart Time Assignment
             time_str = data.get('time')
             if not time_str:
                 time_str = "11:00:00" if session == 'LUNCH' else "17:30:00"
 
             assigned_area = None
+            transfer_notice = ""
 
-            # --- VIP ROOM LOGIC ---
+            # --- 1. VIP ROOM LOGIC WITH STRICT PAX BRACKETS ---
             if area_type_request == 'VIP':
-                suitable_vip_rooms = DiningArea.objects.filter(
-                    area_type='VIP', 
-                    capacity__gte=pax, 
-                    is_active=True
-                ).order_by('capacity')
+                suitable_rooms_query = DiningArea.objects.filter(area_type='VIP', is_active=True)
 
-                for room in suitable_vip_rooms:
+                if pax <= 8:
+                    suitable_rooms_query = suitable_rooms_query.filter(name__in=['VIP Room 2', 'VIP Room 3', 'VIP Room 5', 'VIP Room 7', 'VIP Room 8'])
+                elif 8 < pax <= 12:
+                    suitable_rooms_query = suitable_rooms_query.filter(name__in=['VIP Room 11', 'VIP Room 12', 'VIP Room 15'])
+                elif 12 < pax <= 18:
+                    suitable_rooms_query = suitable_rooms_query.filter(name='VIP Room 10')
+                elif 18 < pax <= 20:
+                    suitable_rooms_query = suitable_rooms_query.filter(name__in=['VIP Room 1', 'VIP Room 9'])
+                elif 20 < pax <= 24:
+                    suitable_rooms_query = suitable_rooms_query.filter(name='VIP Room 6')
+                elif 24 < pax <= 60:
+                    suitable_rooms_query = suitable_rooms_query.filter(name='MANILA VIP Room')
+                else:
+                    return Response({"messages": [{"text": f"Sorry! We don't have a single VIP room large enough for {pax} guests. Please call us at (02) 8804-0332 for banquet options."}]}, status=200)
+
+                # Check which of these specific rooms are free
+                for room in suitable_rooms_query.order_by('capacity'):
                     is_booked = Reservation.objects.filter(
                         dining_area=room, date=date_str, session=session
                     ).exclude(status__in=['CANCELLED', 'NO_SHOW']).exists()
@@ -245,23 +258,44 @@ class ChatbotBookingWebhook(APIView):
                         assigned_area = room
                         break
 
+                # FALLBACK: If VIP tier is full, try the Main Hall
                 if not assigned_area:
-                    return Response({"messages": [{"text": f"Sorry! All VIP rooms are booked for {session} on {date_str}."}]}, status=200)
+                    main_hall = DiningArea.objects.filter(area_type='HALL', is_active=True).first()
+                    if main_hall:
+                        total_pax = Reservation.objects.filter(
+                            dining_area=main_hall, date=date_str, session=session
+                        ).exclude(status__in=['CANCELLED', 'NO_SHOW']).aggregate(Sum('pax'))['pax__sum'] or 0
+                        
+                        if (total_pax + pax) <= main_hall.capacity:
+                            assigned_area = main_hall
+                            transfer_notice = "Note: Our VIP rooms for your guest count are fully booked, so we have secured a table for you in our Main Dining Hall instead. ✨\n\n"
 
-            # --- MAIN HALL LOGIC ---
+            # --- 2. MAIN HALL LOGIC (Direct request or fallback) ---
             else:
                 assigned_area = DiningArea.objects.filter(area_type='HALL', is_active=True).first()
-                if not assigned_area:
-                    return Response({"messages": [{"text": "Sorry, online booking is currently disabled."}]}, status=200)
+                if assigned_area:
+                    total_pax = Reservation.objects.filter(
+                        dining_area=assigned_area, date=date_str, session=session
+                    ).exclude(status__in=['CANCELLED', 'NO_SHOW']).aggregate(Sum('pax'))['pax__sum'] or 0
+                    
+                    if (total_pax + pax) > assigned_area.capacity:
+                        assigned_area = None # Mark as full
 
-                total_pax = Reservation.objects.filter(
-                    dining_area=assigned_area, date=date_str, session=session
-                ).exclude(status__in=['CANCELLED', 'NO_SHOW']).aggregate(Sum('pax'))['pax__sum'] or 0
-                
-                if (total_pax + pax) > assigned_area.capacity:
-                    return Response({"messages": [{"text": f"Sorry! The Main Hall is full for {session} on {date_str}."}]}, status=200)
+            # --- 3. FULLY BOOKED RESPONSE ---
+            if not assigned_area:
+                return Response({
+                    "messages": [
+                        {
+                            "text": f"We are sorry! We are fully booked for {session} on {date_str}. Would you like to check another date?",
+                            "quick_replies": [
+                                {"content_type": "text", "title": "Check Another Date", "payload": "RESTART"},
+                                {"content_type": "text", "title": "View Menu", "payload": "MENU"}
+                            ]
+                        }
+                    ]
+                }, status=200)
 
-            # --- CREATE RESERVATION ---
+            # --- 4. CREATE RESERVATION ---
             reservation = Reservation.objects.create(
                 customer_name=name, customer_contact=contact, date=date_str,
                 session=session, time=time_str, pax=pax, dining_area=assigned_area,
@@ -271,11 +305,8 @@ class ChatbotBookingWebhook(APIView):
             from .tasks import send_new_booking_notifications
             send_new_booking_notifications.delay(reservation.id)
 
-            room_display = f"the {assigned_area.name}" if area_type_request == 'VIP' else "the Main Dining Hall"
-            # Format time for the reply message (HH:MM AM/PM)
             display_time = "11:00 AM" if session == 'LUNCH' else "5:30 PM"
-            
-            success_msg = f"Success! 🎉 Your table for {pax} on {date_str} at {display_time} in {room_display} is reserved under {name}. Ref: #{reservation.id}"
+            success_msg = f"{transfer_notice}Success! 🎉 Your table for {pax} on {date_str} at {display_time} in {assigned_area.name} is reserved. Ref: #{reservation.id}"
             
             return Response({"messages": [{"text": success_msg}]}, status=200)
 
