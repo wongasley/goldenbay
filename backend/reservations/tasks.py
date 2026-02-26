@@ -10,19 +10,11 @@ from .models import Reservation
 @shared_task
 def send_new_booking_notifications(reservation_id, send_sms_flag=True):
     """ ASYNCHRONOUS: Fired by Celery when a NEW booking is created """
-    
-    # Safely fetch the reservation first
     try:
         reservation = Reservation.objects.get(id=reservation_id)
         area_name = reservation.dining_area.name if reservation.dining_area else "Main Dining Hall"
-    except Exception as e:
-        print(f"Celery Task Error: Could not find Reservation {reservation_id}: {e}")
-        return
-
-    # ---------------------------------------------------------
-    # 1. NOTIFY THE RESTAURANT ADMINS (EMAIL)
-    # ---------------------------------------------------------
-    try:
+        
+        # 1. NOTIFY THE RESTAURANT ADMINS
         admin_context = {
             'name': reservation.customer_name,
             'contact': reservation.customer_contact,
@@ -34,36 +26,26 @@ def send_new_booking_notifications(reservation_id, send_sms_flag=True):
             'id': reservation.id
         }
         admin_html = render_to_string('emails/admin_notification.html', admin_context)
+        admin_plain = strip_tags(admin_html)
         
         send_mail(
             subject=f'New Booking Request: {reservation.customer_name}',
-            message=strip_tags(admin_html),
+            message=admin_plain,
             from_email=settings.EMAIL_HOST_USER,
             recipient_list=['marketing@goldenbay.com.ph'], 
             html_message=admin_html,
-            fail_silently=False, 
+            fail_silently=False,
         )
-    except Exception as e:
-        print(f"Warning: Admin Email Failed: {e}")
 
-    # ---------------------------------------------------------
-    # 2. NOTIFY THE RESTAURANT ADMINS (SMS)
-    # ---------------------------------------------------------
-    try:
         admin_numbers_env = os.getenv('ADMIN_PHONE_NUMBERS')
-        if admin_numbers_env and send_sms_flag:  
+        if admin_numbers_env and send_sms_flag:  # <--- ADDED FLAG
             admin_numbers = [num.strip() for num in admin_numbers_env.split(',') if num.strip()]
             admin_sms_body = f"New Booking: {reservation.customer_name} ({reservation.pax} pax) for {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')}. Area: {area_name}. Check Dashboard."
             for num in admin_numbers:
                 send_sms(num, admin_sms_body)
-    except Exception as e:
-         print(f"Warning: Admin SMS Failed: {e}")
 
-    # ---------------------------------------------------------
-    # 3. NOTIFY THE CUSTOMER (EMAIL)
-    # ---------------------------------------------------------
-    if reservation.customer_email and '@' in reservation.customer_email:
-        try:
+        # 2. NOTIFY THE CUSTOMER
+        if reservation.customer_email and '@' in reservation.customer_email:
             customer_context = {
                 'name': reservation.customer_name,
                 'status': 'PENDING',
@@ -74,28 +56,24 @@ def send_new_booking_notifications(reservation_id, send_sms_flag=True):
                 'id': reservation.id
             }
             customer_html = render_to_string('emails/confirmation.html', customer_context)
+            customer_plain = strip_tags(customer_html)
             
             send_mail(
                 subject='Reservation Request Received - Golden Bay',
-                message=strip_tags(customer_html),
+                message=customer_plain,
                 from_email=settings.EMAIL_HOST_USER,
                 recipient_list=[reservation.customer_email],
                 html_message=customer_html,
                 fail_silently=False,
             )
-        except Exception as e:
-            print(f"Warning: Customer Email Failed: {e}")
 
-    # ---------------------------------------------------------
-    # 4. NOTIFY THE CUSTOMER (SMS)
-    # ---------------------------------------------------------
-    try:
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
-        if len(contact_digits) >= 10 and send_sms_flag:  
+        if len(contact_digits) >= 10 and send_sms_flag:  # <--- ADDED FLAG
              sms_body = f"Hi {reservation.customer_name}, we received your booking request for {reservation.pax} pax on {reservation.date.strftime('%b %d')}. Our team is reviewing availability and will confirm during operating hours. - GOLDENBAY"
              send_sms(reservation.customer_contact, sms_body)
+
     except Exception as e:
-        print(f"Warning: Customer SMS Failed: {e}")
+        print(f"Celery Task Error (New Booking): {e}")
 
 @shared_task
 def send_status_update_notifications(reservation_id, new_status, send_sms_flag=True):

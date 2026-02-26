@@ -7372,7 +7372,6 @@ jobs:
           echo "🎨 Building Frontend..."
           cd frontend
           npm install --legacy-peer-deps
-          npm install react-is react-helmet-async recharts react-calendar date-fns react-quill-new react-icons --save --legacy-peer-deps
           npm run build
           
           # 4. Update Backend
@@ -7389,6 +7388,7 @@ jobs:
           echo "${{ secrets.SUDO_PASSWORD }}" | sudo -S systemctl restart gunicorn
           
           # Restart Celery safely via systemd
+          echo "${{ secrets.SUDO_PASSWORD }}" | sudo -S systemctl daemon-reload
           echo "${{ secrets.SUDO_PASSWORD }}" | sudo -S systemctl restart celery
           
           echo "✅ Deployment Complete! Site and Workers are live."
