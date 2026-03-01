@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import heroimage from '../../../assets/images/heroimage2.webp'; // Or a dedicated news banner
+import heroimage from '../../../assets/images/heroimage2.webp'; 
 import { useLanguage } from '../../../context/LanguageContext';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
@@ -35,7 +35,9 @@ const NewsPage = () => {
     const tempDiv = document.createElement("div");
     tempDiv.innerHTML = htmlContent;
     const text = tempDiv.textContent || tempDiv.innerText || "";
-    return text.length > 120 ? text.substring(0, 120) + "..." : text;
+    // FIX: Replace hidden non-breaking spaces with normal spaces to force text wrapping
+    const cleanText = text.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+    return cleanText.length > 120 ? cleanText.substring(0, 120) + "..." : cleanText;
   };
 
   return (
@@ -48,22 +50,26 @@ const NewsPage = () => {
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-cream-50"></div>
         </div>
         <div className="relative z-10 text-center">
-          <Link to="/" className="text-xs tracking-[0.4em] uppercase mb-6 text-white hover:text-gold-400 transition-colors block">← Back to Experience</Link>
-          <h1 className="text-5xl md:text-5xl font-serif tracking-widest uppercase text-white drop-shadow-md">News & Promos</h1>
+          <Link to="/" className={`text-xs tracking-[0.4em] uppercase mb-6 text-white hover:text-gold-400 transition-colors block ${getFontClass()}`}>
+            {t('home.back')}
+          </Link>
+          <h1 className={`text-5xl md:text-5xl font-serif tracking-widest uppercase text-white drop-shadow-md ${getFontClass()}`}>
+            {t('nav.news')}
+          </h1>
           <div className="h-[1px] w-24 bg-gold-400 mt-8 mx-auto"></div>
         </div>
       </div>
 
       <div className="px-6 md:px-24 py-16">
-        {/* Filter Tabs */}
-        <div className="flex justify-center gap-8 text-xs uppercase tracking-widest text-gray-500 mb-16">
+        {/* Filter Tabs - NOW USING TRANSLATIONS */}
+        <div className={`flex justify-center gap-8 text-xs uppercase tracking-widest text-gray-500 mb-16 ${getFontClass()}`}>
             <button 
                 onClick={() => setFilter('ALL')} 
                 className={filter === 'ALL' 
                     ? 'text-black border-b border-gold-600 font-bold' 
                     : 'hover:text-gold-600'}
             >
-                All Updates
+                {t('marketing.all')}
             </button>
             <button 
                 onClick={() => setFilter('PROMO')} 
@@ -71,7 +77,7 @@ const NewsPage = () => {
                     ? 'text-black border-b border-gold-600 font-bold' 
                     : 'hover:text-gold-600'}
             >
-                Promotions
+                {t('marketing.promo')}
             </button>
             <button 
                 onClick={() => setFilter('BLOG')} 
@@ -79,7 +85,7 @@ const NewsPage = () => {
                     ? 'text-black border-b border-gold-600 font-bold' 
                     : 'hover:text-gold-600'}
             >
-                Events & Stories
+                {t('marketing.blog')}
             </button>
         </div>
 
@@ -103,8 +109,9 @@ const NewsPage = () => {
                     <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400">No Image</div>
                     )}
                     
-                    <div className="absolute top-4 left-4 bg-white/90 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-gold-600 border border-gold-600/30 backdrop-blur-sm">
-                        {post.type === 'PROMO' ? 'Limited Offer' : 'Event'}
+                    {/* Badge NOW USING TRANSLATIONS */}
+                    <div className={`absolute top-4 left-4 bg-white/90 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-gold-600 border border-gold-600/30 backdrop-blur-sm ${getFontClass()}`}>
+                        {post.type === 'PROMO' ? t('marketing.limited') : t('marketing.event')}
                     </div>
                 </Link>
 
@@ -115,20 +122,22 @@ const NewsPage = () => {
                     </div>
 
                     <Link to={`/news/${post.slug}`} className="block mb-3">
-                        <h3 className={`text-xl font-serif text-gray-900 group-hover:text-gold-600 transition-colors ${getFontClass()}`}>
+                        {/* Added break-words to title */}
+                        <h3 className={`text-xl font-serif text-gray-900 group-hover:text-gold-600 transition-colors break-words ${getFontClass()}`}>
                             {getLocData(post, 'title')}
                         </h3>
                     </Link>
 
-                    <p className={`text-gray-600 text-sm leading-relaxed mb-6 flex-grow ${getFontClass()}`}>
+                    {/* FIX: Added line-clamp-3 and break-words to perfectly contain the text */}
+                    <p className={`text-gray-600 text-sm leading-relaxed mb-6 flex-grow break-words line-clamp-3 overflow-hidden ${getFontClass()}`}>
                         {getExcerpt(getLocData(post, 'content'))}
                     </p>
 
                     <Link 
                         to={`/news/${post.slug}`} 
-                        className="inline-block text-xs font-bold uppercase tracking-widest text-gold-600 border-b border-gold-600/30 pb-1 hover:text-black transition-all w-max"
+                        className={`inline-block text-xs font-bold uppercase tracking-widest text-gold-600 border-b border-gold-600/30 pb-1 hover:text-black transition-all w-max ${getFontClass()}`}
                     >
-                        Read More
+                        {t('marketing.readMore')}
                     </Link>
                 </div>
             </motion.div>
