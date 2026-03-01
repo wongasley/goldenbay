@@ -1939,12 +1939,13 @@ h2 {
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#0a0a0a" /> 
     
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RCENXX7WNK"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-C5GW1EHVWT"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-      gtag('config', 'G-RCENXX7WNK');
+
+      gtag('config', 'G-C5GW1EHVWT');
     </script>
 
     <script>
@@ -1957,11 +1958,10 @@ h2 {
       s.parentNode.insertBefore(t,s)}(window, document,'script',
       'https://connect.facebook.net/en_US/fbevents.js');
       
-      // YOUR ID IS NOW HERE
       fbq('init', '1592808188663904'); 
       fbq('track', 'PageView');
     </script>
-    </head>
+  </head>
   <body>
     <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1592808188663904&ev=PageView&noscript=1" /></noscript>
     
@@ -2838,9 +2838,8 @@ const ReservationPage = () => {
   };
 
   const availableTimeSlots = generateTimeSlots(session, date);
-  const canProceed = availableTimeSlots.length > 0; // Used to disable the NEXT button
+  const canProceed = availableTimeSlots.length > 0;
 
-  // NEW: Auto-switch session if the current one is expired for today
   useEffect(() => {
       const lunchAvail = generateTimeSlots('LUNCH', date).length > 0;
       const dinnerAvail = generateTimeSlots('DINNER', date).length > 0;
@@ -2881,11 +2880,14 @@ const ReservationPage = () => {
         if (res.ok) { 
           setSubmitStatus('success'); 
           
-          // --- PLAY SUCCESS SOUND ---
           const audio = new Audio('/audio/success.mp3');
           audio.play().catch(err => console.warn("Audio blocked by browser:", err));
 
           if (window.fbq) window.fbq('track', 'Lead');
+          
+          // --- NEW: GOOGLE ANALYTICS TRACKING ---
+          if (window.gtag) window.gtag('event', 'generate_lead', { event_category: 'Reservation', value: formData.pax });
+          
         } else { setSubmitStatus('error'); }
     } catch (error) { setSubmitStatus('error'); }
   };
@@ -2964,7 +2966,6 @@ const ReservationPage = () => {
                         <label className={`block text-xs uppercase tracking-widest text-gray-400 font-bold ${getFontClass()}`}>1. {t('footer.hours')}</label>
                         <div className="flex bg-white p-1 rounded-md border border-gray-200 shadow-sm">
                             {['LUNCH', 'DINNER'].map((s) => {
-                                // NEW: Dynamically check if this specific session has times left
                                 const isAvailable = generateTimeSlots(s, date).length > 0;
                                 
                                 return (
@@ -2996,7 +2997,6 @@ const ReservationPage = () => {
                         </div>
                     </div>
                     <div className="pt-6 space-y-4">
-                        {/* NEW: Disable NEXT button if there are no slots available for today */}
                         <button 
                             disabled={!canProceed} 
                             onClick={() => setStep(2)} 
@@ -7979,7 +7979,9 @@ const FloatingWidget = () => {
         target="_blank"
         rel="noopener noreferrer"
         onClick={() => {
-            if (window.fbq) window.fbq('track', 'Contact'); // <-- ADD THIS LINE
+            if (window.fbq) window.fbq('track', 'Contact'); 
+            // --- NEW: GOOGLE ANALYTICS TRACKING ---
+            if (window.gtag) window.gtag('event', 'click_whatsapp', { event_category: 'Contact', event_label: 'Floating Widget' }); 
         }}
         className="pointer-events-auto flex items-center justify-center w-[52px] h-[52px] md:w-14 md:h-14 bg-[#25D366] text-white rounded-full shadow-[0_8px_30px_rgba(37,211,102,0.4)] hover:scale-110 active:scale-95 transition-all duration-300 group relative"
         title="Chat with us on WhatsApp"

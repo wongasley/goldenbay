@@ -62,9 +62,8 @@ const ReservationPage = () => {
   };
 
   const availableTimeSlots = generateTimeSlots(session, date);
-  const canProceed = availableTimeSlots.length > 0; // Used to disable the NEXT button
+  const canProceed = availableTimeSlots.length > 0;
 
-  // NEW: Auto-switch session if the current one is expired for today
   useEffect(() => {
       const lunchAvail = generateTimeSlots('LUNCH', date).length > 0;
       const dinnerAvail = generateTimeSlots('DINNER', date).length > 0;
@@ -105,11 +104,14 @@ const ReservationPage = () => {
         if (res.ok) { 
           setSubmitStatus('success'); 
           
-          // --- PLAY SUCCESS SOUND ---
           const audio = new Audio('/audio/success.mp3');
           audio.play().catch(err => console.warn("Audio blocked by browser:", err));
 
           if (window.fbq) window.fbq('track', 'Lead');
+          
+          // --- NEW: GOOGLE ANALYTICS TRACKING ---
+          if (window.gtag) window.gtag('event', 'generate_lead', { event_category: 'Reservation', value: formData.pax });
+          
         } else { setSubmitStatus('error'); }
     } catch (error) { setSubmitStatus('error'); }
   };
@@ -188,7 +190,6 @@ const ReservationPage = () => {
                         <label className={`block text-xs uppercase tracking-widest text-gray-400 font-bold ${getFontClass()}`}>1. {t('footer.hours')}</label>
                         <div className="flex bg-white p-1 rounded-md border border-gray-200 shadow-sm">
                             {['LUNCH', 'DINNER'].map((s) => {
-                                // NEW: Dynamically check if this specific session has times left
                                 const isAvailable = generateTimeSlots(s, date).length > 0;
                                 
                                 return (
@@ -220,7 +221,6 @@ const ReservationPage = () => {
                         </div>
                     </div>
                     <div className="pt-6 space-y-4">
-                        {/* NEW: Disable NEXT button if there are no slots available for today */}
                         <button 
                             disabled={!canProceed} 
                             onClick={() => setStep(2)} 
