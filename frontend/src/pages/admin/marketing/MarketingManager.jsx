@@ -1,35 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Send } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
+import axiosInstance from '../../../utils/axiosInstance';
+import toast from 'react-hot-toast';
 
 const MarketingManager = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchPosts = async () => {
-    const token = localStorage.getItem('accessToken');
-    const res = await fetch(`${BACKEND_URL}/api/marketing/manage/all/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (res.ok) {
-        const data = await res.json();
-        setPosts(data);
+    try {
+      const res = await axiosInstance.get('/api/marketing/manage/all/');
+      setPosts(res.data);
+    } catch (err) {
+      toast.error("Failed to load posts.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => { fetchPosts(); }, []);
 
   const handleDelete = async (id) => {
     if(!window.confirm("Delete this post?")) return;
-    const token = localStorage.getItem('accessToken');
-    await fetch(`${BACKEND_URL}/api/marketing/manage/${id}/`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-    });
-    fetchPosts();
+    try {
+        await axiosInstance.delete(`/api/marketing/manage/${id}/`);
+        fetchPosts();
+        toast.success("Post deleted.");
+    } catch (err) {
+        toast.error("Failed to delete post.");
+    }
   };
 
   return (

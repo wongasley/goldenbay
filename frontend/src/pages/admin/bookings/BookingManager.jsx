@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { Plus, Check, X, Phone, Edit, UserCheck, Flag, CheckCircle2, Search, Filter, Users, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import ReservationForm from '../../../components/reservations/ReservationForm';
@@ -6,14 +6,13 @@ import { canCancelBooking } from '../../../utils/auth';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { format, addDays, subDays, isToday } from 'date-fns';
-
-const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
+import axiosInstance from '../../../utils/axiosInstance';
 
 const BookingManager = () => {
   const [bookings, setBookings] = useState([]);
   const [filter, setFilter] = useState('ALL'); 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDate, setSelectedDate] = useState(new Date()); // <-- NEW: Defaults to Today
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [showManualForm, setShowManualForm] = useState(false);
   
   const hasCancelPermission = canCancelBooking();
@@ -21,16 +20,33 @@ const BookingManager = () => {
   const [editRooms, setEditRooms] = useState([]);
   const [isCheckingRooms, setIsCheckingRooms] = useState(false);
   const [loading, setLoading] = useState(true);
+  const latestBookingId = useRef(null);
 
   const fetchBookings = async () => {
-    const token = localStorage.getItem('accessToken'); 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/reservations/manage/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.status === 401) window.location.href = '/login'; 
-      const data = await res.json();
-      setBookings(data);
+      const res = await axiosInstance.get('/api/reservations/manage/');
+      const fetchedBookings = res.data;
+      
+      // --- DASHBOARD NOTIFICATION LOGIC ---
+      if (fetchedBookings.length > 0) {
+        // Find the highest ID in the current fetch
+        const maxId = Math.max(...fetchedBookings.map(b => b.id));
+        
+        // If we already have a recorded maxId, and the new maxId is higher...
+        if (latestBookingId.current !== null && maxId > latestBookingId.current) {
+            // Play the alert bell
+            const bell = new Audio('/audio/bell.mp3');
+            bell.play().catch(e => console.log("Audio blocked. Staff must click the page first.", e));
+            
+            // Show a special toast
+            toast('New Booking Arrived!', { icon: '🔔', duration: 5000 });
+        }
+        
+        // Update the ref to the new highest ID
+        latestBookingId.current = maxId;
+      }
+      
+      setBookings(fetchedBookings);
     } catch (err) {
       toast.error("Failed to load reservations.");
     } finally {
@@ -47,10 +63,11 @@ const BookingManager = () => {
   const checkEditRooms = async (date, session) => {
     setIsCheckingRooms(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/reservations/check/?date=${date}&session=${session}`);
-      const data = await res.json();
-      setEditRooms(data.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })));
-    } catch (err) {}
+      const res = await axiosInstance.get(`/api/reservations/check/?date=${date}&session=${session}`);
+      setEditRooms(res.data.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })));
+    } catch (err) {
+      console.error(err);
+    }
     setIsCheckingRooms(false);
   };
 
@@ -65,23 +82,15 @@ const BookingManager = () => {
 
   const updateStatus = async (id, payload, successMsg, e) => {
     if (e) e.stopPropagation();
-    const token = localStorage.getItem('accessToken'); 
-    const updatePromise = fetch(`${BACKEND_URL}/api/reservations/manage/${id}/`, {
-        method: 'PATCH',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify(payload)
-    }).then(async (res) => {
-        if (res.status === 401) throw new Error("Unauthorized");
-        if (!res.ok) {
-            const errData = await res.json();
-            throw new Error(errData.non_field_errors ? errData.non_field_errors[0] : "Failed to update");
-        }
+    
+    const updatePromise = axiosInstance.patch(`/api/reservations/manage/${id}/`, payload)
+    .then((res) => {
         fetchBookings(); 
         setEditingBooking(null);
-        return res.json();
+        return res.data;
+    }).catch(err => {
+        const errorData = err.response?.data;
+        throw new Error(errorData?.non_field_errors ? errorData.non_field_errors[0] : "Failed to update");
     });
 
     toast.promise(updatePromise, {
@@ -91,22 +100,17 @@ const BookingManager = () => {
     });
   };
 
-  // --- REFINED FILTERING LOGIC ---
   const formattedSelectedDate = format(selectedDate, 'yyyy-MM-dd');
   const isSearching = searchQuery.trim() !== '';
 
   const filteredBookings = bookings.filter(b => {
-      // 1. If searching, ignore the date filter so we can find any customer
       const matchesSearch = isSearching ? (
           b.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
           b.customer_contact.includes(searchQuery) ||
           b.id.toString() === searchQuery
       ) : true;
 
-      // 2. Filter by Date (Only if NOT actively searching)
       const matchesDate = isSearching ? true : b.date === formattedSelectedDate;
-      
-      // 3. Status Filter
       const matchesStatus = filter === 'ALL' ? true : b.status === filter;
 
       return matchesSearch && matchesDate && matchesStatus;
@@ -149,8 +153,6 @@ const BookingManager = () => {
 
   return (
     <div className="pb-20">
-      
-      {/* INJECT CUSTOM CALENDAR STYLES */}
       <style>{`
         .react-calendar { border: none !important; width: 100% !important; font-family: 'Quicksand', sans-serif !important; background: transparent !important; }
         .react-calendar__navigation button { font-weight: bold; color: #1a1a1a; text-transform: uppercase; letter-spacing: 1px; font-size: 12px; }
@@ -163,7 +165,7 @@ const BookingManager = () => {
         .react-calendar__tile--now.react-calendar__tile--active { background-color: #D4AF37 !important; color: white !important; border: none; }
       `}</style>
 
-      {/* 1. HEADER & CONTROLS */}
+      {/* HEADER & CONTROLS */}
       <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-gray-100 pb-3 mb-4">
               <div>
@@ -181,7 +183,6 @@ const BookingManager = () => {
           </div>
 
           <div className="flex flex-col lg:flex-row justify-between gap-4">
-              {/* Status Filters */}
               <div className="flex flex-wrap gap-1.5">
                 {['ALL', 'PENDING', 'CONFIRMED', 'SEATED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'].map(f => (
                   <button 
@@ -197,7 +198,6 @@ const BookingManager = () => {
                 ))}
               </div>
 
-              {/* Search Box */}
               <div className="relative w-full lg:w-72 shrink-0">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                   <input 
@@ -217,8 +217,7 @@ const BookingManager = () => {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">
-        
-        {/* --- LEFT SIDEBAR: DESKTOP CALENDAR --- */}
+        {/* LEFT SIDEBAR: DESKTOP CALENDAR */}
         <div className="hidden lg:block w-80 shrink-0">
             <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm sticky top-24">
                 <div className="text-center border-b border-gray-100 pb-3 mb-4">
@@ -227,17 +226,15 @@ const BookingManager = () => {
                 <Calendar
                     onChange={(date) => {
                         setSelectedDate(date);
-                        setSearchQuery(''); // Clear search when date is clicked
+                        setSearchQuery('');
                     }}
                     value={selectedDate}
                 />
             </div>
         </div>
 
-        {/* --- MAIN CONTENT AREA --- */}
+        {/* MAIN CONTENT AREA */}
         <div className="flex-1 space-y-4">
-            
-            {/* MOBILE DATE NAVIGATOR */}
             <div className="lg:hidden flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
                 <button onClick={() => { setSelectedDate(subDays(selectedDate, 1)); setSearchQuery(''); }} className="p-2 hover:bg-gray-100 rounded text-gray-500 transition-colors">
                     <ChevronLeft size={20}/>
@@ -253,7 +250,6 @@ const BookingManager = () => {
                 </button>
             </div>
 
-            {/* RESULTS HEADER */}
             <div className="flex justify-between items-end pb-2">
                 <h2 className="text-lg font-serif text-gray-900">
                     {isSearching ? 'Search Results' : `Bookings for ${format(selectedDate, 'MMMM dd')}`}
@@ -263,7 +259,6 @@ const BookingManager = () => {
                 </span>
             </div>
 
-            {/* DESKTOP TABLE */}
             <div className="hidden lg:block bg-white border border-gray-200 rounded-lg overflow-visible shadow-sm">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
@@ -316,7 +311,6 @@ const BookingManager = () => {
 
                                 <td className="px-5 py-4 align-middle">
                                     <div className="flex flex-col gap-1">
-                                        {/* Highlight Date if searching globally */}
                                         {isSearching ? (
                                             <span className="text-sm font-bold text-gray-800">{b.date}</span>
                                         ) : (
@@ -466,7 +460,7 @@ const BookingManager = () => {
         </div>
       </div>
 
-      {/* --- EDIT MODAL --- */}
+      {/* EDIT MODAL */}
       {editingBooking && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
               <div className="bg-white p-0 rounded-lg shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
@@ -553,7 +547,7 @@ const BookingManager = () => {
                           </select>
                       </div>
 
-                      {/* --- AUDIT LOG BLOCK --- */}
+                      {/* AUDIT LOG BLOCK */}
                       <div className="bg-gray-50 p-4 rounded border border-gray-100 text-xs text-gray-500 font-mono space-y-2 mt-6">
                           <p className="flex justify-between items-center">
                               <span className="uppercase tracking-widest font-bold text-gray-400 text-[10px]">Source</span> 
@@ -601,7 +595,7 @@ const BookingManager = () => {
           </div>
       )}
 
-      {/* --- CREATE MANUAL MODAL --- */}
+      {/* CREATE MANUAL MODAL */}
       {showManualForm && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
               <div className="bg-white w-full max-w-2xl rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css'; 
@@ -15,9 +15,7 @@ const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.
 const ReservationPage = () => {
   const { t, getFontClass } = useLanguage();
   
-  // WIZARD STEPS: 1: Date/Experience, 2: Room, 3: Details
   const [step, setStep] = useState(1); 
-  
   const [date, setDate] = useState(new Date());
   const [session, setSession] = useState('LUNCH'); 
   const [bookingType, setBookingType] = useState('VIP'); 
@@ -29,18 +27,45 @@ const ReservationPage = () => {
   const [formData, setFormData] = useState({ name: '', contact: '', email: '', pax: 2, message: '' });
   const [submitStatus, setSubmitStatus] = useState(null); 
 
-  const generateTimeSlots = (sessionType) => {
+  // NEW: Automatically reset the selected time if they switch dates or sessions
+  useEffect(() => {
+    setSelectedTime('');
+  }, [date, session]);
+
+  // UPDATED: Dynamically filter past time slots if booking for today
+  const generateTimeSlots = (sessionType, selectedDate) => {
     const slots = [];
     const startHour = sessionType === 'LUNCH' ? 11 : 17; 
-    const endHour = sessionType === 'LUNCH' ? 14 : 21;    
+    const endHour = sessionType === 'LUNCH' ? 14 : 21;  
+    
+    const now = new Date();
+    const isToday = 
+        selectedDate.getDate() === now.getDate() &&
+        selectedDate.getMonth() === now.getMonth() &&
+        selectedDate.getFullYear() === now.getFullYear();
+
     for (let hour = startHour; hour <= endHour; hour++) {
       const displayHour = hour > 12 ? hour - 12 : hour;
       const ampm = hour >= 12 ? 'PM' : 'AM';
-      slots.push({ value: `${hour}:00:00`, label: `${displayHour}:00 ${ampm}` });
-      if (hour !== endHour) slots.push({ value: `${hour}:30:00`, label: `${displayHour}:30 ${ampm}` });
+      
+      // Top of the hour (e.g., 11:00)
+      const blockZero = isToday && hour <= now.getHours();
+      if (!blockZero) {
+        slots.push({ value: `${hour}:00:00`, label: `${displayHour}:00 ${ampm}` });
+      }
+      
+      // Bottom of the hour (e.g., 11:30)
+      if (hour !== endHour) {
+        const blockThirty = isToday && (hour < now.getHours() || (hour === now.getHours() && now.getMinutes() >= 30));
+        if (!blockThirty) {
+            slots.push({ value: `${hour}:30:00`, label: `${displayHour}:30 ${ampm}` });
+        }
+      }
     }
     return slots;
   };
+
+  const availableTimeSlots = generateTimeSlots(session, date);
 
   useEffect(() => {
     const fetchAvailability = async () => {
@@ -70,6 +95,11 @@ const ReservationPage = () => {
         });
         if (res.ok) { 
           setSubmitStatus('success'); 
+          
+          // --- PLAY SUCCESS SOUND ---
+          const audio = new Audio('/audio/success.mp3');
+          audio.play().catch(err => console.warn("Audio blocked by browser:", err));
+
           if (window.fbq) window.fbq('track', 'Lead');
         } else { setSubmitStatus('error'); }
     } catch (error) { setSubmitStatus('error'); }
@@ -115,7 +145,6 @@ const ReservationPage = () => {
   return (
     <div className="min-h-screen bg-cream-50 text-gray-900 font-sans transition-all duration-500">
       
-      {/* RESTORED HERO BANNER DESIGN */}
       <div className="relative h-[40vh] w-full flex items-center justify-center pt-24 bg-black">
         <div className="absolute inset-0 opacity-60">
           <img src={heroimage} className="w-full h-full object-cover" alt="Reservations" />
@@ -126,7 +155,6 @@ const ReservationPage = () => {
           <h1 className={`text-3xl sm:text-4xl md:text-5xl font-serif tracking-widest uppercase text-white drop-shadow-md ${getFontClass()}`}>{t('reservation.title')}</h1>
           <div className="h-[1px] w-24 bg-gold-400 mt-8 mx-auto"></div>
           
-          {/* STEP INDICATOR */}
           <div className="flex items-center justify-center gap-3 mt-10">
             {[1, 2, 3].map(i => (
               <div key={i} className={`h-1 w-8 rounded-full transition-all duration-700 ${step >= i ? 'bg-gold-500' : 'bg-white/20'}`} />
@@ -198,7 +226,6 @@ const ReservationPage = () => {
                                 <div>
                                     <h4 className="font-serif text-lg text-gray-900">{room.name}</h4>
                                     
-                                    {/* Display PAX and Price visually distinct */}
                                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                                         <span className={`text-[10px] text-gray-400 uppercase tracking-widest ${getFontClass()}`}>
                                             {t('vip.maxCap')} {room.capacity}
@@ -248,8 +275,12 @@ const ReservationPage = () => {
                                 <div className="space-y-1">
                                     <label className={`text-[10px] font-bold uppercase text-gray-400 tracking-widest ${getFontClass()}`}>{t('reservation.fTime')} ({session === 'LUNCH' ? t('footer.lunch') : t('footer.dinner')})</label>
                                     <select required className={`w-full bg-gray-50 border-b-2 border-gray-200 p-4 focus:border-gold-500 outline-none transition-colors appearance-none ${getFontClass()}`} value={selectedTime} onChange={e => setSelectedTime(e.target.value)}>
-                                        <option value="">{t('reservation.selTime')}</option>
-                                        {generateTimeSlots(session).map(slot => <option key={slot.value} value={slot.value}>{slot.label}</option>)}
+                                        <option value="" disabled>{t('reservation.selTime')}</option>
+                                        {availableTimeSlots.length === 0 ? (
+                                            <option value="" disabled>No times available for today</option>
+                                        ) : (
+                                            availableTimeSlots.map(slot => <option key={slot.value} value={slot.value}>{slot.label}</option>)
+                                        )}
                                     </select>
                                 </div>
                                 <div className="space-y-1">

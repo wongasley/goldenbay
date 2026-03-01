@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Users, Contact, Megaphone, AlertCircle, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
-const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
+import axiosInstance from '../../../utils/axiosInstance';
 
 const StatCard = ({ title, value, icon: Icon, colorClass, linkTo, subText }) => (
   <Link to={linkTo} className="group block h-full">
@@ -29,13 +28,14 @@ const AdminDashboardPage = () => {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
-      const token = localStorage.getItem('accessToken');
       try {
-        const response = await fetch(`${BACKEND_URL}/api/reservations/dashboard/`, { headers: { 'Authorization': `Bearer ${token}` }});
-        if (response.ok) setData(await response.json());
+        const response = await axiosInstance.get('/api/reservations/dashboard/');
+        setData(response.data);
       } catch (error) {
-        console.error(error);
-      } finally { setLoading(false); }
+        console.error("Dashboard Error:", error);
+      } finally { 
+        setLoading(false); 
+      }
     };
     fetchDashboardData();
   }, []);

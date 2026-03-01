@@ -3,8 +3,7 @@ import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import { Send, Users, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
+import axiosInstance from '../../../utils/axiosInstance';
 
 const CampaignBuilder = () => {
   const [formData, setFormData] = useState({
@@ -19,26 +18,13 @@ const CampaignBuilder = () => {
     if (!window.confirm(`Are you sure you want to email this to ${formData.audience} customers?`)) return;
     
     setIsSending(true);
-    const token = localStorage.getItem('accessToken');
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/marketing/manage/blast/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      });
-
-      if (res.ok) {
-        toast.success("Email Campaign launched successfully!");
-        setFormData({ ...formData, subject: '', content: '' }); // Clear form
-      } else {
-        toast.error("Failed to launch campaign.");
-      }
+      await axiosInstance.post('/api/marketing/manage/blast/', formData);
+      toast.success("Email Campaign launched successfully!");
+      setFormData({ ...formData, subject: '', content: '' }); // Clear form
     } catch (err) {
-      toast.error("Network error.");
+      toast.error(err.response?.data?.error || "Failed to launch campaign.");
     } finally {
       setIsSending(false);
     }

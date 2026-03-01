@@ -111,6 +111,11 @@ FILES_TO_READ = [
     'frontend/src/utils/translations.jsx',
     'frontend/src/components/seo/SEO.jsx',
     'backend/marketing/tasks.py',
+    'frontend/src/utils/axiosInstance.js',
+    'frontend/src/utils/auth.js',
+    'frontend/src/pages/public/NotFoundPage.jsx',
+    'frontend/src/components/layout/PixelTracker.jsx',
+    'frontend/src/pages/admin/marketing/CampaignBuilder.jsx',
 
 ]
 

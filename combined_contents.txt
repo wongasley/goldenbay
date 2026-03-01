@@ -2162,8 +2162,7 @@ import React, { useEffect, useState } from 'react';
 import { Users, Contact, Megaphone, AlertCircle, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
-const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
+import axiosInstance from '../../../utils/axiosInstance';
 
 const StatCard = ({ title, value, icon: Icon, colorClass, linkTo, subText }) => (
   <Link to={linkTo} className="group block h-full">
@@ -2189,13 +2188,14 @@ const AdminDashboardPage = () => {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
-      const token = localStorage.getItem('accessToken');
       try {
-        const response = await fetch(`${BACKEND_URL}/api/reservations/dashboard/`, { headers: { 'Authorization': `Bearer ${token}` }});
-        if (response.ok) setData(await response.json());
+        const response = await axiosInstance.get('/api/reservations/dashboard/');
+        setData(response.data);
       } catch (error) {
-        console.error(error);
-      } finally { setLoading(false); }
+        console.error("Dashboard Error:", error);
+      } finally { 
+        setLoading(false); 
+      }
     };
     fetchDashboardData();
   }, []);
@@ -2774,7 +2774,7 @@ const MenuPage = () => {
 
 export default MenuPage;
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css'; 
@@ -2791,9 +2791,7 @@ const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.
 const ReservationPage = () => {
   const { t, getFontClass } = useLanguage();
   
-  // WIZARD STEPS: 1: Date/Experience, 2: Room, 3: Details
   const [step, setStep] = useState(1); 
-  
   const [date, setDate] = useState(new Date());
   const [session, setSession] = useState('LUNCH'); 
   const [bookingType, setBookingType] = useState('VIP'); 
@@ -2805,18 +2803,45 @@ const ReservationPage = () => {
   const [formData, setFormData] = useState({ name: '', contact: '', email: '', pax: 2, message: '' });
   const [submitStatus, setSubmitStatus] = useState(null); 
 
-  const generateTimeSlots = (sessionType) => {
+  // NEW: Automatically reset the selected time if they switch dates or sessions
+  useEffect(() => {
+    setSelectedTime('');
+  }, [date, session]);
+
+  // UPDATED: Dynamically filter past time slots if booking for today
+  const generateTimeSlots = (sessionType, selectedDate) => {
     const slots = [];
     const startHour = sessionType === 'LUNCH' ? 11 : 17; 
-    const endHour = sessionType === 'LUNCH' ? 14 : 21;    
+    const endHour = sessionType === 'LUNCH' ? 14 : 21;  
+    
+    const now = new Date();
+    const isToday = 
+        selectedDate.getDate() === now.getDate() &&
+        selectedDate.getMonth() === now.getMonth() &&
+        selectedDate.getFullYear() === now.getFullYear();
+
     for (let hour = startHour; hour <= endHour; hour++) {
       const displayHour = hour > 12 ? hour - 12 : hour;
       const ampm = hour >= 12 ? 'PM' : 'AM';
-      slots.push({ value: `${hour}:00:00`, label: `${displayHour}:00 ${ampm}` });
-      if (hour !== endHour) slots.push({ value: `${hour}:30:00`, label: `${displayHour}:30 ${ampm}` });
+      
+      // Top of the hour (e.g., 11:00)
+      const blockZero = isToday && hour <= now.getHours();
+      if (!blockZero) {
+        slots.push({ value: `${hour}:00:00`, label: `${displayHour}:00 ${ampm}` });
+      }
+      
+      // Bottom of the hour (e.g., 11:30)
+      if (hour !== endHour) {
+        const blockThirty = isToday && (hour < now.getHours() || (hour === now.getHours() && now.getMinutes() >= 30));
+        if (!blockThirty) {
+            slots.push({ value: `${hour}:30:00`, label: `${displayHour}:30 ${ampm}` });
+        }
+      }
     }
     return slots;
   };
+
+  const availableTimeSlots = generateTimeSlots(session, date);
 
   useEffect(() => {
     const fetchAvailability = async () => {
@@ -2846,6 +2871,11 @@ const ReservationPage = () => {
         });
         if (res.ok) { 
           setSubmitStatus('success'); 
+          
+          // --- PLAY SUCCESS SOUND ---
+          const audio = new Audio('/audio/success.mp3');
+          audio.play().catch(err => console.warn("Audio blocked by browser:", err));
+
           if (window.fbq) window.fbq('track', 'Lead');
         } else { setSubmitStatus('error'); }
     } catch (error) { setSubmitStatus('error'); }
@@ -2891,7 +2921,6 @@ const ReservationPage = () => {
   return (
     <div className="min-h-screen bg-cream-50 text-gray-900 font-sans transition-all duration-500">
       
-      {/* RESTORED HERO BANNER DESIGN */}
       <div className="relative h-[40vh] w-full flex items-center justify-center pt-24 bg-black">
         <div className="absolute inset-0 opacity-60">
           <img src={heroimage} className="w-full h-full object-cover" alt="Reservations" />
@@ -2902,7 +2931,6 @@ const ReservationPage = () => {
           <h1 className={`text-3xl sm:text-4xl md:text-5xl font-serif tracking-widest uppercase text-white drop-shadow-md ${getFontClass()}`}>{t('reservation.title')}</h1>
           <div className="h-[1px] w-24 bg-gold-400 mt-8 mx-auto"></div>
           
-          {/* STEP INDICATOR */}
           <div className="flex items-center justify-center gap-3 mt-10">
             {[1, 2, 3].map(i => (
               <div key={i} className={`h-1 w-8 rounded-full transition-all duration-700 ${step >= i ? 'bg-gold-500' : 'bg-white/20'}`} />
@@ -2974,7 +3002,6 @@ const ReservationPage = () => {
                                 <div>
                                     <h4 className="font-serif text-lg text-gray-900">{room.name}</h4>
                                     
-                                    {/* Display PAX and Price visually distinct */}
                                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                                         <span className={`text-[10px] text-gray-400 uppercase tracking-widest ${getFontClass()}`}>
                                             {t('vip.maxCap')} {room.capacity}
@@ -3024,8 +3051,12 @@ const ReservationPage = () => {
                                 <div className="space-y-1">
                                     <label className={`text-[10px] font-bold uppercase text-gray-400 tracking-widest ${getFontClass()}`}>{t('reservation.fTime')} ({session === 'LUNCH' ? t('footer.lunch') : t('footer.dinner')})</label>
                                     <select required className={`w-full bg-gray-50 border-b-2 border-gray-200 p-4 focus:border-gold-500 outline-none transition-colors appearance-none ${getFontClass()}`} value={selectedTime} onChange={e => setSelectedTime(e.target.value)}>
-                                        <option value="">{t('reservation.selTime')}</option>
-                                        {generateTimeSlots(session).map(slot => <option key={slot.value} value={slot.value}>{slot.label}</option>)}
+                                        <option value="" disabled>{t('reservation.selTime')}</option>
+                                        {availableTimeSlots.length === 0 ? (
+                                            <option value="" disabled>No times available for today</option>
+                                        ) : (
+                                            availableTimeSlots.map(slot => <option key={slot.value} value={slot.value}>{slot.label}</option>)
+                                        )}
                                     </select>
                                 </div>
                                 <div className="space-y-1">
@@ -3067,7 +3098,7 @@ const ReservationPage = () => {
 
 export default ReservationPage;
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { Plus, Check, X, Phone, Edit, UserCheck, Flag, CheckCircle2, Search, Filter, Users, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import ReservationForm from '../../../components/reservations/ReservationForm';
@@ -3075,14 +3106,13 @@ import { canCancelBooking } from '../../../utils/auth';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { format, addDays, subDays, isToday } from 'date-fns';
-
-const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
+import axiosInstance from '../../../utils/axiosInstance';
 
 const BookingManager = () => {
   const [bookings, setBookings] = useState([]);
   const [filter, setFilter] = useState('ALL'); 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDate, setSelectedDate] = useState(new Date()); // <-- NEW: Defaults to Today
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [showManualForm, setShowManualForm] = useState(false);
   
   const hasCancelPermission = canCancelBooking();
@@ -3090,16 +3120,33 @@ const BookingManager = () => {
   const [editRooms, setEditRooms] = useState([]);
   const [isCheckingRooms, setIsCheckingRooms] = useState(false);
   const [loading, setLoading] = useState(true);
+  const latestBookingId = useRef(null);
 
   const fetchBookings = async () => {
-    const token = localStorage.getItem('accessToken'); 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/reservations/manage/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.status === 401) window.location.href = '/login'; 
-      const data = await res.json();
-      setBookings(data);
+      const res = await axiosInstance.get('/api/reservations/manage/');
+      const fetchedBookings = res.data;
+      
+      // --- DASHBOARD NOTIFICATION LOGIC ---
+      if (fetchedBookings.length > 0) {
+        // Find the highest ID in the current fetch
+        const maxId = Math.max(...fetchedBookings.map(b => b.id));
+        
+        // If we already have a recorded maxId, and the new maxId is higher...
+        if (latestBookingId.current !== null && maxId > latestBookingId.current) {
+            // Play the alert bell
+            const bell = new Audio('/audio/bell.mp3');
+            bell.play().catch(e => console.log("Audio blocked. Staff must click the page first.", e));
+            
+            // Show a special toast
+            toast('New Booking Arrived!', { icon: '🔔', duration: 5000 });
+        }
+        
+        // Update the ref to the new highest ID
+        latestBookingId.current = maxId;
+      }
+      
+      setBookings(fetchedBookings);
     } catch (err) {
       toast.error("Failed to load reservations.");
     } finally {
@@ -3116,10 +3163,11 @@ const BookingManager = () => {
   const checkEditRooms = async (date, session) => {
     setIsCheckingRooms(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/reservations/check/?date=${date}&session=${session}`);
-      const data = await res.json();
-      setEditRooms(data.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })));
-    } catch (err) {}
+      const res = await axiosInstance.get(`/api/reservations/check/?date=${date}&session=${session}`);
+      setEditRooms(res.data.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })));
+    } catch (err) {
+      console.error(err);
+    }
     setIsCheckingRooms(false);
   };
 
@@ -3134,23 +3182,15 @@ const BookingManager = () => {
 
   const updateStatus = async (id, payload, successMsg, e) => {
     if (e) e.stopPropagation();
-    const token = localStorage.getItem('accessToken'); 
-    const updatePromise = fetch(`${BACKEND_URL}/api/reservations/manage/${id}/`, {
-        method: 'PATCH',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify(payload)
-    }).then(async (res) => {
-        if (res.status === 401) throw new Error("Unauthorized");
-        if (!res.ok) {
-            const errData = await res.json();
-            throw new Error(errData.non_field_errors ? errData.non_field_errors[0] : "Failed to update");
-        }
+    
+    const updatePromise = axiosInstance.patch(`/api/reservations/manage/${id}/`, payload)
+    .then((res) => {
         fetchBookings(); 
         setEditingBooking(null);
-        return res.json();
+        return res.data;
+    }).catch(err => {
+        const errorData = err.response?.data;
+        throw new Error(errorData?.non_field_errors ? errorData.non_field_errors[0] : "Failed to update");
     });
 
     toast.promise(updatePromise, {
@@ -3160,22 +3200,17 @@ const BookingManager = () => {
     });
   };
 
-  // --- REFINED FILTERING LOGIC ---
   const formattedSelectedDate = format(selectedDate, 'yyyy-MM-dd');
   const isSearching = searchQuery.trim() !== '';
 
   const filteredBookings = bookings.filter(b => {
-      // 1. If searching, ignore the date filter so we can find any customer
       const matchesSearch = isSearching ? (
           b.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
           b.customer_contact.includes(searchQuery) ||
           b.id.toString() === searchQuery
       ) : true;
 
-      // 2. Filter by Date (Only if NOT actively searching)
       const matchesDate = isSearching ? true : b.date === formattedSelectedDate;
-      
-      // 3. Status Filter
       const matchesStatus = filter === 'ALL' ? true : b.status === filter;
 
       return matchesSearch && matchesDate && matchesStatus;
@@ -3218,8 +3253,6 @@ const BookingManager = () => {
 
   return (
     <div className="pb-20">
-      
-      {/* INJECT CUSTOM CALENDAR STYLES */}
       <style>{`
         .react-calendar { border: none !important; width: 100% !important; font-family: 'Quicksand', sans-serif !important; background: transparent !important; }
         .react-calendar__navigation button { font-weight: bold; color: #1a1a1a; text-transform: uppercase; letter-spacing: 1px; font-size: 12px; }
@@ -3232,7 +3265,7 @@ const BookingManager = () => {
         .react-calendar__tile--now.react-calendar__tile--active { background-color: #D4AF37 !important; color: white !important; border: none; }
       `}</style>
 
-      {/* 1. HEADER & CONTROLS */}
+      {/* HEADER & CONTROLS */}
       <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-gray-100 pb-3 mb-4">
               <div>
@@ -3250,7 +3283,6 @@ const BookingManager = () => {
           </div>
 
           <div className="flex flex-col lg:flex-row justify-between gap-4">
-              {/* Status Filters */}
               <div className="flex flex-wrap gap-1.5">
                 {['ALL', 'PENDING', 'CONFIRMED', 'SEATED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'].map(f => (
                   <button 
@@ -3266,7 +3298,6 @@ const BookingManager = () => {
                 ))}
               </div>
 
-              {/* Search Box */}
               <div className="relative w-full lg:w-72 shrink-0">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                   <input 
@@ -3286,8 +3317,7 @@ const BookingManager = () => {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">
-        
-        {/* --- LEFT SIDEBAR: DESKTOP CALENDAR --- */}
+        {/* LEFT SIDEBAR: DESKTOP CALENDAR */}
         <div className="hidden lg:block w-80 shrink-0">
             <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm sticky top-24">
                 <div className="text-center border-b border-gray-100 pb-3 mb-4">
@@ -3296,17 +3326,15 @@ const BookingManager = () => {
                 <Calendar
                     onChange={(date) => {
                         setSelectedDate(date);
-                        setSearchQuery(''); // Clear search when date is clicked
+                        setSearchQuery('');
                     }}
                     value={selectedDate}
                 />
             </div>
         </div>
 
-        {/* --- MAIN CONTENT AREA --- */}
+        {/* MAIN CONTENT AREA */}
         <div className="flex-1 space-y-4">
-            
-            {/* MOBILE DATE NAVIGATOR */}
             <div className="lg:hidden flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
                 <button onClick={() => { setSelectedDate(subDays(selectedDate, 1)); setSearchQuery(''); }} className="p-2 hover:bg-gray-100 rounded text-gray-500 transition-colors">
                     <ChevronLeft size={20}/>
@@ -3322,7 +3350,6 @@ const BookingManager = () => {
                 </button>
             </div>
 
-            {/* RESULTS HEADER */}
             <div className="flex justify-between items-end pb-2">
                 <h2 className="text-lg font-serif text-gray-900">
                     {isSearching ? 'Search Results' : `Bookings for ${format(selectedDate, 'MMMM dd')}`}
@@ -3332,7 +3359,6 @@ const BookingManager = () => {
                 </span>
             </div>
 
-            {/* DESKTOP TABLE */}
             <div className="hidden lg:block bg-white border border-gray-200 rounded-lg overflow-visible shadow-sm">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
@@ -3385,7 +3411,6 @@ const BookingManager = () => {
 
                                 <td className="px-5 py-4 align-middle">
                                     <div className="flex flex-col gap-1">
-                                        {/* Highlight Date if searching globally */}
                                         {isSearching ? (
                                             <span className="text-sm font-bold text-gray-800">{b.date}</span>
                                         ) : (
@@ -3535,7 +3560,7 @@ const BookingManager = () => {
         </div>
       </div>
 
-      {/* --- EDIT MODAL --- */}
+      {/* EDIT MODAL */}
       {editingBooking && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
               <div className="bg-white p-0 rounded-lg shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
@@ -3622,7 +3647,7 @@ const BookingManager = () => {
                           </select>
                       </div>
 
-                      {/* --- AUDIT LOG BLOCK --- */}
+                      {/* AUDIT LOG BLOCK */}
                       <div className="bg-gray-50 p-4 rounded border border-gray-100 text-xs text-gray-500 font-mono space-y-2 mt-6">
                           <p className="flex justify-between items-center">
                               <span className="uppercase tracking-widest font-bold text-gray-400 text-[10px]">Source</span> 
@@ -3670,7 +3695,7 @@ const BookingManager = () => {
           </div>
       )}
 
-      {/* --- CREATE MANUAL MODAL --- */}
+      {/* CREATE MANUAL MODAL */}
       {showManualForm && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
               <div className="bg-white w-full max-w-2xl rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -3712,6 +3737,8 @@ export default BookingManager;
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import axiosInstance from '../../utils/axiosInstance';
+import axios from 'axios';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
@@ -3736,29 +3763,52 @@ const ReservationForm = ({
     const [manualSource, setManualSource] = useState('PHONE'); 
     const [submitStatus, setSubmitStatus] = useState(null);
 
-    const generateTimeSlots = (sessionType) => {
+    // NEW: Automatically reset time when date or session changes in admin view
+    useEffect(() => {
+        setManualTime('');
+    }, [manualDate, manualSession]);
+
+    // UPDATED: Time slot generation with time-blocking for today
+    const generateTimeSlots = (sessionType, selectedDateStr) => {
         const slots = [];
         const startHour = sessionType === 'LUNCH' ? 11 : 17; 
         const endHour = sessionType === 'LUNCH' ? 14 : 22;      
 
+        const now = new Date();
+        const [year, month, day] = selectedDateStr.split('-').map(Number);
+        const isToday = 
+            year === now.getFullYear() &&
+            (month - 1) === now.getMonth() &&
+            day === now.getDate();
+
         for (let hour = startHour; hour <= endHour; hour++) {
             const displayHour = hour > 12 ? hour - 12 : hour;
             const ampm = hour >= 12 ? 'PM' : 'AM';
-            slots.push({ value: `${hour}:00:00`, label: `${displayHour}:00 ${ampm}` });
+            
+            // Allow admins to override time block. Otherwise, block past times.
+            const blockZero = !isManualEntry && isToday && hour <= now.getHours();
+            if (!blockZero) {
+                slots.push({ value: `${hour}:00:00`, label: `${displayHour}:00 ${ampm}` });
+            }
+            
             if (hour !== endHour) {
-                slots.push({ value: `${hour}:30:00`, label: `${displayHour}:30 ${ampm}` });
+                const blockThirty = !isManualEntry && isToday && (hour < now.getHours() || (hour === now.getHours() && now.getMinutes() >= 30));
+                if (!blockThirty) {
+                    slots.push({ value: `${hour}:30:00`, label: `${displayHour}:30 ${ampm}` });
+                }
             }
         }
         return slots;
     };
 
+    const availableTimeSlots = generateTimeSlots(manualSession, manualDate);
+
     useEffect(() => {
         if (isManualEntry) {
             const fetchRooms = async () => {
                 try {
-                    const res = await fetch(`${BACKEND_URL}/api/reservations/check/?date=${manualDate}&session=${manualSession}`);
-                    const data = await res.json();
-                    setRooms(data);
+                    const res = await axios.get(`${BACKEND_URL}/api/reservations/check/?date=${manualDate}&session=${manualSession}`);
+                    setRooms(res.data);
                 } catch (err) {
                     console.error("Failed to load rooms", err);
                 }
@@ -3792,7 +3842,6 @@ const ReservationForm = ({
 
         setSubmitStatus('loading');
 
-        // Strictly enforce data types before sending to Django to prevent 500 DB crashes
         const payload = {
             customer_name: formData.name.trim(),
             customer_contact: formData.contact.trim(),
@@ -3800,60 +3849,47 @@ const ReservationForm = ({
             date: isManualEntry ? manualDate : format(date, 'yyyy-MM-dd'),
             session: isManualEntry ? manualSession : session,
             time: finalTime,
-            pax: parseInt(formData.pax, 10) || 1, // Fallback to 1 to prevent NaN/Null
+            pax: parseInt(formData.pax, 10) || 1, 
             dining_area: parseInt(finalRoomId, 10),
             special_request: formData.message ? formData.message.trim() : "",
             status: isManualEntry ? 'CONFIRMED' : 'PENDING',
             source: isManualEntry ? manualSource : 'WEB' 
         };
 
-        const token = localStorage.getItem('accessToken');
-        const headers = { 'Content-Type': 'application/json' };
-        
-        if (isManualEntry && token) {
-            headers['Authorization'] = `Bearer ${token}`;
-        }
-
         try {
-            const res = await fetch(`${BACKEND_URL}/api/reservations/create/`, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(payload),
-            });
-
-            if (res.ok) {
-                setSubmitStatus('success');
-                if (onSuccess) onSuccess();
+            if (isManualEntry) {
+                await axiosInstance.post('/api/reservations/create/', payload);
             } else {
-                // Check if the response is JSON (400) or HTML (500)
-                const contentType = res.headers.get("content-type");
-                let errorMessage = "Booking failed.";
-
-                if (contentType && contentType.indexOf("application/json") !== -1) {
-                    try {
-                        const errData = await res.json();
-                        if (errData.non_field_errors) {
-                            errorMessage = errData.non_field_errors[0];
-                        } else if (errData.detail) {
-                            errorMessage = errData.error ? `${errData.detail}: ${errData.error}` : errData.detail;
-                        } else {
-                            const firstKey = Object.keys(errData)[0];
-                            const firstError = errData[firstKey];
-                            errorMessage = `${firstKey.toUpperCase()}: ${Array.isArray(firstError) ? firstError[0] : firstError}`;
-                        }
-                    } catch (parseErr) {
-                        errorMessage = `Server Error (${res.status}). Failed to parse error.`;
-                    }
-                } else {
-                    // This catches the 500 Internal Server Error HTML response
-                    errorMessage = `Fatal Server Error (${res.status}). Check server logs.`;
-                }
-                
-                toast.error(errorMessage);
-                setSubmitStatus('error');
+                await axios.post(`${BACKEND_URL}/api/reservations/create/`, payload);
             }
+
+            setSubmitStatus('success');
+            
+            // --- PLAY SUCCESS SOUND ---
+            const audio = new Audio('/audio/success.mp3');
+            audio.play().catch(err => console.warn("Audio blocked by browser:", err));
+
+            if (onSuccess) onSuccess();
+            
         } catch (error) {
-            toast.error("Network connection refused. Check your internet or backend status.");
+            let errorMessage = "Booking failed.";
+            
+            if (error.response && error.response.data) {
+                const errData = error.response.data;
+                if (errData.non_field_errors) {
+                    errorMessage = errData.non_field_errors[0];
+                } else if (errData.detail) {
+                    errorMessage = errData.error ? `${errData.detail}: ${errData.error}` : errData.detail;
+                } else {
+                    const firstKey = Object.keys(errData)[0];
+                    const firstError = errData[firstKey];
+                    errorMessage = `${firstKey.toUpperCase()}: ${Array.isArray(firstError) ? firstError[0] : firstError}`;
+                }
+            } else {
+                errorMessage = "Network connection refused or fatal server error.";
+            }
+            
+            toast.error(errorMessage);
             setSubmitStatus('error');
         }
     };
@@ -3913,9 +3949,11 @@ const ReservationForm = ({
                                 onChange={e => setManualTime(e.target.value)}
                             >
                                 <option value="" disabled>-- Select Time --</option>
-                                {generateTimeSlots(manualSession).map((slot, index) => (
-                                    <option key={index} value={slot.value}>{slot.label}</option>
-                                ))}
+                                {availableTimeSlots.length === 0 ? (
+                                    <option value="" disabled>No times available for today</option>
+                                ) : (
+                                    availableTimeSlots.map(slot => <option key={slot.value} value={slot.value}>{slot.label}</option>)
+                                )}
                             </select>
                         </div>
                         <div>
@@ -5907,35 +5945,35 @@ export default SinglePostPage;
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Send } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
+import axiosInstance from '../../../utils/axiosInstance';
+import toast from 'react-hot-toast';
 
 const MarketingManager = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchPosts = async () => {
-    const token = localStorage.getItem('accessToken');
-    const res = await fetch(`${BACKEND_URL}/api/marketing/manage/all/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (res.ok) {
-        const data = await res.json();
-        setPosts(data);
+    try {
+      const res = await axiosInstance.get('/api/marketing/manage/all/');
+      setPosts(res.data);
+    } catch (err) {
+      toast.error("Failed to load posts.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => { fetchPosts(); }, []);
 
   const handleDelete = async (id) => {
     if(!window.confirm("Delete this post?")) return;
-    const token = localStorage.getItem('accessToken');
-    await fetch(`${BACKEND_URL}/api/marketing/manage/${id}/`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-    });
-    fetchPosts();
+    try {
+        await axiosInstance.delete(`/api/marketing/manage/${id}/`);
+        fetchPosts();
+        toast.success("Post deleted.");
+    } catch (err) {
+        toast.error("Failed to delete post.");
+    }
   };
 
   return (
@@ -8312,3 +8350,247 @@ def send_mass_blast(audience, subject, html_content):
         )
         
     return f"Successfully queued {customers.count()} emails for sending."
+
+import axios from 'axios';
+
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
+
+const axiosInstance = axios.create({
+    baseURL: BACKEND_URL,
+});
+
+// Request Interceptor: Attach Token to every request automatically
+axiosInstance.interceptors.request.use(async (config) => {
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+}, (error) => Promise.reject(error));
+
+// Response Interceptor: Handle 401 Token Expiry
+axiosInstance.interceptors.response.use((response) => {
+    return response;
+}, async (error) => {
+    const originalRequest = error.config;
+
+    // If error is 401 (Unauthorized) and we haven't tried refreshing yet
+    if (error.response && error.response.status === 401 && !originalRequest._retry) {
+        originalRequest._retry = true;
+        const refreshToken = localStorage.getItem('refreshToken');
+
+        if (refreshToken) {
+            try {
+                // Ask backend for a new access token
+                const response = await axios.post(`${BACKEND_URL}/api/token/refresh/`, {
+                    refresh: refreshToken
+                });
+
+                // Save new token
+                localStorage.setItem('accessToken', response.data.access);
+
+                // Retry the original failed request with the new token attached
+                originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
+                return axiosInstance(originalRequest);
+                
+            } catch (refreshError) {
+                // If refresh fails (e.g. refresh token also expired), force logout
+                console.error("Session completely expired", refreshError);
+                localStorage.clear();
+                window.location.href = '/login';
+            }
+        } else {
+            // No refresh token available at all
+            localStorage.clear();
+            window.location.href = '/login';
+        }
+    }
+    return Promise.reject(error);
+});
+
+export default axiosInstance;
+
+// frontend/src/utils/auth.js
+import { jwtDecode } from 'jwt-decode';
+
+export const getUserRole = () => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) return null;
+    
+    try {
+        const decoded = jwtDecode(token);
+        return decoded.role || 'Receptionist'; // Default fallback
+    } catch (error) {
+        return null;
+    }
+};
+
+export const canCancelBooking = () => {
+    const role = getUserRole();
+    return role === 'Supervisor' || role === 'Admin';
+};
+
+export const canManageMarketing = () => {
+    const role = getUserRole();
+    return role === 'Admin';
+};
+
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
+
+const NotFoundPage = () => {
+  return (
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center text-center px-6 relative overflow-hidden">
+      <Helmet>
+        <title>Page Not Found | Golden Bay</title>
+      </Helmet>
+      
+      {/* Subtle Background Elements */}
+      <div className="absolute top-0 left-0 w-full h-full opacity-20 pointer-events-none">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-gold-600 blur-[120px] rounded-full"></div>
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-gold-600 blur-[120px] rounded-full"></div>
+      </div>
+
+      <div className="relative z-10">
+        <h1 className="text-9xl font-serif text-gold-600 mb-4 opacity-50">404</h1>
+        <h2 className="text-3xl font-serif text-white mb-6 tracking-widest uppercase">Lost at Sea</h2>
+        <p className="text-gray-400 max-w-md mx-auto mb-10 font-light leading-relaxed">
+          The page you are looking for has drifted away or does not exist. Let us guide you back to our shores.
+        </p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link to="/">
+                <button className="w-full sm:w-auto px-8 py-3 bg-gold-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-colors rounded-sm shadow-lg">
+                    Return Home
+                </button>
+            </Link>
+            <Link to="/menu">
+                <button className="w-full sm:w-auto px-8 py-3 border border-gold-600/50 text-gold-500 text-xs font-bold uppercase tracking-widest hover:bg-gold-600/10 transition-colors rounded-sm">
+                    View Menu
+                </button>
+            </Link>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default NotFoundPage;
+
+// src/components/layout/PixelTracker.jsx
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+
+const PixelTracker = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    // Fire a Facebook PageView event every time the URL changes
+    if (window.fbq) {
+      window.fbq('track', 'PageView');
+    }
+  }, [location.pathname]);
+
+  return null;
+};
+
+export default PixelTracker;
+
+import React, { useState } from 'react';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
+import { Send, Users, Star } from 'lucide-react';
+import toast from 'react-hot-toast';
+import axiosInstance from '../../../utils/axiosInstance';
+
+const CampaignBuilder = () => {
+  const [formData, setFormData] = useState({
+    audience: 'ALL',
+    subject: '',
+    content: ''
+  });
+  const [isSending, setIsSending] = useState(false);
+
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!window.confirm(`Are you sure you want to email this to ${formData.audience} customers?`)) return;
+    
+    setIsSending(true);
+
+    try {
+      await axiosInstance.post('/api/marketing/manage/blast/', formData);
+      toast.success("Email Campaign launched successfully!");
+      setFormData({ ...formData, subject: '', content: '' }); // Clear form
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to launch campaign.");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const btnClass = (active) => `flex-1 py-3 text-xs font-bold uppercase tracking-widest rounded-sm transition-all border flex items-center justify-center gap-2 ${active ? 'bg-gold-50 border-gold-400 text-gold-700 shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`;
+
+  return (
+    <div className="bg-white p-8 rounded-lg border border-gray-200 shadow-sm">
+      <div className="mb-8 border-b border-gray-100 pb-4 flex justify-between items-center">
+        <div>
+            <h2 className="text-xl font-serif font-bold text-gray-900">Email Campaign Blast</h2>
+            <p className="text-xs text-gray-500 mt-1">Send mass emails directly to your clientele.</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSend} className="space-y-8">
+        
+        {/* Targeting Setup */}
+        <div className="w-full md:w-1/2">
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Target Audience</label>
+            <div className="flex gap-2">
+                <button type="button" onClick={() => setFormData({...formData, audience: 'ALL'})} className={btnClass(formData.audience === 'ALL')}>
+                    <Users size={14}/> All Clients
+                </button>
+                <button type="button" onClick={() => setFormData({...formData, audience: 'VIP'})} className={btnClass(formData.audience === 'VIP')}>
+                    <Star size={14}/> VIPs Only
+                </button>
+            </div>
+        </div>
+
+        {/* Content Creation */}
+        <div>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Email Subject Line</label>
+            <input 
+                required 
+                type="text" 
+                placeholder="e.g. Exclusive Lunar New Year Promo at Golden Bay!"
+                className="w-full bg-gray-50 border border-gray-200 p-3 text-gray-900 text-sm focus:bg-white focus:border-gold-500 outline-none rounded-sm transition-all"
+                value={formData.subject}
+                onChange={e => setFormData({...formData, subject: e.target.value})}
+            />
+        </div>
+
+        <div>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Email Body (HTML)</label>
+            <div className="border border-gray-200 rounded-sm overflow-hidden">
+                <style>{`.ql-toolbar { background: #f9fafb; border-bottom: 1px solid #e5e7eb !important; } .ql-editor { min-height: 250px; font-family: 'Quicksand', sans-serif; }`}</style>
+                <ReactQuill 
+                    theme="snow" 
+                    value={formData.content} 
+                    onChange={val => setFormData({...formData, content: val})} 
+                    placeholder="Craft your beautiful message here..."
+                />
+            </div>
+        </div>
+
+        <button 
+            type="submit" 
+            disabled={isSending || !formData.subject || !formData.content}
+            className="w-full bg-gold-600 text-white font-bold uppercase tracking-widest py-4 text-sm hover:bg-black transition-colors disabled:opacity-50 rounded-sm flex justify-center items-center gap-2 shadow-md"
+        >
+            <Send size={16} /> {isSending ? 'Dispatching Campaign...' : 'Send Email Blast'}
+        </button>
+
+      </form>
+    </div>
+  );
+};
+
+export default CampaignBuilder;

@@ -6,7 +6,7 @@ const axiosInstance = axios.create({
     baseURL: BACKEND_URL,
 });
 
-// Request Interceptor: Add Token to every request
+// Request Interceptor: Attach Token to every request automatically
 axiosInstance.interceptors.request.use(async (config) => {
     const token = localStorage.getItem('accessToken');
     if (token) {
@@ -21,8 +21,8 @@ axiosInstance.interceptors.response.use((response) => {
 }, async (error) => {
     const originalRequest = error.config;
 
-    // If error is 401 and we haven't tried refreshing yet
-    if (error.response.status === 401 && !originalRequest._retry) {
+    // If error is 401 (Unauthorized) and we haven't tried refreshing yet
+    if (error.response && error.response.status === 401 && !originalRequest._retry) {
         originalRequest._retry = true;
         const refreshToken = localStorage.getItem('refreshToken');
 
@@ -36,17 +36,18 @@ axiosInstance.interceptors.response.use((response) => {
                 // Save new token
                 localStorage.setItem('accessToken', response.data.access);
 
-                // Retry the original failed request with new token
+                // Retry the original failed request with the new token attached
                 originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
                 return axiosInstance(originalRequest);
+                
             } catch (refreshError) {
-                // If refresh fails (e.g. refresh token expired), force logout
-                console.error("Session expired", refreshError);
+                // If refresh fails (e.g. refresh token also expired), force logout
+                console.error("Session completely expired", refreshError);
                 localStorage.clear();
                 window.location.href = '/login';
             }
         } else {
-            // No refresh token available
+            // No refresh token available at all
             localStorage.clear();
             window.location.href = '/login';
         }

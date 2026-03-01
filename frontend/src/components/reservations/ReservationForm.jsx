@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import axiosInstance from '../../utils/axiosInstance';
+import axios from 'axios';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
@@ -25,29 +27,52 @@ const ReservationForm = ({
     const [manualSource, setManualSource] = useState('PHONE'); 
     const [submitStatus, setSubmitStatus] = useState(null);
 
-    const generateTimeSlots = (sessionType) => {
+    // NEW: Automatically reset time when date or session changes in admin view
+    useEffect(() => {
+        setManualTime('');
+    }, [manualDate, manualSession]);
+
+    // UPDATED: Time slot generation with time-blocking for today
+    const generateTimeSlots = (sessionType, selectedDateStr) => {
         const slots = [];
         const startHour = sessionType === 'LUNCH' ? 11 : 17; 
         const endHour = sessionType === 'LUNCH' ? 14 : 22;      
 
+        const now = new Date();
+        const [year, month, day] = selectedDateStr.split('-').map(Number);
+        const isToday = 
+            year === now.getFullYear() &&
+            (month - 1) === now.getMonth() &&
+            day === now.getDate();
+
         for (let hour = startHour; hour <= endHour; hour++) {
             const displayHour = hour > 12 ? hour - 12 : hour;
             const ampm = hour >= 12 ? 'PM' : 'AM';
-            slots.push({ value: `${hour}:00:00`, label: `${displayHour}:00 ${ampm}` });
+            
+            // Allow admins to override time block. Otherwise, block past times.
+            const blockZero = !isManualEntry && isToday && hour <= now.getHours();
+            if (!blockZero) {
+                slots.push({ value: `${hour}:00:00`, label: `${displayHour}:00 ${ampm}` });
+            }
+            
             if (hour !== endHour) {
-                slots.push({ value: `${hour}:30:00`, label: `${displayHour}:30 ${ampm}` });
+                const blockThirty = !isManualEntry && isToday && (hour < now.getHours() || (hour === now.getHours() && now.getMinutes() >= 30));
+                if (!blockThirty) {
+                    slots.push({ value: `${hour}:30:00`, label: `${displayHour}:30 ${ampm}` });
+                }
             }
         }
         return slots;
     };
 
+    const availableTimeSlots = generateTimeSlots(manualSession, manualDate);
+
     useEffect(() => {
         if (isManualEntry) {
             const fetchRooms = async () => {
                 try {
-                    const res = await fetch(`${BACKEND_URL}/api/reservations/check/?date=${manualDate}&session=${manualSession}`);
-                    const data = await res.json();
-                    setRooms(data);
+                    const res = await axios.get(`${BACKEND_URL}/api/reservations/check/?date=${manualDate}&session=${manualSession}`);
+                    setRooms(res.data);
                 } catch (err) {
                     console.error("Failed to load rooms", err);
                 }
@@ -81,7 +106,6 @@ const ReservationForm = ({
 
         setSubmitStatus('loading');
 
-        // Strictly enforce data types before sending to Django to prevent 500 DB crashes
         const payload = {
             customer_name: formData.name.trim(),
             customer_contact: formData.contact.trim(),
@@ -89,60 +113,47 @@ const ReservationForm = ({
             date: isManualEntry ? manualDate : format(date, 'yyyy-MM-dd'),
             session: isManualEntry ? manualSession : session,
             time: finalTime,
-            pax: parseInt(formData.pax, 10) || 1, // Fallback to 1 to prevent NaN/Null
+            pax: parseInt(formData.pax, 10) || 1, 
             dining_area: parseInt(finalRoomId, 10),
             special_request: formData.message ? formData.message.trim() : "",
             status: isManualEntry ? 'CONFIRMED' : 'PENDING',
             source: isManualEntry ? manualSource : 'WEB' 
         };
 
-        const token = localStorage.getItem('accessToken');
-        const headers = { 'Content-Type': 'application/json' };
-        
-        if (isManualEntry && token) {
-            headers['Authorization'] = `Bearer ${token}`;
-        }
-
         try {
-            const res = await fetch(`${BACKEND_URL}/api/reservations/create/`, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(payload),
-            });
-
-            if (res.ok) {
-                setSubmitStatus('success');
-                if (onSuccess) onSuccess();
+            if (isManualEntry) {
+                await axiosInstance.post('/api/reservations/create/', payload);
             } else {
-                // Check if the response is JSON (400) or HTML (500)
-                const contentType = res.headers.get("content-type");
-                let errorMessage = "Booking failed.";
-
-                if (contentType && contentType.indexOf("application/json") !== -1) {
-                    try {
-                        const errData = await res.json();
-                        if (errData.non_field_errors) {
-                            errorMessage = errData.non_field_errors[0];
-                        } else if (errData.detail) {
-                            errorMessage = errData.error ? `${errData.detail}: ${errData.error}` : errData.detail;
-                        } else {
-                            const firstKey = Object.keys(errData)[0];
-                            const firstError = errData[firstKey];
-                            errorMessage = `${firstKey.toUpperCase()}: ${Array.isArray(firstError) ? firstError[0] : firstError}`;
-                        }
-                    } catch (parseErr) {
-                        errorMessage = `Server Error (${res.status}). Failed to parse error.`;
-                    }
-                } else {
-                    // This catches the 500 Internal Server Error HTML response
-                    errorMessage = `Fatal Server Error (${res.status}). Check server logs.`;
-                }
-                
-                toast.error(errorMessage);
-                setSubmitStatus('error');
+                await axios.post(`${BACKEND_URL}/api/reservations/create/`, payload);
             }
+
+            setSubmitStatus('success');
+            
+            // --- PLAY SUCCESS SOUND ---
+            const audio = new Audio('/audio/success.mp3');
+            audio.play().catch(err => console.warn("Audio blocked by browser:", err));
+
+            if (onSuccess) onSuccess();
+            
         } catch (error) {
-            toast.error("Network connection refused. Check your internet or backend status.");
+            let errorMessage = "Booking failed.";
+            
+            if (error.response && error.response.data) {
+                const errData = error.response.data;
+                if (errData.non_field_errors) {
+                    errorMessage = errData.non_field_errors[0];
+                } else if (errData.detail) {
+                    errorMessage = errData.error ? `${errData.detail}: ${errData.error}` : errData.detail;
+                } else {
+                    const firstKey = Object.keys(errData)[0];
+                    const firstError = errData[firstKey];
+                    errorMessage = `${firstKey.toUpperCase()}: ${Array.isArray(firstError) ? firstError[0] : firstError}`;
+                }
+            } else {
+                errorMessage = "Network connection refused or fatal server error.";
+            }
+            
+            toast.error(errorMessage);
             setSubmitStatus('error');
         }
     };
@@ -202,9 +213,11 @@ const ReservationForm = ({
                                 onChange={e => setManualTime(e.target.value)}
                             >
                                 <option value="" disabled>-- Select Time --</option>
-                                {generateTimeSlots(manualSession).map((slot, index) => (
-                                    <option key={index} value={slot.value}>{slot.label}</option>
-                                ))}
+                                {availableTimeSlots.length === 0 ? (
+                                    <option value="" disabled>No times available for today</option>
+                                ) : (
+                                    availableTimeSlots.map(slot => <option key={slot.value} value={slot.value}>{slot.label}</option>)
+                                )}
                             </select>
                         </div>
                         <div>
