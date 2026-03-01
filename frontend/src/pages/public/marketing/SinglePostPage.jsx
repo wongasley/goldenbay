@@ -40,14 +40,19 @@ const SinglePostPage = () => {
           <div className="h-[400px] w-full bg-gray-200 animate-pulse rounded"></div>
       </div>
   );
+  
   if (!post) return <div className="min-h-screen flex items-center justify-center pt-24">Post not found.</div>;
 
   const imageUrl = post.image ? (post.image.startsWith('http') ? post.image : `${BACKEND_URL}${post.image}`) : '';
 
+  // FIX 1: Strip out hidden non-breaking spaces that cause text to stretch forever
+  const cleanContent = post.content 
+    ? post.content.replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ') 
+    : '';
+
   return (
-    <div className="min-h-screen bg-cream-50 text-gray-900 pt-32 pb-20 px-6 md:px-24">
+    <div className="min-h-screen bg-cream-50 text-gray-900 pt-32 pb-20 px-6 md:px-24 overflow-x-hidden w-full">
       
-      {/* DYNAMIC SEO TAGS (Old Helmet removed!) */}
       <SEO 
         title={post.title}
         description={getExcerpt(post.content)}
@@ -55,12 +60,12 @@ const SinglePostPage = () => {
         type="article"
       />
 
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-3xl mx-auto w-full">
         <Link to="/news" className="inline-flex items-center text-gold-600 hover:text-black mb-8 transition-colors text-xs uppercase tracking-widest">
             <ArrowLeft size={14} className="mr-2" /> Back to News
         </Link>
 
-        <div className="mb-10">
+        <div className="mb-10 w-full">
             <div className="flex items-center gap-4 text-xs text-gray-500 uppercase tracking-widest mb-4">
                 <span className="px-2 py-1 border border-gold-600/30 text-gold-600 rounded-sm">
                     {post.type === 'PROMO' ? 'Promotion' : 'Event'}
@@ -70,7 +75,7 @@ const SinglePostPage = () => {
                     {new Date(post.created_at).toLocaleDateString()}
                 </span>
             </div>
-            <h1 className="text-4xl md:text-5xl font-serif text-gray-900 leading-tight">{post.title}</h1>
+            <h1 className="text-4xl md:text-5xl font-serif text-gray-900 leading-tight break-words">{post.title}</h1>
         </div>
 
         {imageUrl && (
@@ -79,10 +84,13 @@ const SinglePostPage = () => {
             </div>
         )}
 
-        <div 
-            className="prose prose-lg max-w-none text-gray-600 font-light leading-relaxed prose-headings:text-gold-600 prose-headings:font-serif prose-a:text-gold-600 hover:prose-a:text-black prose-strong:text-gray-900"
-            dangerouslySetInnerHTML={{ __html: post.content }} 
-        />
+        <div className="w-full overflow-hidden">
+            {/* FIX 2: Aggressive Tailwind classes to force wrapping and image resizing */}
+            <div 
+                className="prose prose-lg max-w-none w-full text-gray-600 font-light leading-relaxed prose-headings:text-gold-600 prose-headings:font-serif prose-a:text-gold-600 hover:prose-a:text-black prose-strong:text-gray-900 [&_*]:!max-w-full [&_*]:!whitespace-normal [&_*]:break-words [&_img]:!max-w-full [&_img]:!h-auto [&_img]:mx-auto [&_img]:rounded-md"
+                dangerouslySetInnerHTML={{ __html: cleanContent }} 
+            />
+        </div>
       </div>
     </div>
   );
