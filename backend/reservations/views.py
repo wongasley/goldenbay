@@ -203,6 +203,8 @@ class VIPRoomListView(generics.ListAPIView):
         return DiningArea.objects.filter(area_type='VIP', is_active=True).order_by('name')
     
 
+from datetime import datetime
+
 class ChatbotBookingWebhook(APIView):
     permission_classes = [] 
 
@@ -217,7 +219,15 @@ class ChatbotBookingWebhook(APIView):
             name = data.get('name')
             contact = data.get('contact')
             date_str = data.get('date') 
-            pax = int(data.get('pax', 2))
+            
+            # 1. FIX: Missing data check
+            if not name or not contact or not date_str:
+                 return Response({"messages": [{"text": "Missing required details (Name, Contact, or Date). Please try again."}]}, status=200)
+
+            # 2. FIX: Safe integer casting for pax
+            raw_pax = data.get('pax')
+            pax = int(raw_pax) if raw_pax else 2
+            
             session = data.get('session', 'LUNCH')
             area_type_request = data.get('area_type', 'HALL')
             
@@ -305,10 +315,15 @@ class ChatbotBookingWebhook(APIView):
             from .tasks import send_new_booking_notifications
             send_new_booking_notifications.delay(reservation.id)
 
-            display_time = "11:00 AM" if session == 'LUNCH' else "5:30 PM"
+            # 3. FIX: Display the actual parsed time elegantly
+            time_obj = datetime.strptime(time_str, "%H:%M:%S")
+            display_time = time_obj.strftime("%I:%M %p")
+            
             success_msg = f"{transfer_notice}Success! 🎉 Your table for {pax} on {date_str} at {display_time} in {assigned_area.name} is reserved. Ref: #{reservation.id}"
             
             return Response({"messages": [{"text": success_msg}]}, status=200)
 
         except Exception as e:
+            # We print the error to your server logs so you can debug if it fails
+            print(f"Chatbot Webhook Error: {e}") 
             return Response({"messages": [{"text": "Something went wrong. Please try again or call us at (02) 8804-0332."}]}, status=200)
