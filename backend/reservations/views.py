@@ -1,34 +1,31 @@
-import requests
 import os
-from django.db import transaction
+from datetime import date, timedelta
+from django.db.models import Sum
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied
-from datetime import date, timedelta
-from django.core.exceptions import ValidationError as DjangoValidationError
-from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
-from django.db.models import Sum
+
 from .models import DiningArea, Reservation, Customer
 from .serializers import ReservationSerializer, DiningAreaSerializer, CustomerSerializer
-from django.core.mail import send_mail
-from django.conf import settings
-from .utils import send_sms
-from django.template.loader import render_to_string
-from django.utils.html import strip_tags
-from .tasks import send_new_booking_notifications, send_status_update_notifications
+from .tasks import (
+    send_new_booking_notifications, 
+    send_status_update_notifications, 
+    send_booking_modification_notifications, 
+    send_post_dining_feedback
+)
 
 class AvailableRoomsView(APIView):
     def get(self, request):
-        date = request.query_params.get('date')
+        date_param = request.query_params.get('date')
         session = request.query_params.get('session')
 
-        if not date or not session:
+        if not date_param or not session:
             return Response({"error": "Date and Session required"}, status=status.HTTP_400_BAD_REQUEST)
 
         all_areas = DiningArea.objects.filter(is_active=True)
-        bookings = Reservation.objects.filter(date=date, session=session).exclude(status__in=['CANCELLED', 'NO_SHOW'])
+        bookings = Reservation.objects.filter(date=date_param, session=session).exclude(status__in=['CANCELLED', 'NO_SHOW'])
 
         results = []
         for area in all_areas:
@@ -60,12 +57,11 @@ class ReservationCreateView(generics.CreateAPIView):
         user = self.request.user if self.request.user.is_authenticated else None
         
         # 1. Save data to DB first
-        # FIX: Removed `_history_user=user`. The middleware handles history tracking automatically.
         reservation = serializer.save(encoded_by=user)
         send_sms_flag = str(self.request.data.get('send_sms', 'true')).lower() == 'true'
+        
         # 2. Fire notifications ASYNCHRONOUSLY
         try:
-            # 2. Pass flag to celery
             send_new_booking_notifications.delay(reservation.id, send_sms_flag) 
         except Exception as e:
             print(f"Warning: Could not queue celery task: {e}")
@@ -111,7 +107,6 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
 
     def perform_update(self, serializer):
-        # FIX: Removed `_history_user=self.request.user`
         serializer.save(last_modified_by=self.request.user)
 
     def update(self, request, *args, **kwargs):
@@ -135,7 +130,8 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
                  raise PermissionDenied("Only Supervisors and Admins can reopen finalized bookings.")
             
         send_sms_flag = str(request.data.get('send_sms', 'true')).lower() == 'true'    
-        # 2. Perform the save (this automatically runs your collision validations)
+        
+        # 2. Perform the save
         response = super().update(request, *args, **kwargs)
 
         if response.status_code == 200:
@@ -152,13 +148,11 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
                 customer = Customer.objects.filter(phone=reservation.customer_contact).first()
                 if customer:
                     customer.visit_count += 1
-                    if customer.visit_count >= 3: # Tag as VIP after 3 visits
+                    if customer.visit_count >= 3: 
                         customer.is_vip = True
                     customer.save()
                 
                 try:
-                    # Trigger Post-Dining Feedback (Wait 7200 seconds / 2 Hours)
-                    from .tasks import send_post_dining_feedback
                     send_post_dining_feedback.apply_async((reservation.id, send_sms_flag), countdown=7200)
                 except Exception as e:
                     print(f"Warning: Could not queue celery task: {e}")
@@ -171,7 +165,6 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
             
             elif details_changed and reservation.status != 'CANCELLED':
                 try:
-                    from .tasks import send_booking_modification_notifications
                     send_booking_modification_notifications.delay(reservation.id, send_sms_flag)
                 except Exception as e:
                     print(f"Warning: Could not queue celery task: {e}")
@@ -203,8 +196,6 @@ class VIPRoomListView(generics.ListAPIView):
         return DiningArea.objects.filter(area_type='VIP', is_active=True).order_by('name')
     
 
-from datetime import datetime
-
 class ChatbotBookingWebhook(APIView):
     permission_classes = [] 
 
@@ -220,11 +211,11 @@ class ChatbotBookingWebhook(APIView):
             contact = data.get('contact')
             date_str = data.get('date') 
             
-            # 1. FIX: Missing data check
+            # SAFETY CHECK 1: Missing data check
             if not name or not contact or not date_str:
                  return Response({"messages": [{"text": "Missing required details (Name, Contact, or Date). Please try again."}]}, status=200)
 
-            # 2. FIX: Safe integer casting for pax
+            # SAFETY CHECK 2: Safe integer casting for pax
             raw_pax = data.get('pax')
             pax = int(raw_pax) if raw_pax else 2
             
@@ -258,7 +249,6 @@ class ChatbotBookingWebhook(APIView):
                 else:
                     return Response({"messages": [{"text": f"Sorry! We don't have a single VIP room large enough for {pax} guests. Please call us at (02) 8804-0332 for banquet options."}]}, status=200)
 
-                # Check which of these specific rooms are free
                 for room in suitable_rooms_query.order_by('capacity'):
                     is_booked = Reservation.objects.filter(
                         dining_area=room, date=date_str, session=session
@@ -289,7 +279,7 @@ class ChatbotBookingWebhook(APIView):
                     ).exclude(status__in=['CANCELLED', 'NO_SHOW']).aggregate(Sum('pax'))['pax__sum'] or 0
                     
                     if (total_pax + pax) > assigned_area.capacity:
-                        assigned_area = None # Mark as full
+                        assigned_area = None
 
             # --- 3. FULLY BOOKED RESPONSE ---
             if not assigned_area:
@@ -312,18 +302,13 @@ class ChatbotBookingWebhook(APIView):
                 source='SOCIAL', status='PENDING' 
             )
 
-            from .tasks import send_new_booking_notifications
             send_new_booking_notifications.delay(reservation.id)
 
-            # 3. FIX: Display the actual parsed time elegantly
-            time_obj = datetime.strptime(time_str, "%H:%M:%S")
-            display_time = time_obj.strftime("%I:%M %p")
-            
+            display_time = "11:00 AM" if session == 'LUNCH' else "5:30 PM"
             success_msg = f"{transfer_notice}Success! 🎉 Your table for {pax} on {date_str} at {display_time} in {assigned_area.name} is reserved. Ref: #{reservation.id}"
             
             return Response({"messages": [{"text": success_msg}]}, status=200)
 
         except Exception as e:
-            # We print the error to your server logs so you can debug if it fails
             print(f"Chatbot Webhook Error: {e}") 
             return Response({"messages": [{"text": "Something went wrong. Please try again or call us at (02) 8804-0332."}]}, status=200)
