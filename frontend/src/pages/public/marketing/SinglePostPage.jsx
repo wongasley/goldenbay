@@ -32,7 +32,8 @@ const SinglePostPage = () => {
   };
 
   if (loading) return (
-      <div className="min-h-screen bg-cream-50 pt-32 px-6 max-w-3xl mx-auto">
+      // FIX: Increased top padding here (pt-40 md:pt-48)
+      <div className="min-h-screen bg-cream-50 pt-40 md:pt-48 px-6 max-w-3xl mx-auto w-full">
           {/* Skeleton Loader */}
           <div className="h-4 w-24 bg-gray-200 animate-pulse mb-8 rounded"></div>
           <div className="h-6 w-32 bg-gray-200 animate-pulse mb-4 rounded"></div>
@@ -45,13 +46,13 @@ const SinglePostPage = () => {
 
   const imageUrl = post.image ? (post.image.startsWith('http') ? post.image : `${BACKEND_URL}${post.image}`) : '';
 
-  // FIX 1: Strip out hidden non-breaking spaces that cause text to stretch forever
   const cleanContent = post.content 
     ? post.content.replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ') 
     : '';
 
   return (
-    <div className="min-h-screen bg-cream-50 text-gray-900 pt-32 pb-20 px-6 md:px-24 overflow-x-hidden w-full">
+    // FIX: Increased top padding here (pt-40 md:pt-48) to clear the navbar gracefully
+    <div className="min-h-screen bg-cream-50 text-gray-900 pt-40 md:pt-48 pb-20 px-6 md:px-24 overflow-x-hidden w-full">
       
       <SEO 
         title={post.title}
@@ -85,7 +86,6 @@ const SinglePostPage = () => {
         )}
 
         <div className="w-full overflow-hidden">
-            {/* FIX 2: Aggressive Tailwind classes to force wrapping and image resizing */}
             <div 
                 className="prose prose-lg max-w-none w-full text-gray-600 font-light leading-relaxed prose-headings:text-gold-600 prose-headings:font-serif prose-a:text-gold-600 hover:prose-a:text-black prose-strong:text-gray-900 [&_*]:!max-w-full [&_*]:!whitespace-normal [&_*]:break-words [&_img]:!max-w-full [&_img]:!h-auto [&_img]:mx-auto [&_img]:rounded-md"
                 dangerouslySetInnerHTML={{ __html: cleanContent }} 
