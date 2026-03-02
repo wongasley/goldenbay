@@ -1,11 +1,13 @@
 from celery import shared_task
 from django.core.mail import send_mail
 from django.conf import settings
+from datetime import date, timedelta
+from django.db.models import Q
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 import os
 from .utils import send_sms
-from .models import Reservation 
+from .models import Customer, Reservation 
 
 @shared_task
 def send_new_booking_notifications(reservation_id, send_sms_flag=True):
@@ -186,3 +188,57 @@ def send_post_dining_feedback(reservation_id, send_sms_flag=True):
             
     except Exception as e:
         print(f"Celery Task Error (Feedback Loop): {e}")
+
+@shared_task
+def send_we_miss_you_automation():
+    """ ASYNCHRONOUS: Runs daily to re-engage old customers """
+    today = date.today()
+    ninety_days_ago = today - timedelta(days=90)
+    one_eighty_days_ago = today - timedelta(days=180)
+
+    # 1. Find customers who:
+    # - Have actually visited before (visit_count > 0)
+    # - Last visited over 90 days ago
+    # - Have NEVER received a retention message, OR haven't received one in 180 days
+    eligible_customers = Customer.objects.filter(
+        visit_count__gt=0,
+        last_visit__lte=ninety_days_ago
+    ).filter(
+        Q(last_retention_sent__isnull=True) | Q(last_retention_sent__lte=one_eighty_days_ago)
+    )
+
+    for customer in eligible_customers:
+        sent_any = False
+        
+        # 2. SEND SMS (If phone exists)
+        contact_digits = ''.join(filter(str.isdigit, str(customer.phone)))
+        if len(contact_digits) >= 10:
+            sms_body = f"Hi {customer.name}, we miss you at Golden Bay! It's been a while. Show this text for a complimentary dessert on your next dine-in visit with us. Call (02) 8804-0332 to reserve."
+            send_sms(customer.phone, sms_body)
+            sent_any = True
+            
+        # 3. SEND EMAIL (If email exists)
+        if customer.email and '@' in customer.email:
+            subject = "We miss you at Golden Bay!"
+            
+            # Pass the customer's name into the HTML template
+            context = {'name': customer.name}
+            html_message = render_to_string('emails/we_miss_you.html', context)
+            plain_message = strip_tags(html_message) # Fallback for non-HTML email clients
+            
+            send_mail(
+                subject=subject,
+                message=plain_message,
+                from_email=settings.EMAIL_HOST_USER,
+                recipient_list=[customer.email],
+                html_message=html_message,
+                fail_silently=True,
+            )
+            sent_any = True
+            
+        # 4. MARK AS SENT
+        if sent_any:
+            customer.last_retention_sent = today
+            customer.save(update_fields=['last_retention_sent'])
+
+    return f"Processed retention campaign for {eligible_customers.count()} customers."
