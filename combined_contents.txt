@@ -568,6 +568,7 @@ from django.db.models import Prefetch
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.core.cache import cache
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from .models import Category, MenuItem, MenuItemPrice
@@ -608,8 +609,13 @@ class AdminMenuItemUpdateView(generics.UpdateAPIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def perform_update(self, serializer):
+        # --- BLOCK RECEPTIONISTS ---
+        user = self.request.user
+        if not (user.is_superuser or user.groups.filter(name__in=['Admin', 'Supervisor']).exists()):
+            raise PermissionDenied("Only Supervisors and Admins can manage the menu.")
+            
         serializer.save()
-        cache.clear()  # Wipes the cache so the public menu updates instantly!
+        cache.clear()
 
 class AdminMenuItemPriceUpdateView(generics.UpdateAPIView):
     """ Updates specific Prices and Seasonal flags """
@@ -618,8 +624,13 @@ class AdminMenuItemPriceUpdateView(generics.UpdateAPIView):
     permission_classes = [IsAuthenticated]
 
     def perform_update(self, serializer):
+        # --- BLOCK RECEPTIONISTS ---
+        user = self.request.user
+        if not (user.is_superuser or user.groups.filter(name__in=['Admin', 'Supervisor']).exists()):
+            raise PermissionDenied("Only Supervisors and Admins can manage the menu.")
+            
         serializer.save()
-        cache.clear()  # Wipes the cache so the public menu updates instantly!
+        cache.clear()
 
 from django.contrib import admin
 from .models import Customer, DiningArea, Reservation
@@ -2290,6 +2301,7 @@ import { Users, Contact, Megaphone, AlertCircle, ArrowRight } from 'lucide-react
 import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import axiosInstance from '../../../utils/axiosInstance';
+import { canManageMarketing, canManageMenu } from '../../../utils/auth';
 
 const StatCard = ({ title, value, icon: Icon, colorClass, linkTo, subText }) => (
   <Link to={linkTo} className="group block h-full">
@@ -2312,6 +2324,8 @@ const StatCard = ({ title, value, icon: Icon, colorClass, linkTo, subText }) => 
 const AdminDashboardPage = () => {
   const [data, setData] = useState({ stats: { today_count: 0, pending_count: 0 }, recent_bookings: [], chart_data: [] });
   const [loading, setLoading] = useState(true);
+  const isMarketingAdmin = canManageMarketing();
+  const isMenuAdmin = canManageMenu();
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -2340,7 +2354,14 @@ const AdminDashboardPage = () => {
           <StatCard title="Today's Guests" value={loading ? "-" : data.stats.today_count} icon={Users} colorClass="blue" linkTo="/staff/bookings" subText="Reservations" />
           <StatCard title="Pending Actions" value={loading ? "-" : data.stats.pending_count} icon={AlertCircle} colorClass="red" linkTo="/staff/bookings" subText="Urgent" />
           <StatCard title="CRM" value="Phone Book" icon={Contact} colorClass="orange" linkTo="/staff/customers" />
-          <StatCard title="Content" value="Marketing" icon={Megaphone} colorClass="purple" linkTo="/staff/marketing" />
+          {isMarketingAdmin && (
+             <StatCard title="Content" value="Marketing" icon={Megaphone} colorClass="purple" linkTo="/staff/marketing" />
+          )}
+
+          {/* OPTIONAL: SHOW MENU MANAGER CARD TO SUPERVISORS/ADMINS */}
+          {isMenuAdmin && !isMarketingAdmin && (
+             <StatCard title="Menu" value="Menu Manager" icon={Utensils} colorClass="green" linkTo="/staff/menu" />
+          )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -7037,13 +7058,14 @@ import {
 } from 'lucide-react';
 import LogoutButton from '../auth/LogoutButton';
 import logo from '../../assets/images/goldenbaylogo.svg'; 
-import { getUserRole, canManageMarketing } from '../../utils/auth';
+import { getUserRole, canManageMarketing, canManageMenu } from '../../utils/auth';
 
 const AdminLayout = () => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const role = getUserRole(); // Get user role
   const isMarketingAdmin = canManageMarketing();
+  const isMenuAdmin = canManageMenu();
 
   // Close mobile menu when navigating
   useEffect(() => {
@@ -7053,9 +7075,9 @@ const AdminLayout = () => {
   const navItems = [
     { path: '/staff', label: 'Overview', icon: LayoutDashboard, show: true },
     { path: '/staff/bookings', label: 'Reservations', icon: CalendarDays, show: true },
-    { path: '/staff/menu', label: 'Menu Manager', icon: Utensils, show: true },
     { path: '/staff/customers', label: 'Phone Book', icon: Users, show: true },
-    { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: isMarketingAdmin }, // Only show to Admins
+    { path: '/staff/menu', label: 'Menu Manager', icon: Utensils, show: isMenuAdmin }, // <--- NOW RESTRICTED
+    { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: isMarketingAdmin },
   ].filter(item => item.show);
 
   return (
@@ -8610,6 +8632,11 @@ export const canCancelBooking = () => {
 export const canManageMarketing = () => {
     const role = getUserRole();
     return role === 'Admin';
+};
+
+export const canManageMenu = () => {
+    const role = getUserRole();
+    return role === 'Supervisor' || role === 'Admin';
 };
 
 import React from 'react';
