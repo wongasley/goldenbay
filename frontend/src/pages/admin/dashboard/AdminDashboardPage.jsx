@@ -3,6 +3,7 @@ import { Users, Contact, Megaphone, AlertCircle, ArrowRight } from 'lucide-react
 import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import axiosInstance from '../../../utils/axiosInstance';
+import { canManageMarketing, canManageMenu } from '../../../utils/auth';
 
 const StatCard = ({ title, value, icon: Icon, colorClass, linkTo, subText }) => (
   <Link to={linkTo} className="group block h-full">
@@ -25,6 +26,8 @@ const StatCard = ({ title, value, icon: Icon, colorClass, linkTo, subText }) => 
 const AdminDashboardPage = () => {
   const [data, setData] = useState({ stats: { today_count: 0, pending_count: 0 }, recent_bookings: [], chart_data: [] });
   const [loading, setLoading] = useState(true);
+  const isMarketingAdmin = canManageMarketing();
+  const isMenuAdmin = canManageMenu();
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -53,7 +56,14 @@ const AdminDashboardPage = () => {
           <StatCard title="Today's Guests" value={loading ? "-" : data.stats.today_count} icon={Users} colorClass="blue" linkTo="/staff/bookings" subText="Reservations" />
           <StatCard title="Pending Actions" value={loading ? "-" : data.stats.pending_count} icon={AlertCircle} colorClass="red" linkTo="/staff/bookings" subText="Urgent" />
           <StatCard title="CRM" value="Phone Book" icon={Contact} colorClass="orange" linkTo="/staff/customers" />
-          <StatCard title="Content" value="Marketing" icon={Megaphone} colorClass="purple" linkTo="/staff/marketing" />
+          {isMarketingAdmin && (
+             <StatCard title="Content" value="Marketing" icon={Megaphone} colorClass="purple" linkTo="/staff/marketing" />
+          )}
+
+          {/* OPTIONAL: SHOW MENU MANAGER CARD TO SUPERVISORS/ADMINS */}
+          {isMenuAdmin && !isMarketingAdmin && (
+             <StatCard title="Menu" value="Menu Manager" icon={Utensils} colorClass="green" linkTo="/staff/menu" />
+          )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
