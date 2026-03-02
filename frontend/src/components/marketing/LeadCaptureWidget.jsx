@@ -26,11 +26,17 @@ const LeadCaptureWidget = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Use public endpoint
-      await axiosInstance.post('/api/reservations/lead-capture/', formData);
+      const res = await axiosInstance.post('/api/reservations/lead-capture/', formData);
       setIsSubmitted(true);
       localStorage.setItem('gb_vip_widget_seen', 'true');
-      toast.success("Welcome to the VIP list!", { duration: 5000 });
+      
+      // NEW: Check the status returned from the backend
+      if (res.data.status === 'already_joined') {
+         toast('You are already on the VIP list!', { icon: '✨', duration: 4000 });
+      } else {
+         toast.success("Welcome! Check your SMS for your coupon.", { duration: 5000 });
+      }
+      
       setTimeout(() => setIsVisible(false), 3000);
     } catch (error) {
       toast.error('Something went wrong. Please try again.');

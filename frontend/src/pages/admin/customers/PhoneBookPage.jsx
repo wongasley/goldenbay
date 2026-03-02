@@ -220,6 +220,7 @@ const PhoneBookPage = () => {
                                     <div className="flex items-center gap-2">
                                         <h3 className="font-bold text-gray-900 text-sm truncate">{c.name}</h3>
                                         {c.is_vip && <span className="bg-gold-100 text-gold-700 text-[8px] font-bold px-1.5 py-0.5 rounded border border-gold-200 uppercase tracking-widest shrink-0">VIP</span>}
+                                        {c.has_claimed_vip_perk && <span className="bg-blue-50 text-blue-600 text-[8px] font-bold px-1.5 py-0.5 rounded border border-blue-200 uppercase tracking-widest shrink-0" title="Has claimed website welcome perk">Perk Claimed</span>}
                                     </div>
                                     <div className="md:hidden text-xs text-gray-500 font-mono mt-0.5">{c.phone}</div>
                                 </div>

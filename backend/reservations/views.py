@@ -6,7 +6,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
-
+from .utils import send_sms
 from .models import DiningArea, Reservation, Customer
 from .serializers import ReservationSerializer, DiningAreaSerializer, CustomerSerializer
 from .tasks import (
@@ -324,17 +324,15 @@ class ChatbotBookingWebhook(APIView):
 class LeadCaptureView(APIView):
     """ Public endpoint for the frontend VIP Perk Widget """
     permission_classes = [AllowAny]
-    throttle_classes = [AnonRateThrottle] # Protects against spam bots
+    throttle_classes = [AnonRateThrottle]
 
     def post(self, request):
         name = request.data.get('name')
         phone = request.data.get('phone')
         email = request.data.get('email')
-        dob = request.data.get('dob') # Expected format: YYYY-MM-DD
+        dob = request.data.get('dob') 
 
-        if not dob:
-            dob = None
-
+        if not dob: dob = None
         if not name or not phone:
             return Response({"error": "Name and Phone are required."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -343,18 +341,37 @@ class LeadCaptureView(APIView):
         if clean_phone.startswith('63') and len(clean_phone) == 12:
             clean_phone = '0' + clean_phone[2:]
 
-        # Update or Create the customer in the CRM
+        # Fetch or create the customer
         customer, created = Customer.objects.get_or_create(
             phone=clean_phone,
             defaults={'name': name, 'email': email, 'date_of_birth': dob, 'notes': 'Captured via Website VIP Widget'}
         )
 
-        if not created:
-            # If they already exist, enrich their profile with the new data
+        # --- NEW: Check if they already claimed it ---
+        if customer.has_claimed_vip_perk:
+            # Update info just in case they added a new email/birthday
             if email and not customer.email: customer.email = email
             if dob and not customer.date_of_birth: customer.date_of_birth = dob
             customer.save()
+            return Response({
+                "status": "already_joined", 
+                "message": "You are already on our VIP list! We look forward to seeing you."
+            }, status=status.HTTP_200_OK)
 
-        # Optional: You could trigger an immediate Welcome SMS here if you want.
-        
-        return Response({"message": "Success! Check your SMS/Email for your perk."}, status=status.HTTP_200_OK)
+        # --- If they haven't claimed it yet ---
+        customer.has_claimed_vip_perk = True
+        if not created: # Enrich existing profile
+            if email and not customer.email: customer.email = email
+            if dob and not customer.date_of_birth: customer.date_of_birth = dob
+            
+        customer.save()
+
+        # --- SEND THE ACTUAL SMS COUPON ---
+        if len(clean_phone) >= 10:
+            sms_body = f"Welcome to Golden Bay VIP, {name}! 🥂 Show this text to our receptionist on your next dine-in visit to claim your complimentary dessert. Reserve at: (02) 8804-0332"
+            send_sms(customer.phone, sms_body)
+
+        return Response({
+            "status": "success", 
+            "message": "Success! Check your SMS for your VIP perk."
+        }, status=status.HTTP_200_OK)

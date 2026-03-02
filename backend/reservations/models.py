@@ -124,7 +124,8 @@ class Customer(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     last_visit = models.DateField(auto_now=True)
     last_retention_sent = models.DateField(null=True, blank=True, help_text="When the last 'We Miss You' message was sent")
-
+    has_claimed_vip_perk = models.BooleanField(default=False, help_text="Has received the website welcome perk")
+    
     class Meta:
         ordering = ['name']
 
