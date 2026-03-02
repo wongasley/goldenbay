@@ -60,9 +60,16 @@ class ReservationCreateView(generics.CreateAPIView):
         reservation = serializer.save(encoded_by=user)
         send_sms_flag = str(self.request.data.get('send_sms', 'true')).lower() == 'true'
         
-        # 2. Fire notifications ASYNCHRONOUSLY
+        # 2. Fire notifications ASYNCHRONOUSLY based on creation status
         try:
-            send_new_booking_notifications.delay(reservation.id, send_sms_flag) 
+            # If an Admin/Receptionist makes a manual booking, it is created as 'CONFIRMED'
+            if reservation.status == 'CONFIRMED':
+                send_status_update_notifications.delay(reservation.id, 'CONFIRMED', send_sms_flag)
+            
+            # If a customer books via the Website, it is created as 'PENDING'
+            else:
+                send_new_booking_notifications.delay(reservation.id, send_sms_flag) 
+                
         except Exception as e:
             print(f"Warning: Could not queue celery task: {e}")
 
