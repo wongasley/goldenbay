@@ -117,6 +117,7 @@ FILES_TO_READ = [
     'frontend/src/components/layout/PixelTracker.jsx',
     'frontend/src/pages/admin/marketing/CampaignBuilder.jsx',
     'frontend/src/pages/admin/menu/MenuManager.jsx',
+    'frontend/src/components/marketing/LeadCaptureWidget.jsx',
 
 ]
 

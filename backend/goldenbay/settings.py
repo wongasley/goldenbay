@@ -230,4 +230,8 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'reservations.tasks.send_we_miss_you_automation',
         'schedule': crontab(hour=10, minute=0), # Runs every day at 10:00 AM
     },
+    'send-birthday-promos-daily': {
+        'task': 'reservations.tasks.send_birthday_promos',
+        'schedule': crontab(hour=11, minute=0), # Runs every day at 11:00 AM
+    },
 }

@@ -108,7 +108,8 @@ class Customer(models.Model):
     name = models.CharField(max_length=200)
     phone = models.CharField(max_length=50, unique=True) # Phone is the unique key
     email = models.EmailField(blank=True, null=True)
-    
+    date_of_birth = models.DateField(blank=True, null=True, help_text="Used for automated birthday promos")
+    last_birthday_promo_year = models.IntegerField(blank=True, null=True, help_text="Prevents sending multiple times a year")
     # Socials
     wechat = models.CharField(max_length=100, blank=True, null=True)
     viber = models.CharField(max_length=100, blank=True, null=True)

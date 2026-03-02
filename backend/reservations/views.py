@@ -15,6 +15,7 @@ from .tasks import (
     send_booking_modification_notifications, 
     send_post_dining_feedback
 )
+from rest_framework.throttling import AnonRateThrottle
 
 class AvailableRoomsView(APIView):
     def get(self, request):
@@ -319,3 +320,41 @@ class ChatbotBookingWebhook(APIView):
         except Exception as e:
             print(f"Chatbot Webhook Error: {e}") 
             return Response({"messages": [{"text": "Something went wrong. Please try again or call us at (02) 8804-0332."}]}, status=200)
+        
+class LeadCaptureView(APIView):
+    """ Public endpoint for the frontend VIP Perk Widget """
+    permission_classes = [AllowAny]
+    throttle_classes = [AnonRateThrottle] # Protects against spam bots
+
+    def post(self, request):
+        name = request.data.get('name')
+        phone = request.data.get('phone')
+        email = request.data.get('email')
+        dob = request.data.get('dob') # Expected format: YYYY-MM-DD
+
+        if not dob:
+            dob = None
+
+        if not name or not phone:
+            return Response({"error": "Name and Phone are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Clean the phone number
+        clean_phone = ''.join(filter(str.isdigit, str(phone)))
+        if clean_phone.startswith('63') and len(clean_phone) == 12:
+            clean_phone = '0' + clean_phone[2:]
+
+        # Update or Create the customer in the CRM
+        customer, created = Customer.objects.get_or_create(
+            phone=clean_phone,
+            defaults={'name': name, 'email': email, 'date_of_birth': dob, 'notes': 'Captured via Website VIP Widget'}
+        )
+
+        if not created:
+            # If they already exist, enrich their profile with the new data
+            if email and not customer.email: customer.email = email
+            if dob and not customer.date_of_birth: customer.date_of_birth = dob
+            customer.save()
+
+        # Optional: You could trigger an immediate Welcome SMS here if you want.
+        
+        return Response({"message": "Success! Check your SMS/Email for your perk."}, status=status.HTTP_200_OK)

@@ -44,14 +44,20 @@ const CampaignBuilder = () => {
       <form onSubmit={handleSend} className="space-y-8">
         
         {/* Targeting Setup */}
-        <div className="w-full md:w-1/2">
-            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Target Audience</label>
-            <div className="flex gap-2">
+        <div className="w-full">
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Target Audience Segment</label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <button type="button" onClick={() => setFormData({...formData, audience: 'ALL'})} className={btnClass(formData.audience === 'ALL')}>
                     <Users size={14}/> All Clients
                 </button>
                 <button type="button" onClick={() => setFormData({...formData, audience: 'VIP'})} className={btnClass(formData.audience === 'VIP')}>
                     <Star size={14}/> VIPs Only
+                </button>
+                <button type="button" onClick={() => setFormData({...formData, audience: 'INACTIVE_6M'})} className={btnClass(formData.audience === 'INACTIVE_6M')}>
+                    Awaken (6mo+ Inactive)
+                </button>
+                <button type="button" onClick={() => setFormData({...formData, audience: 'MANILA_VIP'})} className={btnClass(formData.audience === 'MANILA_VIP')}>
+                    Manila Room Spenders
                 </button>
             </div>
         </div>

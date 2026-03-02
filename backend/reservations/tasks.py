@@ -242,3 +242,28 @@ def send_we_miss_you_automation():
             customer.save(update_fields=['last_retention_sent'])
 
     return f"Processed retention campaign for {eligible_customers.count()} customers."
+
+@shared_task
+def send_birthday_promos():
+    """ Runs daily to find customers with a birthday exactly 7 days from now """
+    today = date.today()
+    target_date = today + timedelta(days=7)
+    current_year = today.year
+
+    # Find customers born on this month & day, who haven't received a promo THIS year
+    birthday_customers = Customer.objects.filter(
+        date_of_birth__month=target_date.month,
+        date_of_birth__day=target_date.day
+    ).exclude(last_birthday_promo_year=current_year)
+
+    for customer in birthday_customers:
+        contact_digits = ''.join(filter(str.isdigit, str(customer.phone)))
+        if len(contact_digits) >= 10:
+            sms_body = f"Advance Happy Birthday, {customer.name}! 🎉 Celebrate your special day at Golden Bay. Show this text within your birthday month for a complimentary Longevity Peach Bun on us! Reserve at (02) 8804-0332"
+            send_sms(customer.phone, sms_body)
+            
+            # Mark as sent for this year
+            customer.last_birthday_promo_year = current_year
+            customer.save(update_fields=['last_birthday_promo_year'])
+
+    return f"Sent birthday promos to {birthday_customers.count()} customers."

@@ -9,6 +9,7 @@ import ScrollToTop from './components/layout/ScrollToTop';
 import FloatingWidget from './components/layout/FloatingWidget'; 
 import { LanguageProvider } from './context/LanguageContext';
 import PixelTracker from './components/layout/PixelTracker';
+import LeadCaptureWidget from './components/marketing/LeadCaptureWidget';
 
 // --- LAZY LOAD PUBLIC PAGES ---
 const HomePage = lazy(() => import('./pages/public/home/HomePage'));
@@ -101,6 +102,7 @@ function App() {
 
         {/* Widget Component (Old manual widget was removed from here) */}
         <FloatingWidget />
+        <LeadCaptureWidget />
 
       </div>
     </Router>
