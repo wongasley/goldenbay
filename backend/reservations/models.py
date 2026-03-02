@@ -122,6 +122,7 @@ class Customer(models.Model):
     notes = models.TextField(blank=True, null=True, help_text="VVIP status, allergies, preferences")
     created_at = models.DateTimeField(auto_now_add=True)
     last_visit = models.DateField(auto_now=True)
+    last_retention_sent = models.DateField(null=True, blank=True, help_text="When the last 'We Miss You' message was sent")
 
     class Meta:
         ordering = ['name']

@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv # Import this to read .env
+from celery.schedules import crontab
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -223,3 +224,10 @@ CELERY_TASK_SERIALIZER = 'json'
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 20971520 
 FILE_UPLOAD_MAX_MEMORY_SIZE = 20971520
+
+CELERY_BEAT_SCHEDULE = {
+    'send-we-miss-you-daily': {
+        'task': 'reservations.tasks.send_we_miss_you_automation',
+        'schedule': crontab(hour=10, minute=0), # Runs every day at 10:00 AM
+    },
+}

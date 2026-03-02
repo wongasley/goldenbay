@@ -31,3 +31,13 @@ class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = ['id', 'name', 'name_zh', 'name_zh_hant', 'name_ja', 'name_ko', 'items']
+
+class AdminMenuItemUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MenuItem
+        fields = ['is_available', 'image']
+
+class AdminMenuItemPriceUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MenuItemPrice
+        fields = ['price', 'is_seasonal']
