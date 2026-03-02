@@ -788,7 +788,8 @@ class Customer(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     last_visit = models.DateField(auto_now=True)
     last_retention_sent = models.DateField(null=True, blank=True, help_text="When the last 'We Miss You' message was sent")
-
+    has_claimed_vip_perk = models.BooleanField(default=False, help_text="Has received the website welcome perk")
+    
     class Meta:
         ordering = ['name']
 
@@ -942,7 +943,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
-
+from .utils import send_sms
 from .models import DiningArea, Reservation, Customer
 from .serializers import ReservationSerializer, DiningAreaSerializer, CustomerSerializer
 from .tasks import (
@@ -1260,17 +1261,15 @@ class ChatbotBookingWebhook(APIView):
 class LeadCaptureView(APIView):
     """ Public endpoint for the frontend VIP Perk Widget """
     permission_classes = [AllowAny]
-    throttle_classes = [AnonRateThrottle] # Protects against spam bots
+    throttle_classes = [AnonRateThrottle]
 
     def post(self, request):
         name = request.data.get('name')
         phone = request.data.get('phone')
         email = request.data.get('email')
-        dob = request.data.get('dob') # Expected format: YYYY-MM-DD
+        dob = request.data.get('dob') 
 
-        if not dob:
-            dob = None
-
+        if not dob: dob = None
         if not name or not phone:
             return Response({"error": "Name and Phone are required."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1279,21 +1278,40 @@ class LeadCaptureView(APIView):
         if clean_phone.startswith('63') and len(clean_phone) == 12:
             clean_phone = '0' + clean_phone[2:]
 
-        # Update or Create the customer in the CRM
+        # Fetch or create the customer
         customer, created = Customer.objects.get_or_create(
             phone=clean_phone,
             defaults={'name': name, 'email': email, 'date_of_birth': dob, 'notes': 'Captured via Website VIP Widget'}
         )
 
-        if not created:
-            # If they already exist, enrich their profile with the new data
+        # --- NEW: Check if they already claimed it ---
+        if customer.has_claimed_vip_perk:
+            # Update info just in case they added a new email/birthday
             if email and not customer.email: customer.email = email
             if dob and not customer.date_of_birth: customer.date_of_birth = dob
             customer.save()
+            return Response({
+                "status": "already_joined", 
+                "message": "You are already on our VIP list! We look forward to seeing you."
+            }, status=status.HTTP_200_OK)
 
-        # Optional: You could trigger an immediate Welcome SMS here if you want.
-        
-        return Response({"message": "Success! Check your SMS/Email for your perk."}, status=status.HTTP_200_OK)
+        # --- If they haven't claimed it yet ---
+        customer.has_claimed_vip_perk = True
+        if not created: # Enrich existing profile
+            if email and not customer.email: customer.email = email
+            if dob and not customer.date_of_birth: customer.date_of_birth = dob
+            
+        customer.save()
+
+        # --- SEND THE ACTUAL SMS COUPON ---
+        if len(clean_phone) >= 10:
+            sms_body = f"Welcome to Golden Bay VIP, {name}! 🥂 Show this text to our receptionist on your next dine-in visit to claim your complimentary dessert. Reserve at: (02) 8804-0332"
+            send_sms(customer.phone, sms_body)
+
+        return Response({
+            "status": "success", 
+            "message": "Success! Check your SMS for your VIP perk."
+        }, status=status.HTTP_200_OK)
 
 import requests
 import os
@@ -7003,6 +7021,7 @@ const PhoneBookPage = () => {
                                     <div className="flex items-center gap-2">
                                         <h3 className="font-bold text-gray-900 text-sm truncate">{c.name}</h3>
                                         {c.is_vip && <span className="bg-gold-100 text-gold-700 text-[8px] font-bold px-1.5 py-0.5 rounded border border-gold-200 uppercase tracking-widest shrink-0">VIP</span>}
+                                        {c.has_claimed_vip_perk && <span className="bg-blue-50 text-blue-600 text-[8px] font-bold px-1.5 py-0.5 rounded border border-blue-200 uppercase tracking-widest shrink-0" title="Has claimed website welcome perk">Perk Claimed</span>}
                                     </div>
                                     <div className="md:hidden text-xs text-gray-500 font-mono mt-0.5">{c.phone}</div>
                                 </div>
@@ -9194,11 +9213,17 @@ const LeadCaptureWidget = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Use public endpoint
-      await axiosInstance.post('/api/reservations/lead-capture/', formData);
+      const res = await axiosInstance.post('/api/reservations/lead-capture/', formData);
       setIsSubmitted(true);
       localStorage.setItem('gb_vip_widget_seen', 'true');
-      toast.success("Welcome to the VIP list!", { duration: 5000 });
+      
+      // NEW: Check the status returned from the backend
+      if (res.data.status === 'already_joined') {
+         toast('You are already on the VIP list!', { icon: '✨', duration: 4000 });
+      } else {
+         toast.success("Welcome! Check your SMS for your coupon.", { duration: 5000 });
+      }
+      
       setTimeout(() => setIsVisible(false), 3000);
     } catch (error) {
       toast.error('Something went wrong. Please try again.');
