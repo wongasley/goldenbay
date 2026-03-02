@@ -17,6 +17,7 @@ const AdminLayout = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const role = getUserRole(); // Get user role
   const isMarketingAdmin = canManageMarketing();
+  const isMenuAdmin = canManageMenu();
 
   // Close mobile menu when navigating
   useEffect(() => {
