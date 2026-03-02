@@ -22,3 +22,8 @@ export const canManageMarketing = () => {
     const role = getUserRole();
     return role === 'Admin';
 };
+
+export const canManageMenu = () => {
+    const role = getUserRole();
+    return role === 'Supervisor' || role === 'Admin';
+};

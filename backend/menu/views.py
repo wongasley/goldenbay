@@ -4,6 +4,7 @@ from django.db.models import Prefetch
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.core.cache import cache
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from .models import Category, MenuItem, MenuItemPrice
@@ -44,8 +45,13 @@ class AdminMenuItemUpdateView(generics.UpdateAPIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def perform_update(self, serializer):
+        # --- BLOCK RECEPTIONISTS ---
+        user = self.request.user
+        if not (user.is_superuser or user.groups.filter(name__in=['Admin', 'Supervisor']).exists()):
+            raise PermissionDenied("Only Supervisors and Admins can manage the menu.")
+            
         serializer.save()
-        cache.clear()  # Wipes the cache so the public menu updates instantly!
+        cache.clear()
 
 class AdminMenuItemPriceUpdateView(generics.UpdateAPIView):
     """ Updates specific Prices and Seasonal flags """
@@ -54,5 +60,10 @@ class AdminMenuItemPriceUpdateView(generics.UpdateAPIView):
     permission_classes = [IsAuthenticated]
 
     def perform_update(self, serializer):
+        # --- BLOCK RECEPTIONISTS ---
+        user = self.request.user
+        if not (user.is_superuser or user.groups.filter(name__in=['Admin', 'Supervisor']).exists()):
+            raise PermissionDenied("Only Supervisors and Admins can manage the menu.")
+            
         serializer.save()
-        cache.clear()  # Wipes the cache so the public menu updates instantly!
+        cache.clear()

@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import LogoutButton from '../auth/LogoutButton';
 import logo from '../../assets/images/goldenbaylogo.svg'; 
-import { getUserRole, canManageMarketing } from '../../utils/auth';
+import { getUserRole, canManageMarketing, canManageMenu } from '../../utils/auth';
 
 const AdminLayout = () => {
   const location = useLocation();
@@ -26,9 +26,9 @@ const AdminLayout = () => {
   const navItems = [
     { path: '/staff', label: 'Overview', icon: LayoutDashboard, show: true },
     { path: '/staff/bookings', label: 'Reservations', icon: CalendarDays, show: true },
-    { path: '/staff/menu', label: 'Menu Manager', icon: Utensils, show: true },
     { path: '/staff/customers', label: 'Phone Book', icon: Users, show: true },
-    { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: isMarketingAdmin }, // Only show to Admins
+    { path: '/staff/menu', label: 'Menu Manager', icon: Utensils, show: isMenuAdmin }, // <--- NOW RESTRICTED
+    { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: isMarketingAdmin },
   ].filter(item => item.show);
 
   return (
