@@ -141,6 +141,7 @@ class Customer(models.Model):
 class RewardItem(models.Model):
     """ Food items that customers can redeem using their points """
     name = models.CharField(max_length=200)
+    size = models.CharField(max_length=50, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     points_required = models.IntegerField(help_text="How many points this costs")
     image = models.ImageField(upload_to='rewards/', blank=True, null=True)

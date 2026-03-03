@@ -228,8 +228,16 @@ const CustomerRewardsPage = () => {
                                             )}
                                         </div>
                                         <div>
-                                            <h4 className="font-bold text-gray-900 text-sm leading-tight mb-1">{reward.name}</h4>
-                                            <p className="text-[10px] text-gray-500 line-clamp-2 leading-relaxed">{reward.description}</p>
+                                            <h4 className="font-bold text-gray-900 text-sm leading-tight mb-1">
+                                                {reward.name} 
+                                                {/* Show the size in a small badge next to the name */}
+                                                <span className="ml-2 text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">
+                                                    {reward.size}
+                                                </span>
+                                            </h4>
+                                            <p className="text-[10px] text-gray-500 line-clamp-2 leading-relaxed">
+                                                {reward.description}
+                                            </p>
                                         </div>
                                     </div>
                                     

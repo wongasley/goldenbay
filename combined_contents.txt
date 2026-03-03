@@ -1474,7 +1474,7 @@ class AwardPointsView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         phone = serializer.validated_data['phone']
-        amount_spent = serializer.validated_data['amount_spent']
+        amount_spent = float(serializer.validated_data['amount_spent'])
         name = serializer.validated_data.get('name', 'Valued Guest')
 
         # Clean the phone number
@@ -1493,15 +1493,18 @@ class AwardPointsView(APIView):
             customer.name = name
             customer.save(update_fields=['name'])
 
-        # 2. Calculate Points (e.g., 100 PHP = 1 Point)
-        # Using math.floor so 1,550 PHP = 15 points.
-        points_earned = math.floor(amount_spent / 100)
+        # 2. NEW LOGIC: Calculate Points with VIP Multiplier
+        # Base: 100 PHP = 1 Point
+        # VIP: 100 PHP = 1.5 Points
+        base_rate = amount_spent / 100
+        multiplier = 1.5 if customer.is_vip else 1.0
+        points_earned = math.floor(base_rate * multiplier)
 
         if points_earned <= 0:
             return Response({"message": "Amount too low to earn points."}, status=status.HTTP_200_OK)
 
-        # 3. Create Transaction (This automatically updates customer.points_balance due to our models.py logic)
-        transaction = PointTransaction.objects.create(
+        # 3. Create Transaction
+        PointTransaction.objects.create(
             customer=customer,
             transaction_type='EARNED',
             points=points_earned,
@@ -1518,6 +1521,7 @@ class AwardPointsView(APIView):
         return Response({
             "message": "Points successfully awarded!",
             "customer_name": customer.name,
+            "is_vip": customer.is_vip,
             "points_earned": points_earned,
             "new_balance": customer.points_balance
         }, status=status.HTTP_200_OK)
@@ -10293,7 +10297,7 @@ class Command(BaseCommand):
         # 2. Set your Point Conversion Rate
         # Example: 1 means a ₱258 Hakaw costs 258 points to redeem.
         # If you want it to cost less points, change to 0.5 (129 pts) or 10 (2580 pts).
-        POINTS_MULTIPLIER = 1 
+        POINTS_MULTIPLIER = 0.5
 
         # Wipe existing rewards to prevent duplicates if you run this multiple times
         RewardItem.objects.all().delete()
