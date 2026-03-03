@@ -1,5 +1,22 @@
-frontend/public/videos/hero-background.mp4
+# Python junk
+venv/
 env/
-*.pyc
 __pycache__/
+*.pyc
+
+# Django junk
+backend/staticfiles/
+backend/media/
+backend/db.sqlite3
+
+# Frontend junk
+frontend/node_modules/
+frontend/dist/
+
+# Large binaries
+*.mp4
+*.mov
+*.wav
+
+# Environment variables
 .env

@@ -397,7 +397,7 @@ class AwardPointsView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         phone = serializer.validated_data['phone']
-        amount_spent = Decimal(serializer.validated_data['amount_spent'])
+        amount_spent = Decimal(str(serializer.validated_data['amount_spent']))
         name = serializer.validated_data.get('name', 'Valued Guest')
 
         # Clean the phone number
@@ -420,7 +420,7 @@ class AwardPointsView(APIView):
         # Base: 100 PHP = 1 Point
         # VIP: 100 PHP = 1.5 Points
         base_rate = amount_spent / 100
-        multiplier = 1.5 if customer.is_vip else 1.0
+        multiplier = Decimal('1.5') if customer.is_vip else Decimal('1.0')
         points_earned = math.floor(base_rate * multiplier)
 
         if points_earned <= 0:
@@ -450,54 +450,64 @@ class AwardPointsView(APIView):
         }, status=status.HTTP_200_OK)
     
 class RedeemRewardView(APIView):
-    permission_classes = [IsAuthenticated] # Ensures only logged-in customers can hit this
+    """
+    Atomic points deduction to prevent double-spending exploits.
+    Uses database-level row locking (SELECT FOR UPDATE).
+    """
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        # 1. Identify the Customer (JWT username is their phone number)
-        try:
-            customer = Customer.objects.get(phone=request.user.username)
-        except Customer.DoesNotExist:
-            return Response({"error": "Customer profile not found."}, status=status.HTTP_404_NOT_FOUND)
-
+        customer_phone = request.user.username
         reward_id = request.data.get('reward_id')
+
+        if not reward_id:
+            return Response({"error": "Reward ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            reward = RewardItem.objects.get(id=reward_id, is_active=True)
-        except RewardItem.DoesNotExist:
-            return Response({"error": "Reward unavailable."}, status=status.HTTP_404_NOT_FOUND)
+            with transaction.atomic():
+                # 1. Lock the customer row immediately to prevent race conditions
+                customer = Customer.objects.select_for_update().get(phone=customer_phone)
+                
+                # 2. Identify the reward
+                try:
+                    reward = RewardItem.objects.get(id=reward_id, is_active=True)
+                except RewardItem.DoesNotExist:
+                    return Response({"error": "Reward is currently unavailable."}, status=status.HTTP_404_NOT_FOUND)
 
-        # 2. Check Balance
-        if customer.points_balance < reward.points_required:
-            return Response({"error": "Insufficient points balance."}, status=status.HTTP_400_BAD_REQUEST)
+                # 3. Final Balance Validation (Happens while row is locked)
+                if customer.points_balance < reward.points_required:
+                    return Response({
+                        "error": "Insufficient points balance.",
+                        "current_balance": customer.points_balance,
+                        "required": reward.points_required
+                    }, status=status.HTTP_400_BAD_REQUEST)
 
-        # 3. Process Transaction Safely
-        with transaction.atomic():
-            # Re-fetch and lock the row to prevent double-clicking exploits
-            customer = Customer.objects.select_for_update().get(id=customer.id)
-            
-            if customer.points_balance >= reward.points_required:
-                # Create the Cashier Ticket
+                # 4. Create the Fulfillment Ticket for staff
                 RewardRedemption.objects.create(
-                    customer=customer,
-                    reward_item=reward,
+                    customer=customer, 
+                    reward_item=reward, 
                     status='PENDING'
                 )
-                
-                # Deduct points (this auto-updates customer.points_balance via your models.py save logic)
+
+                # 5. Log the deduction (Deducts points via your models.py save logic)
                 PointTransaction.objects.create(
-                    customer=customer,
-                    transaction_type='REDEEMED',
+                    customer=customer, 
+                    transaction_type='REDEEMED', 
                     points=reward.points_required,
                     reward_item=reward
                 )
                 
-                # Fetch fresh balance to send back to React
+                # 6. Get the fresh balance after deduction
                 customer.refresh_from_db()
+                
                 return Response({
-                    "message": f"Successfully redeemed {reward.name}! Show this to your waiter.",
+                    "message": f"Successfully redeemed {reward.name}! Please show this to your waiter.",
                     "new_balance": customer.points_balance
                 }, status=status.HTTP_200_OK)
-            else:
-                return Response({"error": "Insufficient points."}, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            # Catching generic DB errors or connection issues
+            return Response({"error": "An internal error occurred. Please try again."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
 class StaffRedemptionListView(generics.ListAPIView):
     """ Lists all redemptions for the staff dashboard """

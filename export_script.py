@@ -121,6 +121,7 @@ FILES_TO_READ = [
     'frontend/src/pages/public/marketing/CustomerRewardsPage.jsx',
     'frontend/src/pages/admin/customers/RewardsManager.jsx',
     'backend/menu/management/commands/seed_rewards.py',
+    '.gitignore',
 
 ]
 
