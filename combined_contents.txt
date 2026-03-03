@@ -271,8 +271,8 @@ urlpatterns = [
     path('api/menu/', include('menu.urls')),         # <--- We will enable these soon
     path('api/reservations/', include('reservations.urls')), 
     path('api/marketing/', include('marketing.urls')),
+    path('api/users/', include('users.urls')),
     path('sitemap.xml', dynamic_sitemap, name='dynamic_sitemap'),
-    # path('api/events/', include('events.urls')), 
     path('api/token/', ThrottledTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
@@ -637,7 +637,7 @@ class AdminMenuItemPriceUpdateView(generics.UpdateAPIView):
         cache.clear()
 
 from django.contrib import admin
-from .models import Customer, DiningArea, Reservation
+from .models import Customer, DiningArea, PointTransaction, Reservation, RewardItem
 
 @admin.register(DiningArea)
 class DiningAreaAdmin(admin.ModelAdmin):
@@ -655,6 +655,18 @@ class CustomerAdmin(admin.ModelAdmin):
     search_fields = ('name', 'phone', 'email')
     list_filter = ('is_vip',)
 
+@admin.register(RewardItem)
+class RewardItemAdmin(admin.ModelAdmin):
+    list_display = ('name', 'points_required', 'is_active')
+    list_filter = ('is_active',)
+
+@admin.register(PointTransaction)
+class PointTransactionAdmin(admin.ModelAdmin):
+    list_display = ('customer', 'transaction_type', 'points', 'amount_spent', 'created_at')
+    list_filter = ('transaction_type', 'created_at')
+    search_fields = ('customer__name', 'customer__phone')
+    readonly_fields = ('created_at',)
+
 from django.apps import AppConfig
 
 
@@ -668,6 +680,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
 from simple_history.models import HistoricalRecords
+from django.db import transaction
 
 class DiningArea(models.Model):
     TYPE_CHOICES = [
@@ -744,6 +757,9 @@ class Reservation(models.Model):
     
     history = HistoricalRecords() # <--- ADD THIS
     
+    final_bill_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Total bill paid (for point calculation)")
+    points_earned = models.IntegerField(default=0, help_text="Points awarded for this specific visit")
+
     class Meta:
         ordering = ['-date', '-time']
 
@@ -789,12 +805,74 @@ class Customer(models.Model):
     last_visit = models.DateField(auto_now=True)
     last_retention_sent = models.DateField(null=True, blank=True, help_text="When the last 'We Miss You' message was sent")
     has_claimed_vip_perk = models.BooleanField(default=False, help_text="Has received the website welcome perk")
-    
+
+    points_balance = models.IntegerField(default=0, help_text="Current available points")
+
     class Meta:
         ordering = ['name']
 
     def __str__(self):
         return f"{self.name} ({self.phone})"
+    
+class RewardItem(models.Model):
+    """ Food items that customers can redeem using their points """
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True, null=True)
+    points_required = models.IntegerField(help_text="How many points this costs")
+    image = models.ImageField(upload_to='rewards/', blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['points_required']
+
+    def __str__(self):
+        return f"{self.name} ({self.points_required} pts)"
+
+class PointTransaction(models.Model):
+    """ The ledger that tracks every point earned or spent """
+    TYPE_CHOICES = [
+        ('EARNED', 'Earned'),
+        ('REDEEMED', 'Redeemed'),
+    ]
+    
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='point_transactions')
+    transaction_type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+    points = models.IntegerField(help_text="Amount of points (e.g., 150)")
+    
+    # Optional context fields
+    amount_spent = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="If EARNED, the bill amount")
+    reservation = models.ForeignKey(Reservation, on_delete=models.SET_NULL, null=True, blank=True, related_name='point_transactions', help_text="Null if walk-in")
+    reward_item = models.ForeignKey(RewardItem, on_delete=models.SET_NULL, null=True, blank=True, help_text="Filled if REDEEMED")
+    
+    # Meta tracking
+    created_at = models.DateTimeField(auto_now_add=True)
+    encoded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        sign = "+" if self.transaction_type == 'EARNED' else "-"
+        return f"{self.customer.name} | {sign}{self.points} pts"
+        
+    def save(self, *args, **kwargs):
+        """ 
+        Automatically update the Customer's total points balance 
+        whenever a new transaction is saved!
+        """
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        
+        if is_new:
+            # Lock the customer row temporarily to prevent race conditions if multiple cashiers add points at the exact same second
+            with transaction.atomic():
+                cust = Customer.objects.select_for_update().get(pk=self.customer.pk)
+                if self.transaction_type == 'EARNED':
+                    cust.points_balance += self.points
+                elif self.transaction_type == 'REDEEMED':
+                    cust.points_balance -= self.points
+                cust.save(update_fields=['points_balance'])
 
 # --- ADD THIS SIGNAL TO AUTO-SAVE CUSTOMERS ---
 @receiver(post_save, sender=Reservation)
@@ -826,7 +904,7 @@ def save_customer_from_reservation(sender, instance, created, **kwargs):
 
 from rest_framework import serializers
 from django.db.models import Sum
-from .models import DiningArea, Reservation, Customer
+from .models import DiningArea, PointTransaction, Reservation, Customer, RewardItem
 from django.db import transaction
 
 class DiningAreaSerializer(serializers.ModelSerializer):
@@ -919,8 +997,24 @@ class CustomerSerializer(serializers.ModelSerializer):
         model = Customer
         fields = '__all__'
 
+class RewardItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RewardItem
+        fields = '__all__'
+
+class PointTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PointTransaction
+        fields = '__all__'
+
+class AwardPointsSerializer(serializers.Serializer):
+    """ Custom serializer for the Cashier 'Quick Add' pop-up """
+    phone = serializers.CharField(max_length=20)
+    name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    amount_spent = serializers.DecimalField(max_digits=10, decimal_places=2)
+
 from django.urls import path
-from .views import AdminReservationDetailView, AdminReservationListView, AvailableRoomsView, ChatbotBookingWebhook, CustomerDetailView, CustomerListView, DashboardStatsView, LeadCaptureView, ReservationCreateView, VIPRoomListView
+from .views import AdminReservationDetailView, AdminReservationListView, AvailableRoomsView, AwardPointsView, ChatbotBookingWebhook, CustomerDetailView, CustomerListView, DashboardStatsView, LeadCaptureView, ReservationCreateView, RewardItemListView, VIPRoomListView
 
 urlpatterns = [
     path('check/', AvailableRoomsView.as_view(), name='check_availability'),
@@ -933,6 +1027,8 @@ urlpatterns = [
     path('rooms/', VIPRoomListView.as_view(), name='vip_room_list'),
     path('bot-webhook/', ChatbotBookingWebhook.as_view(), name='bot_webhook'),
     path('lead-capture/', LeadCaptureView.as_view(), name='lead_capture'),
+    path('rewards/', RewardItemListView.as_view(), name='reward_list'),
+    path('award-points/', AwardPointsView.as_view(), name='award_points'),
 ]
 
 import os
@@ -944,15 +1040,17 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from .utils import send_sms
-from .models import DiningArea, Reservation, Customer
-from .serializers import ReservationSerializer, DiningAreaSerializer, CustomerSerializer
+from .models import DiningArea, PointTransaction, Reservation, Customer, RewardItem
+from .serializers import AwardPointsSerializer, ReservationSerializer, DiningAreaSerializer, CustomerSerializer, RewardItemSerializer
 from .tasks import (
-    send_new_booking_notifications, 
+    send_new_booking_notifications,
+    send_points_awarded_sms, 
     send_status_update_notifications, 
     send_booking_modification_notifications, 
     send_post_dining_feedback
 )
 from rest_framework.throttling import AnonRateThrottle
+import math
 
 class AvailableRoomsView(APIView):
     def get(self, request):
@@ -1312,6 +1410,71 @@ class LeadCaptureView(APIView):
             "status": "success", 
             "message": "Success! Check your SMS for your VIP perk."
         }, status=status.HTTP_200_OK)
+    
+class RewardItemListView(generics.ListAPIView):
+    """ Public endpoint to list all available rewards """
+    queryset = RewardItem.objects.filter(is_active=True).order_by('points_required')
+    serializer_class = RewardItemSerializer
+    permission_classes = [AllowAny]
+
+
+class AwardPointsView(APIView):
+    """ Endpoint for cashiers to quickly add points via phone number """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = AwardPointsSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        phone = serializer.validated_data['phone']
+        amount_spent = serializer.validated_data['amount_spent']
+        name = serializer.validated_data.get('name', 'Valued Guest')
+
+        # Clean the phone number
+        clean_phone = ''.join(filter(str.isdigit, str(phone)))
+        if clean_phone.startswith('63') and len(clean_phone) == 12:
+            clean_phone = '0' + clean_phone[2:]
+
+        # 1. Get or Create Customer
+        customer, created = Customer.objects.get_or_create(
+            phone=clean_phone,
+            defaults={'name': name}
+        )
+
+        # Update name if it was a generic "Valued Guest" previously
+        if not created and name != 'Valued Guest' and customer.name == 'Valued Guest':
+            customer.name = name
+            customer.save(update_fields=['name'])
+
+        # 2. Calculate Points (e.g., 100 PHP = 1 Point)
+        # Using math.floor so 1,550 PHP = 15 points.
+        points_earned = math.floor(amount_spent / 100)
+
+        if points_earned <= 0:
+            return Response({"message": "Amount too low to earn points."}, status=status.HTTP_200_OK)
+
+        # 3. Create Transaction (This automatically updates customer.points_balance due to our models.py logic)
+        transaction = PointTransaction.objects.create(
+            customer=customer,
+            transaction_type='EARNED',
+            points=points_earned,
+            amount_spent=amount_spent,
+            encoded_by=request.user
+        )
+
+        # Fetch the updated customer to get the fresh balance
+        customer.refresh_from_db()
+
+        # 4. Fire Background SMS
+        send_points_awarded_sms.delay(customer.id, points_earned, customer.points_balance)
+
+        return Response({
+            "message": "Points successfully awarded!",
+            "customer_name": customer.name,
+            "points_earned": points_earned,
+            "new_balance": customer.points_balance
+        }, status=status.HTTP_200_OK)
 
 import requests
 import os
@@ -1625,6 +1788,22 @@ def send_birthday_promos():
 
     return f"Sent birthday promos to {birthday_customers.count()} customers."
 
+
+@shared_task
+def send_points_awarded_sms(customer_id, points_earned, total_points):
+    """ ASYNCHRONOUS: Fired when a cashier awards points to a customer """
+    try:
+        customer = Customer.objects.get(id=customer_id)
+        contact_digits = ''.join(filter(str.isdigit, str(customer.phone)))
+        
+        if len(contact_digits) >= 10:
+            # You can customize this message!
+            sms_body = f"Hi {customer.name}! You earned {points_earned} pts at Golden Bay today. Your new balance is {total_points} pts. View rewards at goldenbay.com.ph/rewards"
+            send_sms(customer.phone, sms_body)
+            
+    except Exception as e:
+        print(f"Celery Task Error (Points SMS): {e}")
+
 from django.contrib import admin
 from .models import Post
 
@@ -1887,10 +2066,108 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         return token
 
-from django.shortcuts import render
+from django.urls import path
+from .views import RequestOTPView, VerifyOTPView
 
-# Create your views here.
+urlpatterns = [
+    path('request-otp/', RequestOTPView.as_view(), name='request_otp'),
+    path('verify-otp/', VerifyOTPView.as_view(), name='verify_otp'),
+]
 
+import random
+from django.core.cache import cache
+from django.contrib.auth.models import User
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import AllowAny
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.throttling import AnonRateThrottle
+from reservations.models import Customer
+from reservations.utils import send_sms
+
+class RequestOTPView(APIView):
+    """ Step 1: Generate OTP, save to cache, and text it to the customer """
+    permission_classes = [AllowAny]
+    throttle_classes = [AnonRateThrottle] # Prevent SMS spam attacks
+
+    def post(self, request):
+        phone = request.data.get('phone')
+        if not phone:
+            return Response({"error": "Phone number is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Standardize phone format
+        clean_phone = ''.join(filter(str.isdigit, str(phone)))
+        if clean_phone.startswith('63') and len(clean_phone) == 12:
+            clean_phone = '0' + clean_phone[2:]
+
+        # Generate random 6-digit pin
+        otp = str(random.randint(100000, 999999))
+        
+        # Save to memory/redis for exactly 5 minutes (300 seconds)
+        cache.set(f"otp_{clean_phone}", otp, timeout=300)
+
+        # Send via Semaphore
+        sms_body = f"Golden Bay Rewards: Your login code is {otp}. It will expire in 5 minutes. Do not share this code with anyone."
+        send_sms(clean_phone, sms_body)
+
+        # For local testing purposes (shows in your terminal)
+        print(f"🔑 OTP for {clean_phone} is: {otp}")
+
+        return Response({"message": "OTP sent successfully. Please check your phone."}, status=status.HTTP_200_OK)
+
+
+class VerifyOTPView(APIView):
+    """ Step 2: Verify the OTP and issue standard JWT tokens """
+    permission_classes = [AllowAny]
+    throttle_classes = [AnonRateThrottle]
+
+    def post(self, request):
+        phone = request.data.get('phone')
+        otp_entered = request.data.get('otp')
+
+        if not phone or not otp_entered:
+            return Response({"error": "Phone and OTP are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        clean_phone = ''.join(filter(str.isdigit, str(phone)))
+        if clean_phone.startswith('63') and len(clean_phone) == 12:
+            clean_phone = '0' + clean_phone[2:]
+
+        cached_otp = cache.get(f"otp_{clean_phone}")
+
+        # 1. Check OTP (Also includes a universal backdoor '008804' for Apple/Google App Store reviewers)
+        if cached_otp != str(otp_entered) and str(otp_entered) != "008804":
+            return Response({"error": "Invalid or expired OTP."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Clear OTP to prevent reuse
+        cache.delete(f"otp_{clean_phone}")
+
+        # 3. Fetch Customer or create a new "Walk-in" shell account
+        customer, created = Customer.objects.get_or_create(
+            phone=clean_phone,
+            defaults={'name': 'Valued Guest'}
+        )
+
+        # 4. We map the Customer to a Django User behind the scenes so SimpleJWT works flawlessly
+        user, user_created = User.objects.get_or_create(username=clean_phone)
+
+        # 5. Generate secure JWT
+        refresh = RefreshToken.for_user(user)
+        refresh['role'] = 'Customer'
+        refresh['customer_id'] = customer.id
+        refresh['name'] = customer.name
+
+        return Response({
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+            "customer": {
+                "id": customer.id,
+                "name": customer.name,
+                "phone": customer.phone,
+                "points_balance": customer.points_balance,
+                "is_vip": customer.is_vip
+            }
+        }, status=status.HTTP_200_OK)
 
 import React, { Suspense, lazy } from 'react';
 import { HelmetProvider } from 'react-helmet-async';
@@ -1916,6 +2193,7 @@ const SinglePostPage = lazy(() => import('./pages/public/marketing/SinglePostPag
 const EventInquiriesPage = lazy(() => import('./pages/public/events/EventInquiriesPage'));
 const VIPRoomsPage = lazy(() => import('./pages/public/vip/VIPRoomsPage'));
 const NotFoundPage = lazy(() => import('./pages/public/NotFoundPage'));
+const CustomerRewardsPage = lazy(() => import('./pages/public/marketing/CustomerRewardsPage'));
 
 // --- LAZY LOAD ADMIN PAGES ---
 const LoginPage = lazy(() => import('./pages/admin/auth/LoginPage')); 
@@ -1976,6 +2254,7 @@ function App() {
             <Route path="/vip-rooms" element={<><Navbar /><VIPRoomsPage /><Footer /></>} />
             <Route path="/contact" element={<><Navbar /><ContactPage /><Footer /></>} />
             <Route path="*" element={<><Navbar /><NotFoundPage /><Footer /></>} />
+            <Route path="/rewards" element={<CustomerRewardsPage />} />
             
             <Route path="/login" element={<LoginPage />} />
 
@@ -2388,9 +2667,10 @@ const Navbar = () => {
 export default Navbar;
 
 import React, { useEffect, useState } from 'react';
-import { Users, Contact, Megaphone, AlertCircle, ArrowRight } from 'lucide-react';
+import { Users, Contact, Megaphone, AlertCircle, ArrowRight, Gift, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import toast from 'react-hot-toast';
 import axiosInstance from '../../../utils/axiosInstance';
 import { canManageMarketing, canManageMenu } from '../../../utils/auth';
 
@@ -2418,6 +2698,11 @@ const AdminDashboardPage = () => {
   const isMarketingAdmin = canManageMarketing();
   const isMenuAdmin = canManageMenu();
 
+  // --- NEW: Points Modal State ---
+  const [showPointsModal, setShowPointsModal] = useState(false);
+  const [isAwarding, setIsAwarding] = useState(false);
+  const [pointsForm, setPointsForm] = useState({ phone: '', amount: '', name: '' });
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -2432,13 +2717,42 @@ const AdminDashboardPage = () => {
     fetchDashboardData();
   }, []);
 
+  const handleAwardPoints = async (e) => {
+      e.preventDefault();
+      setIsAwarding(true);
+      try {
+          const res = await axiosInstance.post('/api/reservations/award-points/', {
+              phone: pointsForm.phone,
+              name: pointsForm.name,
+              amount_spent: pointsForm.amount
+          });
+          
+          if (res.data.points_earned > 0) {
+              toast.success(`Success! ${res.data.customer_name} earned ${res.data.points_earned} points.`);
+          } else {
+              toast('Amount too low to earn points.', { icon: 'ℹ️' });
+          }
+          
+          setShowPointsModal(false);
+          setPointsForm({ phone: '', amount: '', name: '' });
+      } catch (err) {
+          toast.error(err.response?.data?.non_field_errors?.[0] || "Failed to award points.");
+      } finally {
+          setIsAwarding(false);
+      }
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-end border-b border-gray-200 pb-3">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-gray-200 pb-3">
          <div>
             <h1 className="text-xl font-bold text-gray-900 font-serif">Dashboard Overview</h1>
             <p className="text-gray-500 text-xs">Insights for {new Date().toLocaleDateString('en-US', { dateStyle: 'medium' })}</p>
          </div>
+         {/* Quick Action Button for Cashiers */}
+         <button onClick={() => setShowPointsModal(true)} className="w-full md:w-auto bg-gold-600 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest rounded-sm shadow-md hover:bg-black transition-colors flex items-center justify-center gap-2">
+            <Gift size={16} /> Award Points
+         </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -2508,6 +2822,44 @@ const AdminDashboardPage = () => {
             </div>
         </div>
       </div>
+
+      {/* --- QUICK AWARD POINTS MODAL --- */}
+      {showPointsModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+            <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                    <h2 className="text-lg font-serif text-gray-900 font-bold flex items-center gap-2"><Gift size={18} className="text-gold-600"/> Award Points</h2>
+                    <button onClick={() => setShowPointsModal(false)} className="p-1 hover:bg-gray-200 rounded text-gray-500"><X size={18}/></button>
+                </div>
+                
+                <form onSubmit={handleAwardPoints} className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Customer Phone <span className="text-red-500">*</span></label>
+                        <input required type="tel" placeholder="e.g. 0917 123 4567" className="w-full bg-white border border-gray-300 p-2.5 text-sm focus:border-gold-500 outline-none rounded-sm transition-all"
+                            value={pointsForm.phone} onChange={e => setPointsForm({...pointsForm, phone: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Total Bill Amount (₱) <span className="text-red-500">*</span></label>
+                        <input required type="number" min="0" step="0.01" placeholder="e.g. 15500.00" className="w-full bg-white border border-gray-300 p-2.5 text-sm focus:border-gold-500 outline-none rounded-sm transition-all"
+                            value={pointsForm.amount} onChange={e => setPointsForm({...pointsForm, amount: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Customer Name <span className="text-gray-400 font-normal lowercase">(Optional for new numbers)</span></label>
+                        <input type="text" placeholder="Leave blank if already registered" className="w-full bg-white border border-gray-300 p-2.5 text-sm focus:border-gold-500 outline-none rounded-sm transition-all"
+                            value={pointsForm.name} onChange={e => setPointsForm({...pointsForm, name: e.target.value})}
+                        />
+                    </div>
+
+                    <button type="submit" disabled={isAwarding || !pointsForm.phone || !pointsForm.amount} className="w-full bg-gold-600 text-white font-bold uppercase tracking-widest py-3 text-xs hover:bg-black transition-colors disabled:opacity-50 rounded-sm shadow-md mt-4">
+                        {isAwarding ? 'Processing...' : 'Award Points Now'}
+                    </button>
+                </form>
+            </div>
+        </div>
+      )}
+
     </div>
   );
 };
@@ -6801,7 +7153,7 @@ const Footer = () => {
 export default Footer;
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Phone, Mail, Trash2, ArrowUpDown, X, User, StickyNote, Download, Calendar as CalendarIcon } from 'lucide-react';
+import { Search, Plus, Phone, Mail, Trash2, ArrowUpDown, X, User, StickyNote, Download, Calendar as CalendarIcon, Gift } from 'lucide-react';
 import { FaWeixin, FaViber, FaWhatsapp, FaTelegram } from 'react-icons/fa';
 import axiosInstance from '../../../utils/axiosInstance';
 import toast from 'react-hot-toast';
@@ -6818,6 +7170,11 @@ const PhoneBookPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // --- NEW: Award Points Modal State ---
+  const [pointsCustomer, setPointsCustomer] = useState(null);
+  const [pointsAmount, setPointsAmount] = useState('');
+  const [isAwarding, setIsAwarding] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '', phone: '', email: '', wechat: '', viber: '', whatsapp: '', telegram: '', notes: '', date_of_birth: ''
@@ -6861,6 +7218,32 @@ const PhoneBookPage = () => {
     }
   };
 
+  const handleAwardPoints = async (e) => {
+      e.preventDefault();
+      setIsAwarding(true);
+      try {
+          const res = await axiosInstance.post('/api/reservations/award-points/', {
+              phone: pointsCustomer.phone,
+              name: pointsCustomer.name,
+              amount_spent: pointsAmount
+          });
+          
+          if (res.data.points_earned > 0) {
+              toast.success(`Success! ${res.data.customer_name} earned ${res.data.points_earned} points.`);
+              fetchCustomers(); // Refresh to show new total
+          } else {
+              toast('Amount too low to earn points.', { icon: 'ℹ️' });
+          }
+          
+          setPointsCustomer(null);
+          setPointsAmount('');
+      } catch (err) {
+          toast.error("Failed to award points.");
+      } finally {
+          setIsAwarding(false);
+      }
+  };
+
   const handleDelete = async (id, e) => {
       e.stopPropagation();
       if(!window.confirm("Are you sure you want to delete this customer?")) return;
@@ -6884,7 +7267,7 @@ const PhoneBookPage = () => {
           whatsapp: customer.whatsapp || '',
           telegram: customer.telegram || '',
           notes: customer.notes || '',
-          date_of_birth: customer.date_of_birth || '' // NEW: DOB Field
+          date_of_birth: customer.date_of_birth || ''
       });
       setShowModal(true);
   };
@@ -6900,7 +7283,6 @@ const PhoneBookPage = () => {
       setEditingCustomer(null);
   };
 
-  // --- FILTERING & SORTING LOGIC ---
   const filtered = customers
     .filter(c => {
         const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search);
@@ -6910,7 +7292,7 @@ const PhoneBookPage = () => {
     .sort((a, b) => sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
 
   const exportToCSV = () => {
-      const headers = ['Name', 'Phone', 'Email', 'WeChat', 'Viber', 'WhatsApp', 'Telegram', 'Notes', 'DOB', 'Last Visit'];
+      const headers = ['Name', 'Phone', 'Email', 'WeChat', 'Viber', 'WhatsApp', 'Telegram', 'Notes', 'DOB', 'Last Visit', 'Points Balance'];
       const csvData = filtered.map(c => [
           `"${c.name}"`, 
           `"${c.phone}"`, 
@@ -6921,7 +7303,8 @@ const PhoneBookPage = () => {
           `"${c.telegram || ''}"`, 
           `"${(c.notes || '').replace(/"/g, '""')}"`, 
           `"${c.date_of_birth || ''}"`,
-          `"${c.last_visit || ''}"`
+          `"${c.last_visit || ''}"`,
+          `"${c.points_balance || 0}"`
       ].join(','));
       
       const csvContent = [headers.join(','), ...csvData].join('\n');
@@ -6937,7 +7320,6 @@ const PhoneBookPage = () => {
   const inputClass = "w-full bg-white border border-gray-300 p-2 text-gray-900 text-sm focus:border-gold-500 focus:ring-1 focus:ring-gold-500 outline-none rounded-sm transition-all shadow-sm";
   const labelClass = "block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1";
 
-  // A-Z Alphabet Array
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
   return (
@@ -6972,7 +7354,7 @@ const PhoneBookPage = () => {
                   />
               </div>
 
-              {/* A-Z Quick Jump (Scrollable on mobile) */}
+              {/* A-Z Quick Jump */}
               <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar flex-1 justify-end">
                  <button onClick={() => setActiveLetter('ALL')} className={`px-2 py-1 text-[10px] font-bold uppercase tracking-widest rounded transition-colors shrink-0 ${activeLetter === 'ALL' ? 'bg-gold-600 text-white' : 'text-gray-500 hover:bg-gray-100'}`}>All</button>
                  {alphabet.map(letter => (
@@ -7000,20 +7382,17 @@ const PhoneBookPage = () => {
                 </div>
             ) : (
                 <div className="divide-y divide-gray-100">
-                    {/* Header Row for Desktop */}
                     <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-200">
                         <div className="col-span-4 flex items-center gap-1 cursor-pointer hover:text-gray-900 transition-colors" onClick={() => setSortAsc(!sortAsc)}>Customer Name <ArrowUpDown size={12}/></div>
                         <div className="col-span-3">Contact Details</div>
                         <div className="col-span-2">Last Visit</div>
-                        <div className="col-span-2">Socials</div>
+                        <div className="col-span-2">Points Balance</div>
                         <div className="col-span-1 text-right">Actions</div>
                     </div>
 
-                    {/* Data Rows */}
                     {filtered.map(c => (
                         <div key={c.id} onClick={() => openEdit(c)} className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 px-4 md:px-6 py-3 hover:bg-gold-50/30 transition-colors cursor-pointer items-center group">
                             
-                            {/* Mobile Layout -> Merged into flex col */}
                             <div className="col-span-1 md:col-span-4 flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-xs shrink-0">
                                     {c.name.charAt(0).toUpperCase()}
@@ -7028,29 +7407,24 @@ const PhoneBookPage = () => {
                                 </div>
                             </div>
 
-                            {/* Contact (Hidden on very small mobile, merged above) */}
                             <div className="hidden md:block col-span-3 text-xs text-gray-600 font-mono space-y-0.5">
                                 <div className="flex items-center gap-1.5"><Phone size={12} className="text-gray-400"/> {c.phone}</div>
                                 {c.email && <div className="flex items-center gap-1.5 truncate"><Mail size={12} className="text-gray-400"/> {c.email}</div>}
                             </div>
 
-                            {/* Visit Info */}
                             <div className="hidden md:block col-span-2 text-[10px] text-gray-500 uppercase tracking-widest">
                                 <div>{c.last_visit || 'Never'}</div>
                                 <div className="text-gray-400 normal-case tracking-normal">{c.visit_count} total visits</div>
                             </div>
 
-                            {/* Socials & DOB */}
-                            <div className="hidden md:flex col-span-2 items-center gap-2">
-                                {c.wechat && <FaWeixin className="text-[#07c160]" size={16} title="WeChat"/>}
-                                {c.viber && <FaViber className="text-[#7360f2]" size={16} title="Viber"/>}
-                                {c.whatsapp && <FaWhatsapp className="text-[#25D366]" size={16} title="WhatsApp"/>}
-                                {c.telegram && <FaTelegram className="text-[#0088cc]" size={16} title="Telegram"/>}
-                                {c.date_of_birth && <CalendarIcon size={14} className="text-pink-400 ml-1" title={`DOB: ${c.date_of_birth}`} />}
+                            <div className="hidden md:block col-span-2 text-[11px] font-bold text-gold-600 font-mono">
+                                {c.points_balance || 0} pts
                             </div>
 
-                            {/* Actions */}
-                            <div className="hidden md:flex col-span-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="hidden md:flex col-span-1 justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={(e) => { e.stopPropagation(); setPointsCustomer(c); }} className="p-1.5 text-white bg-gold-600 hover:bg-black rounded shadow-sm transition-colors" title="Award Points">
+                                    <Gift size={14}/>
+                                </button>
                                 <button onClick={(e) => handleDelete(c.id, e)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete">
                                     <Trash2 size={14}/>
                                 </button>
@@ -7078,8 +7452,6 @@ const PhoneBookPage = () => {
                 
                 <div className="p-6 overflow-y-auto bg-white">
                     <form id="contactForm" onSubmit={handleSubmit} className="space-y-6">
-                        
-                        {/* Primary Details Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                             <div className="md:col-span-2"><h3 className="text-[10px] font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-1 flex items-center gap-1.5"><User size={12}/> Primary Info</h3></div>
                             
@@ -7101,7 +7473,6 @@ const PhoneBookPage = () => {
                             </div>
                         </div>
 
-                        {/* Social Apps Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                             <div className="md:col-span-2"><h3 className="text-[10px] font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-1 flex items-center gap-1.5"><Phone size={12}/> Connected Apps</h3></div>
                             
@@ -7123,7 +7494,6 @@ const PhoneBookPage = () => {
                             </div>
                         </div>
 
-                        {/* Notes */}
                         <div>
                             <h3 className="text-[10px] font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-1 flex items-center gap-1.5 mb-3"><StickyNote size={12}/> Internal Notes</h3>
                             <textarea className={`${inputClass} h-20 resize-none`} placeholder="E.g. VIP, prefers window seat, allergic to shrimp..." value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} />
@@ -7142,6 +7512,39 @@ const PhoneBookPage = () => {
             </div>
         </div>
       )}
+
+      {/* --- AWARD POINTS MODAL (Phone Book Target) --- */}
+      {pointsCustomer && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+            <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                    <h2 className="text-lg font-serif text-gray-900 font-bold flex items-center gap-2"><Gift size={18} className="text-gold-600"/> Award Points</h2>
+                    <button onClick={() => setPointsCustomer(null)} className="p-1 hover:bg-gray-200 rounded text-gray-500"><X size={18}/></button>
+                </div>
+                
+                <form onSubmit={handleAwardPoints} className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Customer</label>
+                        <div className="w-full bg-gray-50 border border-gray-200 p-2.5 text-sm text-gray-900 rounded-sm">
+                            <span className="font-bold">{pointsCustomer.name}</span><br/>
+                            <span className="text-xs text-gray-500 font-mono">{pointsCustomer.phone}</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Total Bill Amount (₱) <span className="text-red-500">*</span></label>
+                        <input required type="number" min="0" step="0.01" placeholder="e.g. 15500.00" className="w-full bg-white border border-gray-300 p-2.5 text-sm focus:border-gold-500 outline-none rounded-sm transition-all"
+                            value={pointsAmount} onChange={e => setPointsAmount(e.target.value)} autoFocus
+                        />
+                    </div>
+
+                    <button type="submit" disabled={isAwarding || !pointsAmount} className="w-full bg-gold-600 text-white font-bold uppercase tracking-widest py-3 text-xs hover:bg-black transition-colors disabled:opacity-50 rounded-sm shadow-md mt-4">
+                        {isAwarding ? 'Processing...' : 'Confirm Points'}
+                    </button>
+                </form>
+            </div>
+        </div>
+      )}
+
     </div>
   );
 };
@@ -9202,7 +9605,7 @@ const LeadCaptureWidget = () => {
     // Show widget after 15 seconds, but only if they haven't dismissed or submitted it before
     const hasSeenWidget = localStorage.getItem('gb_vip_widget_seen');
     if (!hasSeenWidget) {
-      const timer = setTimeout(() => setIsVisible(true), 15000);
+      const timer = setTimeout(() => setIsVisible(true), 1000);
       return () => clearTimeout(timer);
     }
   }, []);

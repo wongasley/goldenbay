@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Users, Contact, Megaphone, AlertCircle, ArrowRight } from 'lucide-react';
+import { Users, Contact, Megaphone, AlertCircle, ArrowRight, Gift, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import toast from 'react-hot-toast';
 import axiosInstance from '../../../utils/axiosInstance';
 import { canManageMarketing, canManageMenu } from '../../../utils/auth';
 
@@ -29,6 +30,11 @@ const AdminDashboardPage = () => {
   const isMarketingAdmin = canManageMarketing();
   const isMenuAdmin = canManageMenu();
 
+  // --- NEW: Points Modal State ---
+  const [showPointsModal, setShowPointsModal] = useState(false);
+  const [isAwarding, setIsAwarding] = useState(false);
+  const [pointsForm, setPointsForm] = useState({ phone: '', amount: '', name: '' });
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -43,13 +49,42 @@ const AdminDashboardPage = () => {
     fetchDashboardData();
   }, []);
 
+  const handleAwardPoints = async (e) => {
+      e.preventDefault();
+      setIsAwarding(true);
+      try {
+          const res = await axiosInstance.post('/api/reservations/award-points/', {
+              phone: pointsForm.phone,
+              name: pointsForm.name,
+              amount_spent: pointsForm.amount
+          });
+          
+          if (res.data.points_earned > 0) {
+              toast.success(`Success! ${res.data.customer_name} earned ${res.data.points_earned} points.`);
+          } else {
+              toast('Amount too low to earn points.', { icon: 'ℹ️' });
+          }
+          
+          setShowPointsModal(false);
+          setPointsForm({ phone: '', amount: '', name: '' });
+      } catch (err) {
+          toast.error(err.response?.data?.non_field_errors?.[0] || "Failed to award points.");
+      } finally {
+          setIsAwarding(false);
+      }
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-end border-b border-gray-200 pb-3">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-gray-200 pb-3">
          <div>
             <h1 className="text-xl font-bold text-gray-900 font-serif">Dashboard Overview</h1>
             <p className="text-gray-500 text-xs">Insights for {new Date().toLocaleDateString('en-US', { dateStyle: 'medium' })}</p>
          </div>
+         {/* Quick Action Button for Cashiers */}
+         <button onClick={() => setShowPointsModal(true)} className="w-full md:w-auto bg-gold-600 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest rounded-sm shadow-md hover:bg-black transition-colors flex items-center justify-center gap-2">
+            <Gift size={16} /> Award Points
+         </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -119,6 +154,44 @@ const AdminDashboardPage = () => {
             </div>
         </div>
       </div>
+
+      {/* --- QUICK AWARD POINTS MODAL --- */}
+      {showPointsModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+            <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                    <h2 className="text-lg font-serif text-gray-900 font-bold flex items-center gap-2"><Gift size={18} className="text-gold-600"/> Award Points</h2>
+                    <button onClick={() => setShowPointsModal(false)} className="p-1 hover:bg-gray-200 rounded text-gray-500"><X size={18}/></button>
+                </div>
+                
+                <form onSubmit={handleAwardPoints} className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Customer Phone <span className="text-red-500">*</span></label>
+                        <input required type="tel" placeholder="e.g. 0917 123 4567" className="w-full bg-white border border-gray-300 p-2.5 text-sm focus:border-gold-500 outline-none rounded-sm transition-all"
+                            value={pointsForm.phone} onChange={e => setPointsForm({...pointsForm, phone: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Total Bill Amount (₱) <span className="text-red-500">*</span></label>
+                        <input required type="number" min="0" step="0.01" placeholder="e.g. 15500.00" className="w-full bg-white border border-gray-300 p-2.5 text-sm focus:border-gold-500 outline-none rounded-sm transition-all"
+                            value={pointsForm.amount} onChange={e => setPointsForm({...pointsForm, amount: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Customer Name <span className="text-gray-400 font-normal lowercase">(Optional for new numbers)</span></label>
+                        <input type="text" placeholder="Leave blank if already registered" className="w-full bg-white border border-gray-300 p-2.5 text-sm focus:border-gold-500 outline-none rounded-sm transition-all"
+                            value={pointsForm.name} onChange={e => setPointsForm({...pointsForm, name: e.target.value})}
+                        />
+                    </div>
+
+                    <button type="submit" disabled={isAwarding || !pointsForm.phone || !pointsForm.amount} className="w-full bg-gold-600 text-white font-bold uppercase tracking-widest py-3 text-xs hover:bg-black transition-colors disabled:opacity-50 rounded-sm shadow-md mt-4">
+                        {isAwarding ? 'Processing...' : 'Award Points Now'}
+                    </button>
+                </form>
+            </div>
+        </div>
+      )}
+
     </div>
   );
 };

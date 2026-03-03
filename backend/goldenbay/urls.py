@@ -15,8 +15,8 @@ urlpatterns = [
     path('api/menu/', include('menu.urls')),         # <--- We will enable these soon
     path('api/reservations/', include('reservations.urls')), 
     path('api/marketing/', include('marketing.urls')),
+    path('api/users/', include('users.urls')),
     path('sitemap.xml', dynamic_sitemap, name='dynamic_sitemap'),
-    # path('api/events/', include('events.urls')), 
     path('api/token/', ThrottledTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]

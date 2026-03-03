@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.db.models import Sum
-from .models import DiningArea, Reservation, Customer
+from .models import DiningArea, PointTransaction, Reservation, Customer, RewardItem
 from django.db import transaction
 
 class DiningAreaSerializer(serializers.ModelSerializer):
@@ -92,3 +92,19 @@ class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
         fields = '__all__'
+
+class RewardItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RewardItem
+        fields = '__all__'
+
+class PointTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PointTransaction
+        fields = '__all__'
+
+class AwardPointsSerializer(serializers.Serializer):
+    """ Custom serializer for the Cashier 'Quick Add' pop-up """
+    phone = serializers.CharField(max_length=20)
+    name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    amount_spent = serializers.DecimalField(max_digits=10, decimal_places=2)

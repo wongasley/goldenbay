@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import AdminReservationDetailView, AdminReservationListView, AvailableRoomsView, ChatbotBookingWebhook, CustomerDetailView, CustomerListView, DashboardStatsView, LeadCaptureView, ReservationCreateView, VIPRoomListView
+from .views import AdminReservationDetailView, AdminReservationListView, AvailableRoomsView, AwardPointsView, ChatbotBookingWebhook, CustomerDetailView, CustomerListView, DashboardStatsView, LeadCaptureView, ReservationCreateView, RewardItemListView, VIPRoomListView
 
 urlpatterns = [
     path('check/', AvailableRoomsView.as_view(), name='check_availability'),
@@ -12,4 +12,6 @@ urlpatterns = [
     path('rooms/', VIPRoomListView.as_view(), name='vip_room_list'),
     path('bot-webhook/', ChatbotBookingWebhook.as_view(), name='bot_webhook'),
     path('lead-capture/', LeadCaptureView.as_view(), name='lead_capture'),
+    path('rewards/', RewardItemListView.as_view(), name='reward_list'),
+    path('award-points/', AwardPointsView.as_view(), name='award_points'),
 ]

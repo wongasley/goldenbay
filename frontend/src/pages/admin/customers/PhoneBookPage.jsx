@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Phone, Mail, Trash2, ArrowUpDown, X, User, StickyNote, Download, Calendar as CalendarIcon } from 'lucide-react';
+import { Search, Plus, Phone, Mail, Trash2, ArrowUpDown, X, User, StickyNote, Download, Calendar as CalendarIcon, Gift } from 'lucide-react';
 import { FaWeixin, FaViber, FaWhatsapp, FaTelegram } from 'react-icons/fa';
 import axiosInstance from '../../../utils/axiosInstance';
 import toast from 'react-hot-toast';
@@ -16,6 +16,11 @@ const PhoneBookPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // --- NEW: Award Points Modal State ---
+  const [pointsCustomer, setPointsCustomer] = useState(null);
+  const [pointsAmount, setPointsAmount] = useState('');
+  const [isAwarding, setIsAwarding] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '', phone: '', email: '', wechat: '', viber: '', whatsapp: '', telegram: '', notes: '', date_of_birth: ''
@@ -59,6 +64,32 @@ const PhoneBookPage = () => {
     }
   };
 
+  const handleAwardPoints = async (e) => {
+      e.preventDefault();
+      setIsAwarding(true);
+      try {
+          const res = await axiosInstance.post('/api/reservations/award-points/', {
+              phone: pointsCustomer.phone,
+              name: pointsCustomer.name,
+              amount_spent: pointsAmount
+          });
+          
+          if (res.data.points_earned > 0) {
+              toast.success(`Success! ${res.data.customer_name} earned ${res.data.points_earned} points.`);
+              fetchCustomers(); // Refresh to show new total
+          } else {
+              toast('Amount too low to earn points.', { icon: 'ℹ️' });
+          }
+          
+          setPointsCustomer(null);
+          setPointsAmount('');
+      } catch (err) {
+          toast.error("Failed to award points.");
+      } finally {
+          setIsAwarding(false);
+      }
+  };
+
   const handleDelete = async (id, e) => {
       e.stopPropagation();
       if(!window.confirm("Are you sure you want to delete this customer?")) return;
@@ -82,7 +113,7 @@ const PhoneBookPage = () => {
           whatsapp: customer.whatsapp || '',
           telegram: customer.telegram || '',
           notes: customer.notes || '',
-          date_of_birth: customer.date_of_birth || '' // NEW: DOB Field
+          date_of_birth: customer.date_of_birth || ''
       });
       setShowModal(true);
   };
@@ -98,7 +129,6 @@ const PhoneBookPage = () => {
       setEditingCustomer(null);
   };
 
-  // --- FILTERING & SORTING LOGIC ---
   const filtered = customers
     .filter(c => {
         const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search);
@@ -108,7 +138,7 @@ const PhoneBookPage = () => {
     .sort((a, b) => sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
 
   const exportToCSV = () => {
-      const headers = ['Name', 'Phone', 'Email', 'WeChat', 'Viber', 'WhatsApp', 'Telegram', 'Notes', 'DOB', 'Last Visit'];
+      const headers = ['Name', 'Phone', 'Email', 'WeChat', 'Viber', 'WhatsApp', 'Telegram', 'Notes', 'DOB', 'Last Visit', 'Points Balance'];
       const csvData = filtered.map(c => [
           `"${c.name}"`, 
           `"${c.phone}"`, 
@@ -119,7 +149,8 @@ const PhoneBookPage = () => {
           `"${c.telegram || ''}"`, 
           `"${(c.notes || '').replace(/"/g, '""')}"`, 
           `"${c.date_of_birth || ''}"`,
-          `"${c.last_visit || ''}"`
+          `"${c.last_visit || ''}"`,
+          `"${c.points_balance || 0}"`
       ].join(','));
       
       const csvContent = [headers.join(','), ...csvData].join('\n');
@@ -135,7 +166,6 @@ const PhoneBookPage = () => {
   const inputClass = "w-full bg-white border border-gray-300 p-2 text-gray-900 text-sm focus:border-gold-500 focus:ring-1 focus:ring-gold-500 outline-none rounded-sm transition-all shadow-sm";
   const labelClass = "block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1";
 
-  // A-Z Alphabet Array
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
   return (
@@ -170,7 +200,7 @@ const PhoneBookPage = () => {
                   />
               </div>
 
-              {/* A-Z Quick Jump (Scrollable on mobile) */}
+              {/* A-Z Quick Jump */}
               <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar flex-1 justify-end">
                  <button onClick={() => setActiveLetter('ALL')} className={`px-2 py-1 text-[10px] font-bold uppercase tracking-widest rounded transition-colors shrink-0 ${activeLetter === 'ALL' ? 'bg-gold-600 text-white' : 'text-gray-500 hover:bg-gray-100'}`}>All</button>
                  {alphabet.map(letter => (
@@ -198,20 +228,17 @@ const PhoneBookPage = () => {
                 </div>
             ) : (
                 <div className="divide-y divide-gray-100">
-                    {/* Header Row for Desktop */}
                     <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-200">
                         <div className="col-span-4 flex items-center gap-1 cursor-pointer hover:text-gray-900 transition-colors" onClick={() => setSortAsc(!sortAsc)}>Customer Name <ArrowUpDown size={12}/></div>
                         <div className="col-span-3">Contact Details</div>
                         <div className="col-span-2">Last Visit</div>
-                        <div className="col-span-2">Socials</div>
+                        <div className="col-span-2">Points Balance</div>
                         <div className="col-span-1 text-right">Actions</div>
                     </div>
 
-                    {/* Data Rows */}
                     {filtered.map(c => (
                         <div key={c.id} onClick={() => openEdit(c)} className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 px-4 md:px-6 py-3 hover:bg-gold-50/30 transition-colors cursor-pointer items-center group">
                             
-                            {/* Mobile Layout -> Merged into flex col */}
                             <div className="col-span-1 md:col-span-4 flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-xs shrink-0">
                                     {c.name.charAt(0).toUpperCase()}
@@ -226,29 +253,24 @@ const PhoneBookPage = () => {
                                 </div>
                             </div>
 
-                            {/* Contact (Hidden on very small mobile, merged above) */}
                             <div className="hidden md:block col-span-3 text-xs text-gray-600 font-mono space-y-0.5">
                                 <div className="flex items-center gap-1.5"><Phone size={12} className="text-gray-400"/> {c.phone}</div>
                                 {c.email && <div className="flex items-center gap-1.5 truncate"><Mail size={12} className="text-gray-400"/> {c.email}</div>}
                             </div>
 
-                            {/* Visit Info */}
                             <div className="hidden md:block col-span-2 text-[10px] text-gray-500 uppercase tracking-widest">
                                 <div>{c.last_visit || 'Never'}</div>
                                 <div className="text-gray-400 normal-case tracking-normal">{c.visit_count} total visits</div>
                             </div>
 
-                            {/* Socials & DOB */}
-                            <div className="hidden md:flex col-span-2 items-center gap-2">
-                                {c.wechat && <FaWeixin className="text-[#07c160]" size={16} title="WeChat"/>}
-                                {c.viber && <FaViber className="text-[#7360f2]" size={16} title="Viber"/>}
-                                {c.whatsapp && <FaWhatsapp className="text-[#25D366]" size={16} title="WhatsApp"/>}
-                                {c.telegram && <FaTelegram className="text-[#0088cc]" size={16} title="Telegram"/>}
-                                {c.date_of_birth && <CalendarIcon size={14} className="text-pink-400 ml-1" title={`DOB: ${c.date_of_birth}`} />}
+                            <div className="hidden md:block col-span-2 text-[11px] font-bold text-gold-600 font-mono">
+                                {c.points_balance || 0} pts
                             </div>
 
-                            {/* Actions */}
-                            <div className="hidden md:flex col-span-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="hidden md:flex col-span-1 justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={(e) => { e.stopPropagation(); setPointsCustomer(c); }} className="p-1.5 text-white bg-gold-600 hover:bg-black rounded shadow-sm transition-colors" title="Award Points">
+                                    <Gift size={14}/>
+                                </button>
                                 <button onClick={(e) => handleDelete(c.id, e)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete">
                                     <Trash2 size={14}/>
                                 </button>
@@ -276,8 +298,6 @@ const PhoneBookPage = () => {
                 
                 <div className="p-6 overflow-y-auto bg-white">
                     <form id="contactForm" onSubmit={handleSubmit} className="space-y-6">
-                        
-                        {/* Primary Details Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                             <div className="md:col-span-2"><h3 className="text-[10px] font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-1 flex items-center gap-1.5"><User size={12}/> Primary Info</h3></div>
                             
@@ -299,7 +319,6 @@ const PhoneBookPage = () => {
                             </div>
                         </div>
 
-                        {/* Social Apps Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                             <div className="md:col-span-2"><h3 className="text-[10px] font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-1 flex items-center gap-1.5"><Phone size={12}/> Connected Apps</h3></div>
                             
@@ -321,7 +340,6 @@ const PhoneBookPage = () => {
                             </div>
                         </div>
 
-                        {/* Notes */}
                         <div>
                             <h3 className="text-[10px] font-bold text-gold-600 uppercase tracking-widest border-b border-gray-100 pb-1 flex items-center gap-1.5 mb-3"><StickyNote size={12}/> Internal Notes</h3>
                             <textarea className={`${inputClass} h-20 resize-none`} placeholder="E.g. VIP, prefers window seat, allergic to shrimp..." value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} />
@@ -340,6 +358,39 @@ const PhoneBookPage = () => {
             </div>
         </div>
       )}
+
+      {/* --- AWARD POINTS MODAL (Phone Book Target) --- */}
+      {pointsCustomer && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+            <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                    <h2 className="text-lg font-serif text-gray-900 font-bold flex items-center gap-2"><Gift size={18} className="text-gold-600"/> Award Points</h2>
+                    <button onClick={() => setPointsCustomer(null)} className="p-1 hover:bg-gray-200 rounded text-gray-500"><X size={18}/></button>
+                </div>
+                
+                <form onSubmit={handleAwardPoints} className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Customer</label>
+                        <div className="w-full bg-gray-50 border border-gray-200 p-2.5 text-sm text-gray-900 rounded-sm">
+                            <span className="font-bold">{pointsCustomer.name}</span><br/>
+                            <span className="text-xs text-gray-500 font-mono">{pointsCustomer.phone}</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Total Bill Amount (₱) <span className="text-red-500">*</span></label>
+                        <input required type="number" min="0" step="0.01" placeholder="e.g. 15500.00" className="w-full bg-white border border-gray-300 p-2.5 text-sm focus:border-gold-500 outline-none rounded-sm transition-all"
+                            value={pointsAmount} onChange={e => setPointsAmount(e.target.value)} autoFocus
+                        />
+                    </div>
+
+                    <button type="submit" disabled={isAwarding || !pointsAmount} className="w-full bg-gold-600 text-white font-bold uppercase tracking-widest py-3 text-xs hover:bg-black transition-colors disabled:opacity-50 rounded-sm shadow-md mt-4">
+                        {isAwarding ? 'Processing...' : 'Confirm Points'}
+                    </button>
+                </form>
+            </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -268,3 +268,19 @@ def send_birthday_promos():
             customer.save(update_fields=['last_birthday_promo_year'])
 
     return f"Sent birthday promos to {birthday_customers.count()} customers."
+
+
+@shared_task
+def send_points_awarded_sms(customer_id, points_earned, total_points):
+    """ ASYNCHRONOUS: Fired when a cashier awards points to a customer """
+    try:
+        customer = Customer.objects.get(id=customer_id)
+        contact_digits = ''.join(filter(str.isdigit, str(customer.phone)))
+        
+        if len(contact_digits) >= 10:
+            # You can customize this message!
+            sms_body = f"Hi {customer.name}! You earned {points_earned} pts at Golden Bay today. Your new balance is {total_points} pts. View rewards at goldenbay.com.ph/rewards"
+            send_sms(customer.phone, sms_body)
+            
+    except Exception as e:
+        print(f"Celery Task Error (Points SMS): {e}")

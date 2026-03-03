@@ -4,6 +4,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
 from simple_history.models import HistoricalRecords
+from django.db import transaction
 
 class DiningArea(models.Model):
     TYPE_CHOICES = [
@@ -80,6 +81,9 @@ class Reservation(models.Model):
     
     history = HistoricalRecords() # <--- ADD THIS
     
+    final_bill_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Total bill paid (for point calculation)")
+    points_earned = models.IntegerField(default=0, help_text="Points awarded for this specific visit")
+
     class Meta:
         ordering = ['-date', '-time']
 
@@ -125,12 +129,74 @@ class Customer(models.Model):
     last_visit = models.DateField(auto_now=True)
     last_retention_sent = models.DateField(null=True, blank=True, help_text="When the last 'We Miss You' message was sent")
     has_claimed_vip_perk = models.BooleanField(default=False, help_text="Has received the website welcome perk")
-    
+
+    points_balance = models.IntegerField(default=0, help_text="Current available points")
+
     class Meta:
         ordering = ['name']
 
     def __str__(self):
         return f"{self.name} ({self.phone})"
+    
+class RewardItem(models.Model):
+    """ Food items that customers can redeem using their points """
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True, null=True)
+    points_required = models.IntegerField(help_text="How many points this costs")
+    image = models.ImageField(upload_to='rewards/', blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['points_required']
+
+    def __str__(self):
+        return f"{self.name} ({self.points_required} pts)"
+
+class PointTransaction(models.Model):
+    """ The ledger that tracks every point earned or spent """
+    TYPE_CHOICES = [
+        ('EARNED', 'Earned'),
+        ('REDEEMED', 'Redeemed'),
+    ]
+    
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='point_transactions')
+    transaction_type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+    points = models.IntegerField(help_text="Amount of points (e.g., 150)")
+    
+    # Optional context fields
+    amount_spent = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="If EARNED, the bill amount")
+    reservation = models.ForeignKey(Reservation, on_delete=models.SET_NULL, null=True, blank=True, related_name='point_transactions', help_text="Null if walk-in")
+    reward_item = models.ForeignKey(RewardItem, on_delete=models.SET_NULL, null=True, blank=True, help_text="Filled if REDEEMED")
+    
+    # Meta tracking
+    created_at = models.DateTimeField(auto_now_add=True)
+    encoded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        sign = "+" if self.transaction_type == 'EARNED' else "-"
+        return f"{self.customer.name} | {sign}{self.points} pts"
+        
+    def save(self, *args, **kwargs):
+        """ 
+        Automatically update the Customer's total points balance 
+        whenever a new transaction is saved!
+        """
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        
+        if is_new:
+            # Lock the customer row temporarily to prevent race conditions if multiple cashiers add points at the exact same second
+            with transaction.atomic():
+                cust = Customer.objects.select_for_update().get(pk=self.customer.pk)
+                if self.transaction_type == 'EARNED':
+                    cust.points_balance += self.points
+                elif self.transaction_type == 'REDEEMED':
+                    cust.points_balance -= self.points
+                cust.save(update_fields=['points_balance'])
 
 # --- ADD THIS SIGNAL TO AUTO-SAVE CUSTOMERS ---
 @receiver(post_save, sender=Reservation)

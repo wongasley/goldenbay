@@ -7,15 +7,17 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from .utils import send_sms
-from .models import DiningArea, Reservation, Customer
-from .serializers import ReservationSerializer, DiningAreaSerializer, CustomerSerializer
+from .models import DiningArea, PointTransaction, Reservation, Customer, RewardItem
+from .serializers import AwardPointsSerializer, ReservationSerializer, DiningAreaSerializer, CustomerSerializer, RewardItemSerializer
 from .tasks import (
-    send_new_booking_notifications, 
+    send_new_booking_notifications,
+    send_points_awarded_sms, 
     send_status_update_notifications, 
     send_booking_modification_notifications, 
     send_post_dining_feedback
 )
 from rest_framework.throttling import AnonRateThrottle
+import math
 
 class AvailableRoomsView(APIView):
     def get(self, request):
@@ -374,4 +376,69 @@ class LeadCaptureView(APIView):
         return Response({
             "status": "success", 
             "message": "Success! Check your SMS for your VIP perk."
+        }, status=status.HTTP_200_OK)
+    
+class RewardItemListView(generics.ListAPIView):
+    """ Public endpoint to list all available rewards """
+    queryset = RewardItem.objects.filter(is_active=True).order_by('points_required')
+    serializer_class = RewardItemSerializer
+    permission_classes = [AllowAny]
+
+
+class AwardPointsView(APIView):
+    """ Endpoint for cashiers to quickly add points via phone number """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = AwardPointsSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        phone = serializer.validated_data['phone']
+        amount_spent = serializer.validated_data['amount_spent']
+        name = serializer.validated_data.get('name', 'Valued Guest')
+
+        # Clean the phone number
+        clean_phone = ''.join(filter(str.isdigit, str(phone)))
+        if clean_phone.startswith('63') and len(clean_phone) == 12:
+            clean_phone = '0' + clean_phone[2:]
+
+        # 1. Get or Create Customer
+        customer, created = Customer.objects.get_or_create(
+            phone=clean_phone,
+            defaults={'name': name}
+        )
+
+        # Update name if it was a generic "Valued Guest" previously
+        if not created and name != 'Valued Guest' and customer.name == 'Valued Guest':
+            customer.name = name
+            customer.save(update_fields=['name'])
+
+        # 2. Calculate Points (e.g., 100 PHP = 1 Point)
+        # Using math.floor so 1,550 PHP = 15 points.
+        points_earned = math.floor(amount_spent / 100)
+
+        if points_earned <= 0:
+            return Response({"message": "Amount too low to earn points."}, status=status.HTTP_200_OK)
+
+        # 3. Create Transaction (This automatically updates customer.points_balance due to our models.py logic)
+        transaction = PointTransaction.objects.create(
+            customer=customer,
+            transaction_type='EARNED',
+            points=points_earned,
+            amount_spent=amount_spent,
+            encoded_by=request.user
+        )
+
+        # Fetch the updated customer to get the fresh balance
+        customer.refresh_from_db()
+
+        # 4. Fire Background SMS
+        send_points_awarded_sms.delay(customer.id, points_earned, customer.points_balance)
+
+        return Response({
+            "message": "Points successfully awarded!",
+            "customer_name": customer.name,
+            "points_earned": points_earned,
+            "new_balance": customer.points_balance
         }, status=status.HTTP_200_OK)
