@@ -53,7 +53,8 @@ def dynamic_sitemap(request):
         ('/reservations', '0.8', 'monthly'),
         ('/events', '0.8', 'monthly'),
         ('/vip-rooms', '0.8', 'monthly'),
-        ('/contact', '0.8', 'monthly'), # Added your new Contact page!
+        ('/rewards', '0.8', 'monthly'), # <--- ADDED REWARDS HERE
+        ('/contact', '0.8', 'monthly'),
         ('/news', '0.7', 'daily'),
         ('/about', '0.6', 'yearly'),
     ]

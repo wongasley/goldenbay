@@ -15,7 +15,7 @@ const Footer = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-20">
           
-          <div className="md:col-span-5 space-y-6"> {/* Increased spacing between logo and text */}
+          <div className="md:col-span-5 space-y-6">
             <img src={logo} alt="Golden Bay Logo" className="h-16 w-auto opacity-90" />
             
             <div className={`space-y-4 text-gray-400 text-sm font-light tracking-wide leading-relaxed ${getFontClass()}`}>
@@ -23,7 +23,6 @@ const Footer = () => {
                 Golden Bay Fresh Seafood Restaurant
               </p>
               
-              {/* Split the address for better visual hierarchy */}
               <div className="max-w-xs space-y-1 opacity-80">
                 <p>Lot 3&4 Block A2, Diosdado Macapagal Blvd,</p>
                 <p>CBP, Pasay City, Metro Manila</p>
@@ -37,6 +36,7 @@ const Footer = () => {
                 <Link to="/menu" className="hover:text-white transition-colors duration-300 w-max">{t('nav.menu')}</Link>
                 <Link to="/reservations" className="hover:text-white transition-colors duration-300 w-max">{t('nav.book')}</Link>
                 <Link to="/news" className="hover:text-white transition-colors duration-300 w-max">{t('nav.news')}</Link>
+                <Link to="/rewards" className="hover:text-white transition-colors duration-300 w-max">{t('nav.rewards')}</Link>
                 <Link to="/about" className="hover:text-white transition-colors duration-300 w-max">{t('nav.about')}</Link>
                 <Link to="/vip-rooms" className="hover:text-white transition-colors duration-300 w-max">{t('nav.rooms')}</Link>
              </div>

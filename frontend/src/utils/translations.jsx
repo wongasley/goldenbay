@@ -1,6 +1,56 @@
+import React, { createContext, useState, useContext, useEffect } from 'react';
+
+const LanguageContext = createContext();
+
+export const LanguageProvider = ({ children }) => {
+    // Load saved language or default to English
+    const [language, setLanguage] = useState(() => localStorage.getItem('siteLang') || 'en');
+
+    useEffect(() => {
+        localStorage.setItem('siteLang', language);
+    }, [language]);
+
+    // Simple nested key translator: t('nav.menu')
+    const t = (key) => {
+        const keys = key.split('.');
+        let result = translations[language];
+        for (const k of keys) {
+            if (!result || result[k] === undefined) return key; // Fallback to key name if missing
+            result = result[k];
+        }
+        return result;
+    };
+
+    // Font dynamic class
+    const getFontClass = () => {
+        switch(language) {
+            case 'zh': return 'font-chinese';
+            case 'zh_hant': return 'font-chinese_traditional';
+            case 'ja': return 'font-japanese';
+            case 'ko': return 'font-korean';
+            default: return 'font-serif';
+        }
+    };
+
+    // Helper to extract translated data from API models
+    const getLocData = (obj, fieldName) => {
+        if (!obj) return "";
+        if (language === 'en') return obj[fieldName];
+        return obj[`${fieldName}_${language}`] || obj[fieldName];
+    };
+
+    return (
+        <LanguageContext.Provider value={{ language, setLanguage, t, getFontClass, getLocData }}>
+            {children}
+        </LanguageContext.Provider>
+    );
+};
+
+export const useLanguage = () => useContext(LanguageContext);
+
 export const translations = {
     en: {
-        nav: { menu: "Menu", events: "Events", news: "News & Promos", rooms: "Private Rooms", about: "About Us", contact: "Contact", book: "Book a Table" },
+        nav: { menu: "Menu", events: "Events", news: "News & Promos", rooms: "Private Rooms", rewards: "Rewards", about: "About Us", contact: "Contact", book: "Book a Table" },
         footer: { explore: "Explore", contact: "Contact", hours: "Hours", lunch: "Lunch", dinner: "Dinner", address: "Lot 3&4 Block A2, Diosdado Macapagal Blvd, CBP, Pasay City, Metro Manila", rights: "Golden Bay Restaurant. All Rights Reserved." },
         home: { back: "← Back to Experience", enter: "Enter Experience", loc: "Lot 3&4 Block A2, Diosdado Macapagal Blvd, CBP, Pasay City" },
         marketing: { all: "All Updates", promo: "Promotions", blog: "Events & Stories", readMore: "Read More", limited: "Limited Offer", event: "Event", back: "← Back to News" },
@@ -52,7 +102,7 @@ export const translations = {
         }
     },
     zh: {
-        nav: { menu: "菜单", events: "活动", news: "新闻与优惠", rooms: "贵宾包厢", about: "关于我们", contact: "联系我们", book: "预订餐桌" },
+        nav: { menu: "菜单", events: "活动", news: "新闻与优惠", rooms: "贵宾包厢", rewards: "会员奖励", about: "关于我们", contact: "联系我们", book: "预订餐桌" },
         footer: { explore: "探索", contact: "联系", hours: "营业时间", lunch: "午餐", dinner: "晚餐", address: "帕赛市 Diosdado Macapagal 大道", rights: "金海湾海鲜酒家。保留所有权利。" },
         home: { back: "← 返回体验", enter: "开启体验", loc: "帕赛市 Diosdado Macapagal 大道" },
         marketing: { all: "全部动态", promo: "优惠促销", blog: "活动与故事", readMore: "阅读更多", limited: "限时优惠", event: "活动", back: "← 返回新闻" },
@@ -96,7 +146,7 @@ export const translations = {
         }
     },
     zh_hant: {
-        nav: { menu: "菜單", events: "活動", news: "新聞與優惠", rooms: "貴賓包廂", about: "關於我們", contact: "聯繫我們", book: "預訂餐桌" },
+        nav: { menu: "菜單", events: "活動", news: "新聞與優惠", rooms: "貴賓包廂", rewards: "會員獎勵", about: "關於我們", contact: "聯繫我們", book: "預訂餐桌" },
         footer: { explore: "探索", contact: "聯繫", hours: "營業時間", lunch: "午餐", dinner: "晚餐", address: "帕賽市 Diosdado Macapagal 大道", rights: "金海灣海鮮酒家。保留所有權利。" },
         home: { back: "← 返回體驗", enter: "開啟體驗", loc: "帕賽市 Diosdado Macapagal 大道" },
         marketing: { all: "全部動態", promo: "優惠促銷", blog: "活動與故事", readMore: "閱讀更多", limited: "限時優惠", event: "活動", back: "← 返回新聞" },
@@ -140,7 +190,7 @@ export const translations = {
         }
     },
     ja: {
-        nav: { menu: "メニュー", events: "イベント", news: "ニュース＆プロモ", rooms: "個室", about: "私たちについて", contact: "お問い合わせ", book: "予約する" },
+        nav: { menu: "メニュー", events: "イベント", news: "ニュース＆プロモ", rooms: "個室", rewards: "リワード", about: "私たちについて", contact: "お問い合わせ", book: "予約する" },
         footer: { explore: "探索", contact: "連絡先", hours: "営業時間", lunch: "ランチ", dinner: "ディナー", address: "パサイ市 ディオスダド・マカパガル大通り", rights: "ゴールデンベイ レストラン。全著作権所有。" },
         home: { back: "← 体験に戻る", enter: "体験を始める", loc: "パサイ市 ディオスダド・マカパガル大通り" },
         marketing: { all: "すべての更新", promo: "プロモーション", blog: "イベントとストーリー", readMore: "続きを読む", limited: "限定オファー", event: "イベント", back: "← ニュースに戻る" },
@@ -184,7 +234,7 @@ export const translations = {
         }
     },
     ko: {
-        nav: { menu: "메뉴", events: "이벤트", news: "뉴스 및 프로모션", rooms: "프라이빗 룸", about: "소개", contact: "연락처", book: "테이블 예약" },
+        nav: { menu: "메뉴", events: "이벤트", news: "뉴스 및 프로모션", rooms: "프라이빗 룸", rewards: "리워드", about: "소개", contact: "연락처", book: "테이블 예약" },
         footer: { explore: "둘러보기", contact: "연락처", hours: "영업 시간", lunch: "점심", dinner: "저녁", address: "파사이 시티, 디오스다도 마카파갈 대로", rights: "골든 베이 레스토랑. 모든 권리 보유." },
         home: { back: "← 체험으로 돌아가기", enter: "체험 시작", loc: "파사이 시티, 디오스다도 마카파갈 대로" },
         marketing: { all: "모든 소식", promo: "프로모션", blog: "이벤트 및 스토리", readMore: "더 보기", limited: "한정 혜택", event: "이벤트", back: "← 뉴스로 돌아가기" },

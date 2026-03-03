@@ -30,6 +30,7 @@ const Navbar = () => {
     { name: t('nav.events'), path: '/events' },
     { name: t('nav.news'), path: '/news' },
     { name: t('nav.rooms'), path: '/vip-rooms' },
+    { name: t('nav.rewards'), path: '/rewards' },
     { name: t('nav.about'), path: '/about' },
     { name: t('nav.contact'), path: '/contact' },
   ];
@@ -50,7 +51,7 @@ const Navbar = () => {
           <button onClick={() => setLanguage('ko')} className={`transition-colors ${language === 'ko' ? 'text-gold-500 font-bold' : 'hover:text-white'}`}>KO</button>
       </div>
 
-      {/* 2. Main Navigation (Removed top-7, it now naturally flows under the language bar) */}
+      {/* 2. Main Navigation */}
       <nav className={`w-full transition-all duration-300 ${
         isHomePage && !isMobileMenuOpen
           ? 'bg-black/20 backdrop-blur-sm border-b border-white/5' 
@@ -114,7 +115,7 @@ const Navbar = () => {
                 </motion.div>
               ))}
               
-              {/* Mobile CTA (always visible on mobile) */}
+              {/* Mobile CTA */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
