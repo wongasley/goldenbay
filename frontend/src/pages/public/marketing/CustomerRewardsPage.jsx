@@ -3,19 +3,20 @@ import { Phone, CheckCircle, Star, Gift, Utensils, LogOut, ArrowRight, Activity,
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import axios from 'axios'; // We use raw axios for login requests
+import axios from 'axios';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const CustomerRewardsPage = () => {
-  const [step, setStep] = useState('LOGIN'); // 'LOGIN', 'OTP', 'DASHBOARD'
+  const [step, setStep] = useState('LOGIN'); 
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [customerData, setCustomerData] = useState(null);
+  
   const [rewards, setRewards] = useState([]);
+  const [fetchingRewards, setFetchingRewards] = useState(true); // <-- Added explicit loading state
 
-  // Auto-login if token exists
   useEffect(() => {
       const storedCustomer = localStorage.getItem('gb_customer_data');
       const token = localStorage.getItem('gb_customer_token');
@@ -28,11 +29,14 @@ const CustomerRewardsPage = () => {
   }, []);
 
   const fetchRewards = async () => {
+      setFetchingRewards(true);
       try {
           const res = await axios.get(`${BACKEND_URL}/api/reservations/rewards/`);
           setRewards(res.data);
       } catch (err) {
           console.error("Failed to load rewards catalog.");
+      } finally {
+          setFetchingRewards(false);
       }
   };
 
@@ -56,7 +60,6 @@ const CustomerRewardsPage = () => {
       try {
           const res = await axios.post(`${BACKEND_URL}/api/users/verify-otp/`, { phone, otp });
           
-          // Save customer token and data separately from Staff tokens
           localStorage.setItem('gb_customer_token', res.data.access);
           localStorage.setItem('gb_customer_data', JSON.stringify(res.data.customer));
           
@@ -81,13 +84,9 @@ const CustomerRewardsPage = () => {
       toast("Logged out securely.", { icon: '👋' });
   };
 
-  // ---------------------------------------------------------------------------
-  // RENDER: LOGIN & OTP
-  // ---------------------------------------------------------------------------
   if (step === 'LOGIN' || step === 'OTP') {
       return (
           <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-6 relative overflow-hidden">
-              {/* Luxury Background Glows */}
               <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-gold-600/10 blur-[120px] rounded-full pointer-events-none"></div>
               <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-gold-600/10 blur-[120px] rounded-full pointer-events-none"></div>
               
@@ -152,13 +151,9 @@ const CustomerRewardsPage = () => {
       );
   }
 
-  // ---------------------------------------------------------------------------
-  // RENDER: DASHBOARD
-  // ---------------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-20">
         
-        {/* Navigation Bar */}
         <header className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
             <div className="flex items-center gap-2">
                 <Gift className="text-gold-600" size={20}/>
@@ -171,7 +166,6 @@ const CustomerRewardsPage = () => {
 
         <div className="max-w-3xl mx-auto px-4 mt-8">
             
-            {/* VIP Status Card */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className={`rounded-lg p-8 text-white relative overflow-hidden shadow-2xl mb-8 ${customerData?.is_vip ? 'bg-gradient-to-br from-neutral-900 to-black' : 'bg-gradient-to-br from-gold-500 to-gold-700'}`}>
                 {customerData?.is_vip && (
                     <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
@@ -198,7 +192,6 @@ const CustomerRewardsPage = () => {
                 </div>
             </motion.div>
 
-            {/* Quick Actions / Progress */}
             {!customerData?.is_vip && (
                 <div className="bg-white p-5 rounded-md border border-gray-200 shadow-sm mb-8 flex items-center gap-4">
                     <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 shrink-0">
@@ -211,12 +204,15 @@ const CustomerRewardsPage = () => {
                 </div>
             )}
 
-            {/* Rewards Catalog */}
             <div>
                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-6 border-b border-gray-200 pb-2">Reward Catalog</h3>
                 
-                {rewards.length === 0 ? (
-                    <div className="text-center py-12 text-gray-400 text-sm">Loading rewards...</div>
+                {fetchingRewards ? (
+                    <div className="text-center py-12 text-gray-400 text-sm animate-pulse">Loading rewards...</div>
+                ) : rewards.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400 text-sm bg-white border border-gray-200 rounded-md">
+                        More exciting rewards are coming soon! Please check back later.
+                    </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {rewards.map(reward => {
@@ -252,10 +248,8 @@ const CustomerRewardsPage = () => {
                                                         
                                                         toast.success(res.data.message, { duration: 6000 });
                                                         
-                                                        // Update local state instantly so the UI reflects the new balance
                                                         setCustomerData(prev => ({ ...prev, points_balance: res.data.new_balance }));
                                                         
-                                                        // Play a distinct sound for the customer
                                                         const audio = new Audio('/audio/success.mp3');
                                                         audio.play().catch(e => console.warn(e));
 
