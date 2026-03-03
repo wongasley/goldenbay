@@ -1304,7 +1304,8 @@ class LeadCaptureView(APIView):
 
         # --- SEND THE ACTUAL SMS COUPON ---
         if len(clean_phone) >= 10:
-            sms_body = f"Welcome to Golden Bay VIP, {name}! 🥂 Show this text to our receptionist on your next dine-in visit to claim your complimentary dessert. Reserve at: (02) 8804-0332"
+            # Removed the emoji and upgraded the copy to feel like a professional coupon
+            sms_body = f"GOLDEN BAY VIP E-PASS: Welcome, {name}! Present this message to our receptionist on your next dine-in visit to claim your complimentary Signature Dessert. To reserve a table, call (02) 8804-0332."
             send_sms(customer.phone, sms_body)
 
         return Response({

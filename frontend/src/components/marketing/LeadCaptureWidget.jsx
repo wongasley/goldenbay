@@ -13,7 +13,7 @@ const LeadCaptureWidget = () => {
     // Show widget after 15 seconds, but only if they haven't dismissed or submitted it before
     const hasSeenWidget = localStorage.getItem('gb_vip_widget_seen');
     if (!hasSeenWidget) {
-      const timer = setTimeout(() => setIsVisible(true), 15000);
+      const timer = setTimeout(() => setIsVisible(true), 1000);
       return () => clearTimeout(timer);
     }
   }, []);
