@@ -296,14 +296,14 @@ const CustomerRewardsPage = () => {
                     {/* Sizes / Portions List - Stays consistent below the fixed image */}
                     <div className="space-y-2 mt-auto">
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 border-b border-gray-50 pb-1">
-                        Select Portion
+                        Select
                     </p>
                     {group.options.map((option) => {
                         const canAfford = (customerData?.points_balance || 0) >= option.points_required;
                         return (
                         <div key={option.id} className="flex items-center justify-between p-3 rounded-sm bg-gray-50 border border-transparent hover:border-gold-200 transition-all group/opt">
                             <div className="flex flex-col">
-                            <span className="text-[10px] font-bold text-gray-800 uppercase tracking-tight">{option.size || 'Regular'} Portion</span>
+                            <span className="text-[10px] font-bold text-gray-800 uppercase tracking-tight">{option.size || 'Regular'}</span>
                             <span className="font-mono font-bold text-gold-600 text-xs">{option.points_required} PTS</span>
                             </div>
                             
