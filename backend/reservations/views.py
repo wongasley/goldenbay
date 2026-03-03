@@ -63,13 +63,15 @@ class ReservationCreateView(generics.CreateAPIView):
         
         # 2. Fire notifications ASYNCHRONOUSLY based on creation status
         try:
-            # If an Admin/Receptionist makes a manual booking, it is created as 'CONFIRMED'
+            # 🔴 UPDATED: If an Admin/Receptionist makes a manual booking (CONFIRMED)
             if reservation.status == 'CONFIRMED':
                 send_status_update_notifications.delay(reservation.id, 'CONFIRMED', send_sms_flag)
+                # Send the "New Booking" alert to Admins, but skip sending the "Pending" text to the customer
+                send_new_booking_notifications.delay(reservation.id, send_sms_flag, notify_customer=False) 
             
-            # If a customer books via the Website, it is created as 'PENDING'
+            # If a customer books via the Website (PENDING)
             else:
-                send_new_booking_notifications.delay(reservation.id, send_sms_flag) 
+                send_new_booking_notifications.delay(reservation.id, send_sms_flag, notify_customer=True) 
                 
         except Exception as e:
             print(f"Warning: Could not queue celery task: {e}")
@@ -127,10 +129,7 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
 
         new_status = request.data.get('status', old_status)
         
-        # Prevent Receptionists from Cancelling
-        if new_status == 'CANCELLED' and old_status != 'CANCELLED':
-            if not (request.user.is_superuser or request.user.groups.filter(name__in=['Supervisor', 'Admin']).exists()):
-                raise PermissionDenied("Only Supervisors and Admins can cancel bookings.")
+        # 🔴 REMOVED the block preventing receptionists from cancelling
         
         # Prevent Receptionists from changing a Completed or Cancelled booking back to active
         if old_status in ['COMPLETED', 'CANCELLED'] and new_status not in ['COMPLETED', 'CANCELLED']:

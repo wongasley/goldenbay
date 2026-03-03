@@ -15,7 +15,8 @@ export const getUserRole = () => {
 
 export const canCancelBooking = () => {
     const role = getUserRole();
-    return role === 'Supervisor' || role === 'Admin';
+    // Allow ALL staff roles to cancel bookings
+    return role === 'Receptionist' || role === 'Supervisor' || role === 'Admin';
 };
 
 export const canManageMarketing = () => {
