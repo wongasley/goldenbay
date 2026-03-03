@@ -7,8 +7,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from .utils import send_sms
-from .models import DiningArea, PointTransaction, Reservation, Customer, RewardItem
-from .serializers import AwardPointsSerializer, ReservationSerializer, DiningAreaSerializer, CustomerSerializer, RewardItemSerializer
+from .models import DiningArea, PointTransaction, Reservation, Customer, RewardItem, RewardRedemption
+from .serializers import AwardPointsSerializer, ReservationSerializer, DiningAreaSerializer, CustomerSerializer, RewardItemSerializer, RewardRedemptionSerializer
 from .tasks import (
     send_new_booking_notifications,
     send_points_awarded_sms, 
@@ -18,6 +18,8 @@ from .tasks import (
 )
 from rest_framework.throttling import AnonRateThrottle
 import math
+from django.db import transaction
+
 
 class AvailableRoomsView(APIView):
     def get(self, request):
@@ -442,3 +444,91 @@ class AwardPointsView(APIView):
             "points_earned": points_earned,
             "new_balance": customer.points_balance
         }, status=status.HTTP_200_OK)
+    
+class RedeemRewardView(APIView):
+    permission_classes = [IsAuthenticated] # Ensures only logged-in customers can hit this
+
+    def post(self, request):
+        # 1. Identify the Customer (JWT username is their phone number)
+        try:
+            customer = Customer.objects.get(phone=request.user.username)
+        except Customer.DoesNotExist:
+            return Response({"error": "Customer profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        reward_id = request.data.get('reward_id')
+        try:
+            reward = RewardItem.objects.get(id=reward_id, is_active=True)
+        except RewardItem.DoesNotExist:
+            return Response({"error": "Reward unavailable."}, status=status.HTTP_404_NOT_FOUND)
+
+        # 2. Check Balance
+        if customer.points_balance < reward.points_required:
+            return Response({"error": "Insufficient points balance."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 3. Process Transaction Safely
+        with transaction.atomic():
+            # Re-fetch and lock the row to prevent double-clicking exploits
+            customer = Customer.objects.select_for_update().get(id=customer.id)
+            
+            if customer.points_balance >= reward.points_required:
+                # Create the Cashier Ticket
+                RewardRedemption.objects.create(
+                    customer=customer,
+                    reward_item=reward,
+                    status='PENDING'
+                )
+                
+                # Deduct points (this auto-updates customer.points_balance via your models.py save logic)
+                PointTransaction.objects.create(
+                    customer=customer,
+                    transaction_type='REDEEMED',
+                    points=reward.points_required,
+                    reward_item=reward
+                )
+                
+                # Fetch fresh balance to send back to React
+                customer.refresh_from_db()
+                return Response({
+                    "message": f"Successfully redeemed {reward.name}! Show this to your waiter.",
+                    "new_balance": customer.points_balance
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "Insufficient points."}, status=status.HTTP_400_BAD_REQUEST)
+            
+class StaffRedemptionListView(generics.ListAPIView):
+    """ Lists all redemptions for the staff dashboard """
+    queryset = RewardRedemption.objects.all().order_by('-created_at')
+    serializer_class = RewardRedemptionSerializer
+    permission_classes = [IsAuthenticated]
+
+class StaffRedemptionUpdateView(generics.UpdateAPIView):
+    """ Allows staff to mark tickets as CLAIMED or CANCELLED """
+    queryset = RewardRedemption.objects.all()
+    serializer_class = RewardRedemptionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.status != 'PENDING':
+            return Response({"error": "This ticket has already been processed."}, status=status.HTTP_400_BAD_REQUEST)
+        return super().update(request, *args, **kwargs)
+
+    def perform_update(self, serializer):
+        # Save the user who clicked the button
+        instance = serializer.save(fulfilled_by=self.request.user)
+        
+        # If staff cancels the ticket, automatically refund the points!
+        if instance.status == 'CANCELLED':
+            with transaction.atomic():
+                customer = Customer.objects.select_for_update().get(id=instance.customer.id)
+                customer.points_balance += instance.reward_item.points_required
+                customer.save(update_fields=['points_balance'])
+                
+                # Log the refund in the transaction ledger
+                PointTransaction.objects.create(
+                    customer=customer,
+                    transaction_type='EARNED',
+                    points=instance.reward_item.points_required,
+                    reward_item=instance.reward_item,
+                    encoded_by=self.request.user,
+                )

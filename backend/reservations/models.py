@@ -225,3 +225,23 @@ def save_customer_from_reservation(sender, instance, created, **kwargs):
         except Exception as e:
             # Prevents a 500 Server Error if the Phone Book has duplicate numbers or crashes
             print(f"Failed to auto-save customer to phonebook: {e}")
+
+class RewardRedemption(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending (To Claim)'),
+        ('CLAIMED', 'Claimed / Served'),
+        ('CANCELLED', 'Cancelled (Points Refunded)'),
+    ]
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='redemptions')
+    reward_item = models.ForeignKey(RewardItem, on_delete=models.CASCADE)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Track who handed the food to the customer
+    fulfilled_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"[{self.status}] {self.customer.name} - {self.reward_item.name}"

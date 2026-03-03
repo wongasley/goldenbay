@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.db.models import Sum
-from .models import DiningArea, PointTransaction, Reservation, Customer, RewardItem
+from .models import DiningArea, PointTransaction, Reservation, Customer, RewardItem, RewardRedemption
 from django.db import transaction
 
 class DiningAreaSerializer(serializers.ModelSerializer):
@@ -108,3 +108,17 @@ class AwardPointsSerializer(serializers.Serializer):
     phone = serializers.CharField(max_length=20)
     name = serializers.CharField(max_length=100, required=False, allow_blank=True)
     amount_spent = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+class RewardRedemptionSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(source='customer.name', read_only=True)
+    customer_phone = serializers.CharField(source='customer.phone', read_only=True)
+    reward_name = serializers.CharField(source='reward_item.name', read_only=True)
+    fulfilled_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RewardRedemption
+        fields = '__all__'
+        read_only_fields = ['customer', 'reward_item', 'created_at', 'fulfilled_by']
+
+    def get_fulfilled_by_name(self, obj):
+        return obj.fulfilled_by.username if obj.fulfilled_by else None

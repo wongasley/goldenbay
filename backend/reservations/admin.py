@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Customer, DiningArea, PointTransaction, Reservation, RewardItem
+from .models import Customer, DiningArea, PointTransaction, Reservation, RewardItem, RewardRedemption
 
 @admin.register(DiningArea)
 class DiningAreaAdmin(admin.ModelAdmin):
@@ -28,3 +28,10 @@ class PointTransactionAdmin(admin.ModelAdmin):
     list_filter = ('transaction_type', 'created_at')
     search_fields = ('customer__name', 'customer__phone')
     readonly_fields = ('created_at',)
+
+@admin.register(RewardRedemption)
+class RewardRedemptionAdmin(admin.ModelAdmin):
+    list_display = ('customer', 'reward_item', 'status', 'created_at')
+    list_filter = ('status', 'created_at')
+    search_fields = ('customer__name', 'customer__phone')
+    list_editable = ('status',)

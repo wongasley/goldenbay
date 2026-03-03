@@ -637,7 +637,7 @@ class AdminMenuItemPriceUpdateView(generics.UpdateAPIView):
         cache.clear()
 
 from django.contrib import admin
-from .models import Customer, DiningArea, PointTransaction, Reservation, RewardItem
+from .models import Customer, DiningArea, PointTransaction, Reservation, RewardItem, RewardRedemption
 
 @admin.register(DiningArea)
 class DiningAreaAdmin(admin.ModelAdmin):
@@ -666,6 +666,13 @@ class PointTransactionAdmin(admin.ModelAdmin):
     list_filter = ('transaction_type', 'created_at')
     search_fields = ('customer__name', 'customer__phone')
     readonly_fields = ('created_at',)
+
+@admin.register(RewardRedemption)
+class RewardRedemptionAdmin(admin.ModelAdmin):
+    list_display = ('customer', 'reward_item', 'status', 'created_at')
+    list_filter = ('status', 'created_at')
+    search_fields = ('customer__name', 'customer__phone')
+    list_editable = ('status',)
 
 from django.apps import AppConfig
 
@@ -902,9 +909,29 @@ def save_customer_from_reservation(sender, instance, created, **kwargs):
             # Prevents a 500 Server Error if the Phone Book has duplicate numbers or crashes
             print(f"Failed to auto-save customer to phonebook: {e}")
 
+class RewardRedemption(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending (To Claim)'),
+        ('CLAIMED', 'Claimed / Served'),
+        ('CANCELLED', 'Cancelled (Points Refunded)'),
+    ]
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='redemptions')
+    reward_item = models.ForeignKey(RewardItem, on_delete=models.CASCADE)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Track who handed the food to the customer
+    fulfilled_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"[{self.status}] {self.customer.name} - {self.reward_item.name}"
+
 from rest_framework import serializers
 from django.db.models import Sum
-from .models import DiningArea, PointTransaction, Reservation, Customer, RewardItem
+from .models import DiningArea, PointTransaction, Reservation, Customer, RewardItem, RewardRedemption
 from django.db import transaction
 
 class DiningAreaSerializer(serializers.ModelSerializer):
@@ -1013,8 +1040,22 @@ class AwardPointsSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100, required=False, allow_blank=True)
     amount_spent = serializers.DecimalField(max_digits=10, decimal_places=2)
 
+class RewardRedemptionSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(source='customer.name', read_only=True)
+    customer_phone = serializers.CharField(source='customer.phone', read_only=True)
+    reward_name = serializers.CharField(source='reward_item.name', read_only=True)
+    fulfilled_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RewardRedemption
+        fields = '__all__'
+        read_only_fields = ['customer', 'reward_item', 'created_at', 'fulfilled_by']
+
+    def get_fulfilled_by_name(self, obj):
+        return obj.fulfilled_by.username if obj.fulfilled_by else None
+
 from django.urls import path
-from .views import AdminReservationDetailView, AdminReservationListView, AvailableRoomsView, AwardPointsView, ChatbotBookingWebhook, CustomerDetailView, CustomerListView, DashboardStatsView, LeadCaptureView, ReservationCreateView, RewardItemListView, VIPRoomListView
+from .views import AdminReservationDetailView, AdminReservationListView, AvailableRoomsView, AwardPointsView, ChatbotBookingWebhook, CustomerDetailView, CustomerListView, DashboardStatsView, LeadCaptureView, RedeemRewardView, ReservationCreateView, RewardItemListView, StaffRedemptionListView, StaffRedemptionUpdateView, VIPRoomListView
 
 urlpatterns = [
     path('check/', AvailableRoomsView.as_view(), name='check_availability'),
@@ -1028,7 +1069,10 @@ urlpatterns = [
     path('bot-webhook/', ChatbotBookingWebhook.as_view(), name='bot_webhook'),
     path('lead-capture/', LeadCaptureView.as_view(), name='lead_capture'),
     path('rewards/', RewardItemListView.as_view(), name='reward_list'),
+    path('rewards/redeem/', RedeemRewardView.as_view(), name='redeem_reward'),
     path('award-points/', AwardPointsView.as_view(), name='award_points'),
+    path('manage/redemptions/', StaffRedemptionListView.as_view(), name='manage_redemptions'),
+    path('manage/redemptions/<int:pk>/', StaffRedemptionUpdateView.as_view(), name='update_redemption'),
 ]
 
 import os
@@ -1040,8 +1084,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from .utils import send_sms
-from .models import DiningArea, PointTransaction, Reservation, Customer, RewardItem
-from .serializers import AwardPointsSerializer, ReservationSerializer, DiningAreaSerializer, CustomerSerializer, RewardItemSerializer
+from .models import DiningArea, PointTransaction, Reservation, Customer, RewardItem, RewardRedemption
+from .serializers import AwardPointsSerializer, ReservationSerializer, DiningAreaSerializer, CustomerSerializer, RewardItemSerializer, RewardRedemptionSerializer
 from .tasks import (
     send_new_booking_notifications,
     send_points_awarded_sms, 
@@ -1051,6 +1095,8 @@ from .tasks import (
 )
 from rest_framework.throttling import AnonRateThrottle
 import math
+from django.db import transaction
+
 
 class AvailableRoomsView(APIView):
     def get(self, request):
@@ -1475,6 +1521,94 @@ class AwardPointsView(APIView):
             "points_earned": points_earned,
             "new_balance": customer.points_balance
         }, status=status.HTTP_200_OK)
+    
+class RedeemRewardView(APIView):
+    permission_classes = [IsAuthenticated] # Ensures only logged-in customers can hit this
+
+    def post(self, request):
+        # 1. Identify the Customer (JWT username is their phone number)
+        try:
+            customer = Customer.objects.get(phone=request.user.username)
+        except Customer.DoesNotExist:
+            return Response({"error": "Customer profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        reward_id = request.data.get('reward_id')
+        try:
+            reward = RewardItem.objects.get(id=reward_id, is_active=True)
+        except RewardItem.DoesNotExist:
+            return Response({"error": "Reward unavailable."}, status=status.HTTP_404_NOT_FOUND)
+
+        # 2. Check Balance
+        if customer.points_balance < reward.points_required:
+            return Response({"error": "Insufficient points balance."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 3. Process Transaction Safely
+        with transaction.atomic():
+            # Re-fetch and lock the row to prevent double-clicking exploits
+            customer = Customer.objects.select_for_update().get(id=customer.id)
+            
+            if customer.points_balance >= reward.points_required:
+                # Create the Cashier Ticket
+                RewardRedemption.objects.create(
+                    customer=customer,
+                    reward_item=reward,
+                    status='PENDING'
+                )
+                
+                # Deduct points (this auto-updates customer.points_balance via your models.py save logic)
+                PointTransaction.objects.create(
+                    customer=customer,
+                    transaction_type='REDEEMED',
+                    points=reward.points_required,
+                    reward_item=reward
+                )
+                
+                # Fetch fresh balance to send back to React
+                customer.refresh_from_db()
+                return Response({
+                    "message": f"Successfully redeemed {reward.name}! Show this to your waiter.",
+                    "new_balance": customer.points_balance
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "Insufficient points."}, status=status.HTTP_400_BAD_REQUEST)
+            
+class StaffRedemptionListView(generics.ListAPIView):
+    """ Lists all redemptions for the staff dashboard """
+    queryset = RewardRedemption.objects.all().order_by('-created_at')
+    serializer_class = RewardRedemptionSerializer
+    permission_classes = [IsAuthenticated]
+
+class StaffRedemptionUpdateView(generics.UpdateAPIView):
+    """ Allows staff to mark tickets as CLAIMED or CANCELLED """
+    queryset = RewardRedemption.objects.all()
+    serializer_class = RewardRedemptionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.status != 'PENDING':
+            return Response({"error": "This ticket has already been processed."}, status=status.HTTP_400_BAD_REQUEST)
+        return super().update(request, *args, **kwargs)
+
+    def perform_update(self, serializer):
+        # Save the user who clicked the button
+        instance = serializer.save(fulfilled_by=self.request.user)
+        
+        # If staff cancels the ticket, automatically refund the points!
+        if instance.status == 'CANCELLED':
+            with transaction.atomic():
+                customer = Customer.objects.select_for_update().get(id=instance.customer.id)
+                customer.points_balance += instance.reward_item.points_required
+                customer.save(update_fields=['points_balance'])
+                
+                # Log the refund in the transaction ledger
+                PointTransaction.objects.create(
+                    customer=customer,
+                    transaction_type='EARNED',
+                    points=instance.reward_item.points_required,
+                    reward_item=instance.reward_item,
+                    encoded_by=self.request.user,
+                )
 
 import requests
 import os
@@ -2150,6 +2284,9 @@ class VerifyOTPView(APIView):
 
         # 4. We map the Customer to a Django User behind the scenes so SimpleJWT works flawlessly
         user, user_created = User.objects.get_or_create(username=clean_phone)
+        if user_created:
+            user.set_unusable_password() # <--- ADD THIS
+            user.save()
 
         # 5. Generate secure JWT
         refresh = RefreshToken.for_user(user)
@@ -2205,6 +2342,7 @@ const PostEditor = lazy(() => import('./pages/admin/marketing/PostEditor'));
 const PhoneBookPage = lazy(() => import('./pages/admin/customers/PhoneBookPage')); 
 const CampaignBuilder = lazy(() => import('./pages/admin/marketing/CampaignBuilder'));
 const MenuManager = lazy(() => import('./pages/admin/menu/MenuManager'));
+const RewardsManager = lazy(() => import('./pages/admin/customers/RewardsManager'));
 
 // Premium Loading Fallback while splitting code
 const PageLoader = () => (
@@ -2268,6 +2406,7 @@ function App() {
               <Route path="marketing/edit/:id" element={<PostEditor />} />
               <Route path="marketing/blast" element={<CampaignBuilder />} />
               <Route path="menu" element={<MenuManager />} />
+              <Route path="rewards" element={<RewardsManager />} />
             </Route>
             
           </Routes>
@@ -7559,7 +7698,8 @@ import {
   Users, 
   Megaphone, 
   Utensils,
-  X
+  X,
+  Gift,
 } from 'lucide-react';
 import LogoutButton from '../auth/LogoutButton';
 import logo from '../../assets/images/goldenbaylogo.svg'; 
@@ -7581,7 +7721,8 @@ const AdminLayout = () => {
     { path: '/staff', label: 'Overview', icon: LayoutDashboard, show: true },
     { path: '/staff/bookings', label: 'Reservations', icon: CalendarDays, show: true },
     { path: '/staff/customers', label: 'Phone Book', icon: Users, show: true },
-    { path: '/staff/menu', label: 'Menu Manager', icon: Utensils, show: isMenuAdmin }, // <--- NOW RESTRICTED
+    { path: '/staff/rewards', label: 'Fulfillment', icon: Gift, show: true }, // <--- ADD THIS
+    { path: '/staff/menu', label: 'Menu Manager', icon: Utensils, show: isMenuAdmin },
     { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: isMarketingAdmin },
   ].filter(item => item.show);
 
@@ -9685,3 +9826,394 @@ const LeadCaptureWidget = () => {
 };
 
 export default LeadCaptureWidget;
+
+import React, { useState, useEffect } from 'react';
+import { Phone, CheckCircle, Star, Gift, Utensils, LogOut, ArrowRight, Activity, Calendar } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Link } from 'react-router-dom';
+import axios from 'axios'; // We use raw axios for login requests
+
+const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
+
+const CustomerRewardsPage = () => {
+  const [step, setStep] = useState('LOGIN'); // 'LOGIN', 'OTP', 'DASHBOARD'
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [customerData, setCustomerData] = useState(null);
+  const [rewards, setRewards] = useState([]);
+
+  // Auto-login if token exists
+  useEffect(() => {
+      const storedCustomer = localStorage.getItem('gb_customer_data');
+      const token = localStorage.getItem('gb_customer_token');
+      
+      if (token && storedCustomer) {
+          setCustomerData(JSON.parse(storedCustomer));
+          setStep('DASHBOARD');
+          fetchRewards();
+      }
+  }, []);
+
+  const fetchRewards = async () => {
+      try {
+          const res = await axios.get(`${BACKEND_URL}/api/reservations/rewards/`);
+          setRewards(res.data);
+      } catch (err) {
+          console.error("Failed to load rewards catalog.");
+      }
+  };
+
+  const handleRequestOTP = async (e) => {
+      e.preventDefault();
+      setIsLoading(true);
+      try {
+          await axios.post(`${BACKEND_URL}/api/users/request-otp/`, { phone });
+          toast.success("OTP sent to your phone!");
+          setStep('OTP');
+      } catch (err) {
+          toast.error(err.response?.data?.error || "Failed to send OTP.");
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
+  const handleVerifyOTP = async (e) => {
+      e.preventDefault();
+      setIsLoading(true);
+      try {
+          const res = await axios.post(`${BACKEND_URL}/api/users/verify-otp/`, { phone, otp });
+          
+          // Save customer token and data separately from Staff tokens
+          localStorage.setItem('gb_customer_token', res.data.access);
+          localStorage.setItem('gb_customer_data', JSON.stringify(res.data.customer));
+          
+          setCustomerData(res.data.customer);
+          setStep('DASHBOARD');
+          fetchRewards();
+          toast.success("Welcome back!");
+      } catch (err) {
+          toast.error("Invalid or expired OTP.");
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
+  const handleLogout = () => {
+      localStorage.removeItem('gb_customer_token');
+      localStorage.removeItem('gb_customer_data');
+      setCustomerData(null);
+      setPhone('');
+      setOtp('');
+      setStep('LOGIN');
+      toast("Logged out securely.", { icon: '👋' });
+  };
+
+  // ---------------------------------------------------------------------------
+  // RENDER: LOGIN & OTP
+  // ---------------------------------------------------------------------------
+  if (step === 'LOGIN' || step === 'OTP') {
+      return (
+          <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+              {/* Luxury Background Glows */}
+              <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-gold-600/10 blur-[120px] rounded-full pointer-events-none"></div>
+              <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-gold-600/10 blur-[120px] rounded-full pointer-events-none"></div>
+              
+              <Link to="/" className="absolute top-6 left-6 text-gray-400 text-xs font-bold uppercase tracking-widest hover:text-white transition-colors">
+                  ← Return to Home
+              </Link>
+
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                className="w-full max-w-md bg-white p-10 rounded-sm shadow-2xl relative z-10"
+              >
+                  <div className="text-center mb-8">
+                      <Gift size={32} className="mx-auto text-gold-600 mb-4" />
+                      <h1 className="text-2xl font-serif text-gray-900 font-bold mb-2">Golden Bay Rewards</h1>
+                      <p className="text-gray-500 text-xs uppercase tracking-widest">Sign in to view your points</p>
+                  </div>
+
+                  {step === 'LOGIN' ? (
+                      <form onSubmit={handleRequestOTP} className="space-y-6">
+                          <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Mobile Number</label>
+                              <div className="relative">
+                                  <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                                  <input 
+                                      required type="tel" 
+                                      placeholder="e.g. 0917 123 4567" 
+                                      className="w-full bg-gray-50 border border-gray-200 py-3 pl-12 pr-4 text-gray-900 text-sm focus:bg-white focus:border-gold-500 outline-none rounded-sm transition-all"
+                                      value={phone} onChange={e => setPhone(e.target.value)}
+                                  />
+                              </div>
+                          </div>
+                          <button type="submit" disabled={isLoading || phone.length < 10} className="w-full bg-gold-600 text-white font-bold uppercase tracking-widest py-4 text-xs hover:bg-black transition-colors disabled:opacity-50 rounded-sm shadow-md flex justify-center items-center gap-2">
+                              {isLoading ? <span className="animate-pulse">Sending OTP...</span> : 'Continue'}
+                          </button>
+                      </form>
+                  ) : (
+                      <form onSubmit={handleVerifyOTP} className="space-y-6">
+                          <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Enter 6-Digit Code</label>
+                              <p className="text-xs text-gray-400 mb-4">We sent a text message to <span className="font-bold text-gray-700">{phone}</span>.</p>
+                              <input 
+                                  required type="text" 
+                                  maxLength={6}
+                                  placeholder="• • • • • •" 
+                                  className="w-full bg-gray-50 border border-gray-200 py-4 px-4 text-center tracking-[1em] text-lg font-mono font-bold text-gray-900 focus:bg-white focus:border-gold-500 outline-none rounded-sm transition-all"
+                                  value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                                  autoFocus
+                              />
+                          </div>
+                          <button type="submit" disabled={isLoading || otp.length < 6} className="w-full bg-gold-600 text-white font-bold uppercase tracking-widest py-4 text-xs hover:bg-black transition-colors disabled:opacity-50 rounded-sm shadow-md flex justify-center items-center gap-2">
+                              {isLoading ? <span className="animate-pulse">Verifying...</span> : 'Access Dashboard'}
+                          </button>
+                          <div className="text-center mt-4">
+                              <button type="button" onClick={() => setStep('LOGIN')} className="text-xs text-gray-400 hover:text-gray-900 uppercase tracking-widest font-bold transition-colors">
+                                  Change Number
+                              </button>
+                          </div>
+                      </form>
+                  )}
+              </motion.div>
+          </div>
+      );
+  }
+
+  // ---------------------------------------------------------------------------
+  // RENDER: DASHBOARD
+  // ---------------------------------------------------------------------------
+  return (
+    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-20">
+        
+        {/* Navigation Bar */}
+        <header className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
+            <div className="flex items-center gap-2">
+                <Gift className="text-gold-600" size={20}/>
+                <span className="font-serif font-bold text-lg">My Rewards</span>
+            </div>
+            <button onClick={handleLogout} className="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-red-500 uppercase tracking-widest transition-colors">
+                <LogOut size={14}/> Logout
+            </button>
+        </header>
+
+        <div className="max-w-3xl mx-auto px-4 mt-8">
+            
+            {/* VIP Status Card */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className={`rounded-lg p-8 text-white relative overflow-hidden shadow-2xl mb-8 ${customerData?.is_vip ? 'bg-gradient-to-br from-neutral-900 to-black' : 'bg-gradient-to-br from-gold-500 to-gold-700'}`}>
+                {customerData?.is_vip && (
+                    <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
+                        <Star size={120} />
+                    </div>
+                )}
+                
+                <div className="relative z-10 flex flex-col h-full justify-between">
+                    <div>
+                        <div className="flex items-center gap-2 mb-2">
+                            {customerData?.is_vip ? <Star size={16} className="text-gold-500 fill-gold-500" /> : <Activity size={16} className="text-white/80" />}
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-white/80">
+                                {customerData?.is_vip ? 'VIP Member' : 'Valued Guest'}
+                            </span>
+                        </div>
+                        <h2 className="text-3xl font-serif font-bold break-words">{customerData?.name}</h2>
+                        <p className="text-sm font-mono opacity-80 mt-1">{customerData?.phone}</p>
+                    </div>
+
+                    <div className="mt-10">
+                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-80 mb-1">Available Points</p>
+                        <p className="text-5xl font-bold font-mono tracking-tight">{customerData?.points_balance?.toLocaleString() || 0}</p>
+                    </div>
+                </div>
+            </motion.div>
+
+            {/* Quick Actions / Progress */}
+            {!customerData?.is_vip && (
+                <div className="bg-white p-5 rounded-md border border-gray-200 shadow-sm mb-8 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 shrink-0">
+                        <Utensils size={20} />
+                    </div>
+                    <div>
+                        <h4 className="text-sm font-bold text-gray-900">Unlock VIP Status</h4>
+                        <p className="text-xs text-gray-500 mt-1">Dine with us 3 times to unlock exclusive VIP perks and priority booking.</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Rewards Catalog */}
+            <div>
+                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-6 border-b border-gray-200 pb-2">Reward Catalog</h3>
+                
+                {rewards.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400 text-sm">Loading rewards...</div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {rewards.map(reward => {
+                            const canAfford = customerData?.points_balance >= reward.points_required;
+                            return (
+                                <div key={reward.id} className={`bg-white border p-4 rounded-md shadow-sm flex flex-col ${canAfford ? 'border-gold-300' : 'border-gray-200 opacity-60'}`}>
+                                    <div className="flex gap-4 mb-4">
+                                        <div className="w-20 h-20 bg-gray-100 rounded shrink-0 overflow-hidden border border-gray-200">
+                                            {reward.image ? (
+                                                <img src={reward.image.startsWith('http') ? reward.image : `${BACKEND_URL}${reward.image}`} className="w-full h-full object-cover" alt={reward.name} />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center"><Gift size={20} className="text-gray-300"/></div>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-gray-900 text-sm leading-tight mb-1">{reward.name}</h4>
+                                            <p className="text-[10px] text-gray-500 line-clamp-2 leading-relaxed">{reward.description}</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center">
+                                        <span className="font-mono font-bold text-gold-600 text-sm">{reward.points_required} pts</span>
+                                        
+                                        {canAfford ? (
+                                            <button 
+                                                onClick={async () => {
+                                                    if(!window.confirm(`Redeem ${reward.name} for ${reward.points_required} points?`)) return;
+                                                    try {
+                                                        const res = await axios.post(`${BACKEND_URL}/api/reservations/rewards/redeem/`, 
+                                                            { reward_id: reward.id },
+                                                            { headers: { Authorization: `Bearer ${localStorage.getItem('gb_customer_token')}` } }
+                                                        );
+                                                        
+                                                        toast.success(res.data.message, { duration: 6000 });
+                                                        
+                                                        // Update local state instantly so the UI reflects the new balance
+                                                        setCustomerData(prev => ({ ...prev, points_balance: res.data.new_balance }));
+                                                        
+                                                        // Play a distinct sound for the customer
+                                                        const audio = new Audio('/audio/success.mp3');
+                                                        audio.play().catch(e => console.warn(e));
+
+                                                    } catch(err) {
+                                                        toast.error(err.response?.data?.error || "Redemption failed.");
+                                                    }
+                                                }}
+                                                className="text-[10px] font-bold text-white uppercase tracking-widest bg-gold-600 hover:bg-black px-3 py-1.5 rounded transition-colors shadow-sm flex items-center gap-1"
+                                            >
+                                                <CheckCircle size={12}/> Redeem Now
+                                            </button>
+                                        ) : (
+                                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Not Enough Points</span>
+                                        )}
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
+            </div>
+
+            <div className="mt-12 text-center">
+                <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-4">How to redeem?</p>
+                <p className="text-xs text-gray-500 max-w-sm mx-auto leading-relaxed">Present this dashboard to your server or cashier during your next visit to redeem your available points for complimentary items.</p>
+            </div>
+            
+        </div>
+    </div>
+  );
+};
+
+export default CustomerRewardsPage;
+
+import React, { useState, useEffect } from 'react';
+import { Gift, CheckCircle, XCircle, Clock } from 'lucide-react';
+import toast from 'react-hot-toast';
+import axiosInstance from '../../../utils/axiosInstance';
+
+const RewardsManager = () => {
+    const [tickets, setTickets] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchTickets = async () => {
+        try {
+            const res = await axiosInstance.get('/api/reservations/manage/redemptions/');
+            setTickets(res.data);
+        } catch (err) {
+            toast.error("Failed to load reward tickets.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchTickets();
+        const interval = setInterval(fetchTickets, 15000); // Auto-refresh every 15s
+        return () => clearInterval(interval);
+    }, []);
+
+    const updateTicketStatus = async (id, newStatus, rewardName) => {
+        if (newStatus === 'CANCELLED' && !window.confirm(`Cancel this ticket? Points will be refunded to the customer.`)) return;
+        
+        try {
+            await axiosInstance.patch(`/api/reservations/manage/redemptions/${id}/`, { status: newStatus });
+            toast.success(`Ticket marked as ${newStatus}`);
+            fetchTickets();
+        } catch (err) {
+            toast.error("Failed to update ticket.");
+        }
+    };
+
+    return (
+        <div className="space-y-4 pb-20">
+            <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
+                <h1 className="text-xl font-bold text-gray-900 font-serif flex items-center gap-2">
+                    <Gift size={20} className="text-gold-600"/> Reward Fulfillment
+                </h1>
+                <p className="text-gray-500 text-xs mt-0.5">Manage live customer redemptions here.</p>
+            </div>
+
+            {loading ? (
+                <div className="p-8 text-center text-gray-400 animate-pulse text-xs">Loading tickets...</div>
+            ) : tickets.length === 0 ? (
+                <div className="p-8 text-center text-gray-400 bg-white border border-gray-200 rounded text-xs">No redemption tickets found.</div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {tickets.map(ticket => (
+                        <div key={ticket.id} className={`bg-white border rounded-lg p-5 shadow-sm flex flex-col gap-3 transition-colors ${ticket.status === 'PENDING' ? 'border-gold-400 bg-gold-50/10' : 'border-gray-200'}`}>
+                            
+                            <div className="flex justify-between items-start gap-4">
+                                <div>
+                                    <h3 className="font-bold text-gray-900 text-sm">{ticket.customer_name}</h3>
+                                    <p className="text-xs text-gray-500 font-mono mt-0.5">{ticket.customer_phone}</p>
+                                </div>
+                                <span className={`px-2 py-1 rounded text-[9px] font-bold uppercase tracking-widest border shrink-0
+                                    ${ticket.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 
+                                      ticket.status === 'CLAIMED' ? 'bg-green-50 text-green-700 border-green-200' : 
+                                      'bg-red-50 text-red-700 border-red-200'}`}>
+                                    {ticket.status}
+                                </span>
+                            </div>
+
+                            <div className="bg-gray-50 p-3 rounded border border-gray-100 my-2">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Item to Serve</p>
+                                <p className="font-bold text-gold-700">{ticket.reward_name}</p>
+                                <p className="text-[10px] text-gray-400 mt-2 flex items-center gap-1"><Clock size={10}/> {new Date(ticket.created_at).toLocaleTimeString()}</p>
+                            </div>
+
+                            {ticket.status === 'PENDING' ? (
+                                <div className="flex gap-2 mt-auto">
+                                    <button onClick={() => updateTicketStatus(ticket.id, 'CLAIMED', ticket.reward_name)} className="flex-1 bg-green-600 text-white py-2.5 rounded text-[10px] font-bold uppercase tracking-widest shadow-sm flex items-center justify-center gap-1.5 hover:bg-green-700">
+                                        <CheckCircle size={14}/> Mark Claimed
+                                    </button>
+                                    <button onClick={() => updateTicketStatus(ticket.id, 'CANCELLED', ticket.reward_name)} className="px-3 bg-white text-rose-600 border border-rose-200 py-2.5 rounded text-[10px] font-bold uppercase tracking-widest shadow-sm hover:bg-rose-50 flex items-center justify-center">
+                                        Refund
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="mt-auto text-[10px] text-gray-400 uppercase tracking-widest text-right">
+                                    Handled by {ticket.fulfilled_by_name || 'System'}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default RewardsManager;

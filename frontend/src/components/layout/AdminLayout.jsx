@@ -6,7 +6,8 @@ import {
   Users, 
   Megaphone, 
   Utensils,
-  X
+  X,
+  Gift,
 } from 'lucide-react';
 import LogoutButton from '../auth/LogoutButton';
 import logo from '../../assets/images/goldenbaylogo.svg'; 
@@ -28,7 +29,8 @@ const AdminLayout = () => {
     { path: '/staff', label: 'Overview', icon: LayoutDashboard, show: true },
     { path: '/staff/bookings', label: 'Reservations', icon: CalendarDays, show: true },
     { path: '/staff/customers', label: 'Phone Book', icon: Users, show: true },
-    { path: '/staff/menu', label: 'Menu Manager', icon: Utensils, show: isMenuAdmin }, // <--- NOW RESTRICTED
+    { path: '/staff/rewards', label: 'Fulfillment', icon: Gift, show: true }, // <--- ADD THIS
+    { path: '/staff/menu', label: 'Menu Manager', icon: Utensils, show: isMenuAdmin },
     { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: isMarketingAdmin },
   ].filter(item => item.show);
 

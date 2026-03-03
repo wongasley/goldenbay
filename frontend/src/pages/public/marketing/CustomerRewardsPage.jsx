@@ -239,8 +239,34 @@ const CustomerRewardsPage = () => {
                                     
                                     <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center">
                                         <span className="font-mono font-bold text-gold-600 text-sm">{reward.points_required} pts</span>
+                                        
                                         {canAfford ? (
-                                            <span className="text-[10px] font-bold text-green-600 uppercase tracking-widest bg-green-50 px-2 py-1 rounded border border-green-200 flex items-center gap-1"><CheckCircle size={10}/> Redeemable</span>
+                                            <button 
+                                                onClick={async () => {
+                                                    if(!window.confirm(`Redeem ${reward.name} for ${reward.points_required} points?`)) return;
+                                                    try {
+                                                        const res = await axios.post(`${BACKEND_URL}/api/reservations/rewards/redeem/`, 
+                                                            { reward_id: reward.id },
+                                                            { headers: { Authorization: `Bearer ${localStorage.getItem('gb_customer_token')}` } }
+                                                        );
+                                                        
+                                                        toast.success(res.data.message, { duration: 6000 });
+                                                        
+                                                        // Update local state instantly so the UI reflects the new balance
+                                                        setCustomerData(prev => ({ ...prev, points_balance: res.data.new_balance }));
+                                                        
+                                                        // Play a distinct sound for the customer
+                                                        const audio = new Audio('/audio/success.mp3');
+                                                        audio.play().catch(e => console.warn(e));
+
+                                                    } catch(err) {
+                                                        toast.error(err.response?.data?.error || "Redemption failed.");
+                                                    }
+                                                }}
+                                                className="text-[10px] font-bold text-white uppercase tracking-widest bg-gold-600 hover:bg-black px-3 py-1.5 rounded transition-colors shadow-sm flex items-center gap-1"
+                                            >
+                                                <CheckCircle size={12}/> Redeem Now
+                                            </button>
                                         ) : (
                                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Not Enough Points</span>
                                         )}

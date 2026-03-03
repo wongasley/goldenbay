@@ -118,6 +118,8 @@ FILES_TO_READ = [
     'frontend/src/pages/admin/marketing/CampaignBuilder.jsx',
     'frontend/src/pages/admin/menu/MenuManager.jsx',
     'frontend/src/components/marketing/LeadCaptureWidget.jsx',
+    'frontend/src/pages/public/marketing/CustomerRewardsPage.jsx',
+    'frontend/src/pages/admin/customers/RewardsManager.jsx',
 
 ]
 
