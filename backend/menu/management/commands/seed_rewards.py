@@ -22,7 +22,7 @@ class Command(BaseCommand):
         # 2. Set your Point Conversion Rate
         # Example: 1 means a ₱258 Hakaw costs 258 points to redeem.
         # If you want it to cost less points, change to 0.5 (129 pts) or 10 (2580 pts).
-        POINTS_MULTIPLIER = 1 
+        POINTS_MULTIPLIER = 0.5
 
         # Wipe existing rewards to prevent duplicates if you run this multiple times
         RewardItem.objects.all().delete()

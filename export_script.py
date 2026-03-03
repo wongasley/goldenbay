@@ -120,6 +120,7 @@ FILES_TO_READ = [
     'frontend/src/components/marketing/LeadCaptureWidget.jsx',
     'frontend/src/pages/public/marketing/CustomerRewardsPage.jsx',
     'frontend/src/pages/admin/customers/RewardsManager.jsx',
+    'backend/menu/management/commands/seed_rewards.py',
 
 ]
 
