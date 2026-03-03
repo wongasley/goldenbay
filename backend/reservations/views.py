@@ -19,7 +19,7 @@ from .tasks import (
 from rest_framework.throttling import AnonRateThrottle
 import math
 from django.db import transaction
-
+from decimal import Decimal
 
 class AvailableRoomsView(APIView):
     def get(self, request):
@@ -397,7 +397,7 @@ class AwardPointsView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         phone = serializer.validated_data['phone']
-        amount_spent = float(serializer.validated_data['amount_spent'])
+        amount_spent = Decimal(serializer.validated_data['amount_spent'])
         name = serializer.validated_data.get('name', 'Valued Guest')
 
         # Clean the phone number

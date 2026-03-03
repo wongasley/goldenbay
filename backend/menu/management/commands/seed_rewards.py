@@ -41,11 +41,15 @@ class Command(BaseCommand):
                     # Copy Image
                     if item.image:
                         try:
+                            # FIX: Reset the file pointer to the beginning before reading
+                            item.image.open() 
+                            item.image.seek(0) 
+                            
                             file_content = ContentFile(item.image.read())
                             filename = os.path.basename(item.image.name)
                             reward.image.save(filename, file_content, save=False)
-                        except:
-                            pass
+                        except Exception as e:
+                            self.stdout.write(self.style.WARNING(f"Image error: {e}"))
 
                     reward.save()
                     count += 1
