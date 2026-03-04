@@ -114,7 +114,7 @@ def send_status_update_notifications(reservation_id, new_status, send_sms_flag=T
                  sms_body = f"Great news, {reservation.customer_name}! Your table for {reservation.pax} on {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')} is CONFIRMED. See you soon! - GOLDENBAY"
                  send_sms(reservation.customer_contact, sms_body)
              elif new_status == 'CANCELLED':
-                 sms_body = f"Hi {reservation.customer_name}, your reservation request has been cancelled. Please call (02) 8804-0332 to reschedule. - GOLDENBAY"
+                 sms_body = f"Hi {reservation.customer_name}, your reservation request has been cancelled. Please call +63 917 580 7166 to reschedule. - GOLDENBAY"
                  send_sms(reservation.customer_contact, sms_body)
 
     except Exception as e:
@@ -214,7 +214,7 @@ def send_we_miss_you_automation():
         # 2. SEND SMS (If phone exists)
         contact_digits = ''.join(filter(str.isdigit, str(customer.phone)))
         if len(contact_digits) >= 10:
-            sms_body = f"Hi {customer.name}, we miss you at Golden Bay! It's been a while. Show this text for a complimentary dessert on your next dine-in visit with us. Call (02) 8804-0332 to reserve."
+            sms_body = f"Hi {customer.name}, we miss you at Golden Bay! It's been a while. Show this text for a complimentary dessert on your next dine-in visit with us. Call +63 917 580 7166 to reserve."
             send_sms(customer.phone, sms_body)
             sent_any = True
             
@@ -260,7 +260,7 @@ def send_birthday_promos():
     for customer in birthday_customers:
         contact_digits = ''.join(filter(str.isdigit, str(customer.phone)))
         if len(contact_digits) >= 10:
-            sms_body = f"Advance Happy Birthday, {customer.name}! 🎉 Celebrate your special day at Golden Bay. Show this text within your birthday month for a complimentary Longevity Peach Bun on us! Reserve at (02) 8804-0332"
+            sms_body = f"Advance Happy Birthday, {customer.name}! 🎉 Celebrate your special day at Golden Bay. Show this text within your birthday month for a complimentary Longevity Peach Bun on us! Reserve at +63 917 580 7166"
             send_sms(customer.phone, sms_body)
             
             # Mark as sent for this year

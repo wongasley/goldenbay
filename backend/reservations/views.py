@@ -261,7 +261,7 @@ class ChatbotBookingWebhook(APIView):
                 elif 24 < pax <= 60:
                     suitable_rooms_query = suitable_rooms_query.filter(name='MANILA VIP Room')
                 else:
-                    return Response({"messages": [{"text": f"Sorry! We don't have a single VIP room large enough for {pax} guests. Please call us at (02) 8804-0332 for banquet options."}]}, status=200)
+                    return Response({"messages": [{"text": f"Sorry! We don't have a single VIP room large enough for {pax} guests. Please call us at +63 917 580 7166 for banquet options."}]}, status=200)
 
                 for room in suitable_rooms_query.order_by('capacity'):
                     is_booked = Reservation.objects.filter(
@@ -325,7 +325,7 @@ class ChatbotBookingWebhook(APIView):
 
         except Exception as e:
             print(f"Chatbot Webhook Error: {e}") 
-            return Response({"messages": [{"text": "Something went wrong. Please try again or call us at (02) 8804-0332."}]}, status=200)
+            return Response({"messages": [{"text": "Something went wrong. Please try again or call us at +63 917 580 7166."}]}, status=200)
         
 class LeadCaptureView(APIView):
     """ Public endpoint for the frontend VIP Perk Widget """
@@ -374,8 +374,13 @@ class LeadCaptureView(APIView):
 
         # --- SEND THE ACTUAL SMS COUPON ---
         if len(clean_phone) >= 10:
-            # Removed the emoji and upgraded the copy to feel like a professional coupon
-            sms_body = f"GOLDEN BAY VIP E-PASS: Welcome, {name}! Present this message to our receptionist on your next dine-in visit to claim your complimentary Signature Dessert. To reserve a table, call (02) 8804-0332."
+            sms_body = (
+                f"GOLDEN BAY VIP E-PASS: Welcome, {name}! Present this to our receptionist "
+                f"to claim your complimentary Signature Dessert. "
+                f"✨ Welcome to Golden Bay Rewards! "
+                f"Earn points on every visit and receive exclusive rewards. "
+                f"To book a table, contact our mobile: +63 917 580 7166."
+            )
             send_sms(customer.phone, sms_body)
 
         return Response({
