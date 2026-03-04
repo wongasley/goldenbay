@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { Plus, Check, X, Phone, Edit, UserCheck, Flag, CheckCircle2, Search, Filter, Users, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import ReservationForm from '../../../components/reservations/ReservationForm';
-import { canCancelBooking } from '../../../utils/auth';
+import { canCancelBooking, getUserRole } from '../../../utils/auth'; // <-- Added getUserRole
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { format, addDays, subDays, isToday } from 'date-fns';
@@ -29,20 +29,12 @@ const BookingManager = () => {
       
       // --- DASHBOARD NOTIFICATION LOGIC ---
       if (fetchedBookings.length > 0) {
-        // Find the highest ID in the current fetch
         const maxId = Math.max(...fetchedBookings.map(b => b.id));
-        
-        // If we already have a recorded maxId, and the new maxId is higher...
         if (latestBookingId.current !== null && maxId > latestBookingId.current) {
-            // Play the alert bell
             const bell = new Audio('/audio/bell.mp3');
             bell.play().catch(e => console.log("Audio blocked. Staff must click the page first.", e));
-            
-            // Show a special toast
             toast('New Booking Arrived!', { icon: '🔔', duration: 5000 });
         }
-        
-        // Update the ref to the new highest ID
         latestBookingId.current = maxId;
       }
       
@@ -90,7 +82,7 @@ const BookingManager = () => {
         return res.data;
     }).catch(err => {
         const errorData = err.response?.data;
-        throw new Error(errorData?.non_field_errors ? errorData.non_field_errors[0] : "Failed to update");
+        throw new Error(errorData?.non_field_errors ? errorData.non_field_errors[0] : errorData?.detail || "Failed to update");
     });
 
     toast.promise(updatePromise, {
@@ -98,6 +90,19 @@ const BookingManager = () => {
         success: successMsg,
         error: (err) => err.message,
     });
+  };
+
+  // --- NEW: Intercept Cancellation Clicks for Receptionists ---
+  const handleCancelClick = (id, e) => {
+      e.stopPropagation();
+      if (getUserRole() === 'Receptionist') {
+          toast.error("To delete current booking, please contact Manager to help cancel", {
+            duration: 6000,
+            style: { border: '1px solid #ef4444', padding: '16px', color: '#ef4444', backgroundColor: '#fef2f2' }
+          });
+          return;
+      }
+      updateStatus(id, {status: 'CANCELLED'}, "Cancelled!", e);
   };
 
   const formattedSelectedDate = format(selectedDate, 'yyyy-MM-dd');
@@ -372,7 +377,7 @@ const BookingManager = () => {
                                         )}
                                         
                                         {['PENDING', 'CONFIRMED'].includes(b.status) && hasCancelPermission && (
-                                            <button onClick={(e) => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!", e)} className="bg-rose-50 text-rose-600 p-2 rounded border border-rose-200 hover:bg-rose-100 shadow-sm transition-colors shrink-0" title="Cancel Booking">
+                                            <button onClick={(e) => handleCancelClick(b.id, e)} className="bg-rose-50 text-rose-600 p-2 rounded border border-rose-200 hover:bg-rose-100 shadow-sm transition-colors shrink-0" title="Cancel Booking">
                                                 <X size={14} />
                                             </button>
                                         )}
@@ -449,7 +454,7 @@ const BookingManager = () => {
                                     )}
                                     
                                     {['PENDING', 'CONFIRMED'].includes(b.status) && hasCancelPermission && (
-                                        <button onClick={(e) => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!", e)} className="flex-1 bg-rose-50 text-rose-700 py-2.5 rounded text-[10px] font-bold uppercase tracking-widest border border-rose-200 shadow-sm hover:bg-rose-100 flex items-center justify-center gap-1.5"><X size={14} className="text-rose-500"/> Cancel</button>
+                                        <button onClick={(e) => handleCancelClick(b.id, e)} className="flex-1 bg-rose-50 text-rose-700 py-2.5 rounded text-[10px] font-bold uppercase tracking-widest border border-rose-200 shadow-sm hover:bg-rose-100 flex items-center justify-center gap-1.5"><X size={14} className="text-rose-500"/> Cancel</button>
                                     )}
                                 </div>
                             </div>

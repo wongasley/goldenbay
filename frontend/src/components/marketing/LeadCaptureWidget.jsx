@@ -10,7 +10,7 @@ const LeadCaptureWidget = () => {
   const [formData, setFormData] = useState({ name: '', phone: '', email: '', dob: '' });
 
   useEffect(() => {
-    // Show widget after 15 seconds, but only if they haven't dismissed or submitted it before
+    // Show widget after 1 second, but only if they haven't dismissed or submitted it before
     const hasSeenWidget = localStorage.getItem('gb_vip_widget_seen');
     if (!hasSeenWidget) {
       const timer = setTimeout(() => setIsVisible(true), 1000);
@@ -23,14 +23,35 @@ const LeadCaptureWidget = () => {
     localStorage.setItem('gb_vip_widget_seen', 'true');
   };
 
+  // Helper function to capitalize the first letter of each word (Title Case)
+  const toTitleCase = (str) => {
+    return str.replace(
+      /\w\S*/g,
+      (txt) => txt.charAt(0).toUpperCase() + txt.substring(1).toLowerCase()
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // 1. Validate Philippine Phone Number
+    // Removes spaces/dashes and checks for 09..., 639..., or +639... (10 digits after the prefix)
+    const cleanPhone = formData.phone.replace(/[\s-]/g, '');
+    const phRegex = /^(09|\+?639)\d{9}$/;
+    
+    if (!phRegex.test(cleanPhone)) {
+      toast.error("Please enter a valid Philippine mobile number (e.g., 09171234567).");
+      return;
+    }
+
     try {
-      const res = await axiosInstance.post('/api/reservations/lead-capture/', formData);
+      // Pass the cleaned phone number to the backend
+      const payload = { ...formData, phone: cleanPhone };
+      const res = await axiosInstance.post('/api/reservations/lead-capture/', payload);
+      
       setIsSubmitted(true);
       localStorage.setItem('gb_vip_widget_seen', 'true');
       
-      // NEW: Check the status returned from the backend
       if (res.data.status === 'already_joined') {
          toast('You are already on the VIP list!', { icon: '✨', duration: 4000 });
       } else {
@@ -73,13 +94,45 @@ const LeadCaptureWidget = () => {
                 <p className="text-xs text-gray-600 mb-4 leading-relaxed">
                   Join our guest list and receive a complimentary dessert on your next visit, plus exclusive birthday rewards.
                 </p>
-                <input required type="text" placeholder="Full Name" className="w-full bg-gray-50 border border-gray-200 p-2.5 text-xs focus:border-gold-500 outline-none rounded-sm transition-colors" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-                <input required type="tel" placeholder="Mobile Number" className="w-full bg-gray-50 border border-gray-200 p-2.5 text-xs focus:border-gold-500 outline-none rounded-sm transition-colors" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                <input type="email" placeholder="Email Address" className="w-full bg-gray-50 border border-gray-200 p-2.5 text-xs focus:border-gold-500 outline-none rounded-sm transition-colors" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                
+                <input 
+                  required 
+                  type="text" 
+                  placeholder="Full Name" 
+                  className="w-full bg-gray-50 border border-gray-200 p-2.5 text-xs focus:border-gold-500 outline-none rounded-sm transition-colors" 
+                  value={formData.name} 
+                  onChange={e => setFormData({...formData, name: toTitleCase(e.target.value)})} 
+                />
+                
+                <input 
+                  required 
+                  type="tel" 
+                  placeholder="Mobile Number (e.g. 0917...)" 
+                  className="w-full bg-gray-50 border border-gray-200 p-2.5 text-xs focus:border-gold-500 outline-none rounded-sm transition-colors" 
+                  value={formData.phone} 
+                  onChange={e => setFormData({...formData, phone: e.target.value})} 
+                />
+                
+                <input 
+                  required 
+                  type="email" 
+                  placeholder="Email Address" 
+                  className="w-full bg-gray-50 border border-gray-200 p-2.5 text-xs focus:border-gold-500 outline-none rounded-sm transition-colors" 
+                  value={formData.email} 
+                  onChange={e => setFormData({...formData, email: e.target.value})} 
+                />
+                
                 <div>
-                  <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 mt-1">Birthday (For special treats)</label>
-                  <input type="date" className="w-full bg-gray-50 border border-gray-200 p-2.5 text-xs text-gray-600 focus:border-gold-500 outline-none rounded-sm transition-colors" value={formData.dob} onChange={e => setFormData({...formData, dob: e.target.value})} />
+                  <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 mt-1">Birthday <span className="text-red-500">*</span></label>
+                  <input 
+                    required 
+                    type="date" 
+                    className="w-full bg-gray-50 border border-gray-200 p-2.5 text-xs text-gray-600 focus:border-gold-500 outline-none rounded-sm transition-colors" 
+                    value={formData.dob} 
+                    onChange={e => setFormData({...formData, dob: e.target.value})} 
+                  />
                 </div>
+                
                 <button type="submit" className="w-full bg-gold-600 text-white font-bold uppercase tracking-widest py-3 text-[10px] mt-2 hover:bg-black transition-colors rounded-sm shadow-md">
                   Claim My Perk
                 </button>

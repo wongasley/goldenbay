@@ -92,6 +92,20 @@ const ReservationForm = ({
             return;
         }
 
+        // --- NEW: Strict Phone Validation & Formatting ---
+        // This removes spaces and dashes instantly: "0917 123 4567" -> "09171234567"
+        let cleanContact = formData.contact.replace(/[\s-]/g, '');
+        
+        // Check if it contains ONLY numbers (and an optional '+' at the start)
+        const phoneRegex = /^\+?\d+$/;
+        if (!phoneRegex.test(cleanContact)) {
+            toast.error("Please enter a valid contact number (digits only). Text like 'N/A' or 'C/O' is not allowed.", {
+                duration: 5000,
+                style: { border: '1px solid #ef4444', padding: '16px', color: '#ef4444' }
+            });
+            return; // Stops the submission
+        }
+
         const finalRoomId = isManualEntry ? manualRoomId : selectedRoom;
         if (!finalRoomId) {
             toast.error("Please select a Room or Dining Area.");
@@ -108,7 +122,7 @@ const ReservationForm = ({
 
         const payload = {
             customer_name: formData.name.trim(),
-            customer_contact: formData.contact.trim(),
+            customer_contact: cleanContact, // <-- We now send the perfectly clean number
             customer_email: formData.email ? formData.email.trim() : null,
             date: isManualEntry ? manualDate : format(date, 'yyyy-MM-dd'),
             session: isManualEntry ? manualSession : session,

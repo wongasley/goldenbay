@@ -133,7 +133,10 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
 
         new_status = request.data.get('status', old_status)
         
-        # 🔴 REMOVED the block preventing receptionists from cancelling
+        # --- 🔴 PREVENT RECEPTIONISTS FROM CANCELING ---
+        if new_status == 'CANCELLED' and old_status != 'CANCELLED':
+            if not (request.user.is_superuser or request.user.groups.filter(name__in=['Supervisor', 'Admin']).exists()):
+                raise PermissionDenied("To delete current booking, please contact Manager to help cancel")
         
         # Prevent Receptionists from changing a Completed or Cancelled booking back to active
         if old_status in ['COMPLETED', 'CANCELLED'] and new_status not in ['COMPLETED', 'CANCELLED']:

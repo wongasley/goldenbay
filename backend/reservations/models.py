@@ -207,25 +207,56 @@ class PointTransaction(models.Model):
 def save_customer_from_reservation(sender, instance, created, **kwargs):
     """
     When a Reservation is saved, automatically create or update the Customer 
-    in the Phone Book based on the phone number.
+    in the Phone Book. It smartly handles both Phone Numbers and 'Care Of' names.
     """
     if instance.customer_contact:
         try:
-            # Try to find customer by phone number
-            customer, created = Customer.objects.get_or_create(
-                phone=instance.customer_contact,
-                defaults={
-                    'name': instance.customer_name,
-                    'email': instance.customer_email
-                }
-            )
+            # 1. Determine if the contact is a phone number or a "Care Of" handler
+            contact_str = str(instance.customer_contact).strip()
             
-            # If customer exists, update the last visit
-            if not created:
+            # If the contact string contains letters (A-Z, a-z), treat it as 'care_of'
+            # Otherwise, treat it as a 'phone' number
+            is_care_of = any(c.isalpha() for c in contact_str)
+
+            customer = None
+            customer_created = False
+
+            # 2. Search for existing customer or create new
+            if is_care_of:
+                # Search by name AND care_of to avoid mixing up people with the same handler
+                customer, customer_created = Customer.objects.get_or_create(
+                    name=instance.customer_name,
+                    care_of=contact_str,
+                    defaults={
+                        'email': instance.customer_email
+                    }
+                )
+            else:
+                # Standard phone number search
+                # Clean the phone number to match phone book formatting
+                clean_phone = ''.join(filter(str.isdigit, contact_str))
+                if clean_phone.startswith('63') and len(clean_phone) == 12:
+                    clean_phone = '0' + clean_phone[2:]
+                
+                # Fallback to the raw string if cleaning wiped it out (e.g. they typed symbols only)
+                final_phone = clean_phone if clean_phone else contact_str
+
+                customer, customer_created = Customer.objects.get_or_create(
+                    phone=final_phone,
+                    defaults={
+                        'name': instance.customer_name,
+                        'email': instance.customer_email
+                    }
+                )
+
+            # 3. If customer exists, update their latest info
+            if not customer_created:
                 customer.last_visit = instance.date
+                # Update email if the reservation has one and the profile doesn't
                 if not customer.email and instance.customer_email:
                     customer.email = instance.customer_email
                 customer.save()
+
         except Exception as e:
             # Prevents a 500 Server Error if the Phone Book has duplicate numbers or crashes
             print(f"Failed to auto-save customer to phonebook: {e}")

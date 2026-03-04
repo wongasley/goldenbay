@@ -796,6 +796,7 @@ class Reservation(models.Model):
 class Customer(models.Model):
     name = models.CharField(max_length=200)
     phone = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    care_of = models.CharField(max_length=100, blank=True, null=True, help_text="E.g., Care of Evelyn, Care of Austin")
     email = models.EmailField(blank=True, null=True)
     date_of_birth = models.DateField(blank=True, null=True, help_text="Used for automated birthday promos")
     last_birthday_promo_year = models.IntegerField(blank=True, null=True, help_text="Prevents sending multiple times a year")
@@ -821,8 +822,9 @@ class Customer(models.Model):
         ordering = ['name']
 
     def __str__(self):
-        # UPDATE THIS LINE: Safely handle missing phone numbers
-        return f"{self.name} ({self.phone or 'No Phone'})"
+        # Update this to show the Care Of handler if there is no phone
+        contact_info = self.phone or self.care_of or 'No Contact'
+        return f"{self.name} ({contact_info})"
     
 class RewardItem(models.Model):
     """ Food items that customers can redeem using their points """
@@ -890,25 +892,56 @@ class PointTransaction(models.Model):
 def save_customer_from_reservation(sender, instance, created, **kwargs):
     """
     When a Reservation is saved, automatically create or update the Customer 
-    in the Phone Book based on the phone number.
+    in the Phone Book. It smartly handles both Phone Numbers and 'Care Of' names.
     """
     if instance.customer_contact:
         try:
-            # Try to find customer by phone number
-            customer, created = Customer.objects.get_or_create(
-                phone=instance.customer_contact,
-                defaults={
-                    'name': instance.customer_name,
-                    'email': instance.customer_email
-                }
-            )
+            # 1. Determine if the contact is a phone number or a "Care Of" handler
+            contact_str = str(instance.customer_contact).strip()
             
-            # If customer exists, update the last visit
-            if not created:
+            # If the contact string contains letters (A-Z, a-z), treat it as 'care_of'
+            # Otherwise, treat it as a 'phone' number
+            is_care_of = any(c.isalpha() for c in contact_str)
+
+            customer = None
+            customer_created = False
+
+            # 2. Search for existing customer or create new
+            if is_care_of:
+                # Search by name AND care_of to avoid mixing up people with the same handler
+                customer, customer_created = Customer.objects.get_or_create(
+                    name=instance.customer_name,
+                    care_of=contact_str,
+                    defaults={
+                        'email': instance.customer_email
+                    }
+                )
+            else:
+                # Standard phone number search
+                # Clean the phone number to match phone book formatting
+                clean_phone = ''.join(filter(str.isdigit, contact_str))
+                if clean_phone.startswith('63') and len(clean_phone) == 12:
+                    clean_phone = '0' + clean_phone[2:]
+                
+                # Fallback to the raw string if cleaning wiped it out (e.g. they typed symbols only)
+                final_phone = clean_phone if clean_phone else contact_str
+
+                customer, customer_created = Customer.objects.get_or_create(
+                    phone=final_phone,
+                    defaults={
+                        'name': instance.customer_name,
+                        'email': instance.customer_email
+                    }
+                )
+
+            # 3. If customer exists, update their latest info
+            if not customer_created:
                 customer.last_visit = instance.date
+                # Update email if the reservation has one and the profile doesn't
                 if not customer.email and instance.customer_email:
                     customer.email = instance.customer_email
                 customer.save()
+
         except Exception as e:
             # Prevents a 500 Server Error if the Phone Book has duplicate numbers or crashes
             print(f"Failed to auto-save customer to phonebook: {e}")
@@ -1214,7 +1247,10 @@ class AdminReservationDetailView(generics.RetrieveUpdateAPIView):
 
         new_status = request.data.get('status', old_status)
         
-        # 🔴 REMOVED the block preventing receptionists from cancelling
+        # --- 🔴 PREVENT RECEPTIONISTS FROM CANCELING ---
+        if new_status == 'CANCELLED' and old_status != 'CANCELLED':
+            if not (request.user.is_superuser or request.user.groups.filter(name__in=['Supervisor', 'Admin']).exists()):
+                raise PermissionDenied("To delete current booking, please contact Manager to help cancel")
         
         # Prevent Receptionists from changing a Completed or Cancelled booking back to active
         if old_status in ['COMPLETED', 'CANCELLED'] and new_status not in ['COMPLETED', 'CANCELLED']:
@@ -3888,7 +3924,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { Plus, Check, X, Phone, Edit, UserCheck, Flag, CheckCircle2, Search, Filter, Users, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import ReservationForm from '../../../components/reservations/ReservationForm';
-import { canCancelBooking } from '../../../utils/auth';
+import { canCancelBooking, getUserRole } from '../../../utils/auth'; // <-- Added getUserRole
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { format, addDays, subDays, isToday } from 'date-fns';
@@ -3915,20 +3951,12 @@ const BookingManager = () => {
       
       // --- DASHBOARD NOTIFICATION LOGIC ---
       if (fetchedBookings.length > 0) {
-        // Find the highest ID in the current fetch
         const maxId = Math.max(...fetchedBookings.map(b => b.id));
-        
-        // If we already have a recorded maxId, and the new maxId is higher...
         if (latestBookingId.current !== null && maxId > latestBookingId.current) {
-            // Play the alert bell
             const bell = new Audio('/audio/bell.mp3');
             bell.play().catch(e => console.log("Audio blocked. Staff must click the page first.", e));
-            
-            // Show a special toast
             toast('New Booking Arrived!', { icon: '🔔', duration: 5000 });
         }
-        
-        // Update the ref to the new highest ID
         latestBookingId.current = maxId;
       }
       
@@ -3976,7 +4004,7 @@ const BookingManager = () => {
         return res.data;
     }).catch(err => {
         const errorData = err.response?.data;
-        throw new Error(errorData?.non_field_errors ? errorData.non_field_errors[0] : "Failed to update");
+        throw new Error(errorData?.non_field_errors ? errorData.non_field_errors[0] : errorData?.detail || "Failed to update");
     });
 
     toast.promise(updatePromise, {
@@ -3984,6 +4012,19 @@ const BookingManager = () => {
         success: successMsg,
         error: (err) => err.message,
     });
+  };
+
+  // --- NEW: Intercept Cancellation Clicks for Receptionists ---
+  const handleCancelClick = (id, e) => {
+      e.stopPropagation();
+      if (getUserRole() === 'Receptionist') {
+          toast.error("To delete current booking, please contact Manager to help cancel", {
+            duration: 6000,
+            style: { border: '1px solid #ef4444', padding: '16px', color: '#ef4444', backgroundColor: '#fef2f2' }
+          });
+          return;
+      }
+      updateStatus(id, {status: 'CANCELLED'}, "Cancelled!", e);
   };
 
   const formattedSelectedDate = format(selectedDate, 'yyyy-MM-dd');
@@ -4258,7 +4299,7 @@ const BookingManager = () => {
                                         )}
                                         
                                         {['PENDING', 'CONFIRMED'].includes(b.status) && hasCancelPermission && (
-                                            <button onClick={(e) => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!", e)} className="bg-rose-50 text-rose-600 p-2 rounded border border-rose-200 hover:bg-rose-100 shadow-sm transition-colors shrink-0" title="Cancel Booking">
+                                            <button onClick={(e) => handleCancelClick(b.id, e)} className="bg-rose-50 text-rose-600 p-2 rounded border border-rose-200 hover:bg-rose-100 shadow-sm transition-colors shrink-0" title="Cancel Booking">
                                                 <X size={14} />
                                             </button>
                                         )}
@@ -4335,7 +4376,7 @@ const BookingManager = () => {
                                     )}
                                     
                                     {['PENDING', 'CONFIRMED'].includes(b.status) && hasCancelPermission && (
-                                        <button onClick={(e) => updateStatus(b.id, {status: 'CANCELLED'}, "Cancelled!", e)} className="flex-1 bg-rose-50 text-rose-700 py-2.5 rounded text-[10px] font-bold uppercase tracking-widest border border-rose-200 shadow-sm hover:bg-rose-100 flex items-center justify-center gap-1.5"><X size={14} className="text-rose-500"/> Cancel</button>
+                                        <button onClick={(e) => handleCancelClick(b.id, e)} className="flex-1 bg-rose-50 text-rose-700 py-2.5 rounded text-[10px] font-bold uppercase tracking-widest border border-rose-200 shadow-sm hover:bg-rose-100 flex items-center justify-center gap-1.5"><X size={14} className="text-rose-500"/> Cancel</button>
                                     )}
                                 </div>
                             </div>
@@ -7322,6 +7363,7 @@ import { Search, Plus, Phone, Mail, Trash2, ArrowUpDown, X, User, StickyNote, Do
 import { FaWeixin, FaViber, FaWhatsapp, FaTelegram } from 'react-icons/fa';
 import axiosInstance from '../../../utils/axiosInstance';
 import toast from 'react-hot-toast';
+import { getUserRole } from '../../../utils/auth'; // <-- ADDED
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
@@ -7336,13 +7378,15 @@ const PhoneBookPage = () => {
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- NEW: Award Points Modal State ---
   const [pointsCustomer, setPointsCustomer] = useState(null);
   const [pointsAmount, setPointsAmount] = useState('');
   const [isAwarding, setIsAwarding] = useState(false);
 
+  const isAdmin = getUserRole() === 'Admin'; // <-- Determine if Admin
+
+  // Added care_of to state
   const [formData, setFormData] = useState({
-    name: '', phone: '', email: '', wechat: '', viber: '', whatsapp: '', telegram: '', notes: '', date_of_birth: ''
+    name: '', phone: '', care_of: '', email: '', wechat: '', viber: '', whatsapp: '', telegram: '', notes: '', date_of_birth: ''
   });
 
   const fetchCustomers = async () => {
@@ -7366,15 +7410,13 @@ const PhoneBookPage = () => {
     const url = editingCustomer ? `/api/reservations/customers/${editingCustomer.id}/` : `/api/reservations/customers/`;
     const method = editingCustomer ? 'patch' : 'post';
 
-    // --- ADD THIS CLEANUP LOGIC ---
-    // Django expects null instead of empty strings for dates and emails
     const payload = { ...formData };
     if (!payload.date_of_birth) payload.date_of_birth = null;
     if (!payload.email) payload.email = null;
     if (!payload.phone) payload.phone = null;
+    if (!payload.care_of) payload.care_of = null; // Clean up care_of
 
     try {
-        // Change formData to payload here
         await axiosInstance({ method, url, data: payload });
         fetchCustomers();
         closeModal();
@@ -7384,8 +7426,6 @@ const PhoneBookPage = () => {
         if (errorData?.phone) {
             toast.error("This phone number is already registered.");
         } else {
-            // Optional: Temporarily log the exact error to the console if it happens again
-            console.error("Validation Error:", errorData);
             toast.error("Failed to save customer.");
         }
     } finally {
@@ -7398,14 +7438,14 @@ const PhoneBookPage = () => {
       setIsAwarding(true);
       try {
           const res = await axiosInstance.post('/api/reservations/award-points/', {
-              phone: pointsCustomer.phone,
+              phone: pointsCustomer.phone || pointsCustomer.care_of || 'Walk-in',
               name: pointsCustomer.name,
               amount_spent: pointsAmount
           });
           
           if (res.data.points_earned > 0) {
               toast.success(`Success! ${res.data.customer_name} earned ${res.data.points_earned} points.`);
-              fetchCustomers(); // Refresh to show new total
+              fetchCustomers(); 
           } else {
               toast('Amount too low to earn points.', { icon: 'ℹ️' });
           }
@@ -7435,7 +7475,8 @@ const PhoneBookPage = () => {
       setEditingCustomer(customer);
       setFormData({
           name: customer.name,
-          phone: customer.phone,
+          phone: customer.phone || '',
+          care_of: customer.care_of || '', // Load care_of
           email: customer.email || '',
           wechat: customer.wechat || '',
           viber: customer.viber || '',
@@ -7449,7 +7490,7 @@ const PhoneBookPage = () => {
 
   const openCreate = () => {
       setEditingCustomer(null);
-      setFormData({ name: '', phone: '', email: '', wechat: '', viber: '', whatsapp: '', telegram: '', notes: '', date_of_birth: '' });
+      setFormData({ name: '', phone: '', care_of: '', email: '', wechat: '', viber: '', whatsapp: '', telegram: '', notes: '', date_of_birth: '' });
       setShowModal(true);
   };
 
@@ -7460,17 +7501,20 @@ const PhoneBookPage = () => {
 
   const filtered = customers
     .filter(c => {
-        const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search);
+        const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) || 
+                              (c.phone && c.phone.includes(search)) || 
+                              (c.care_of && c.care_of.toLowerCase().includes(search.toLowerCase()));
         const matchesLetter = activeLetter === 'ALL' || c.name.toUpperCase().startsWith(activeLetter);
         return matchesSearch && matchesLetter;
     })
     .sort((a, b) => sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
 
   const exportToCSV = () => {
-      const headers = ['Name', 'Phone', 'Email', 'WeChat', 'Viber', 'WhatsApp', 'Telegram', 'Notes', 'DOB', 'Last Visit', 'Points Balance'];
+      const headers = ['Name', 'Phone', 'Care Of', 'Email', 'WeChat', 'Viber', 'WhatsApp', 'Telegram', 'Notes', 'DOB', 'Last Visit', 'Points Balance'];
       const csvData = filtered.map(c => [
           `"${c.name}"`, 
-          `"${c.phone}"`, 
+          `"${c.phone || ''}"`, 
+          `"${c.care_of || ''}"`, // Export care_of
           `"${c.email || ''}"`, 
           `"${c.wechat || ''}"`, 
           `"${c.viber || ''}"`, 
@@ -7500,7 +7544,7 @@ const PhoneBookPage = () => {
   return (
     <div className="space-y-4 pb-20">
       
-      {/* 1. COMPACT HEADER */}
+      {/* HEADER */}
       <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-gray-100 pb-3 mb-4">
             <div>
@@ -7522,7 +7566,7 @@ const PhoneBookPage = () => {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                   <input 
                       type="text" 
-                      placeholder="Search name or phone..." 
+                      placeholder="Search name, phone, or handler..." 
                       className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-900 focus:bg-white focus:border-gold-500 outline-none transition-all"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
@@ -7545,7 +7589,7 @@ const PhoneBookPage = () => {
           </div>
       </div>
 
-      {/* 2. COMPACT LIST VIEW */}
+      {/* LIST VIEW */}
       {loading ? (
           <div className="p-8 text-center text-gray-400 animate-pulse text-xs">Loading contacts...</div>
       ) : (
@@ -7578,12 +7622,19 @@ const PhoneBookPage = () => {
                                         {c.is_vip && <span className="bg-gold-100 text-gold-700 text-[8px] font-bold px-1.5 py-0.5 rounded border border-gold-200 uppercase tracking-widest shrink-0">VIP</span>}
                                         {c.has_claimed_vip_perk && <span className="bg-blue-50 text-blue-600 text-[8px] font-bold px-1.5 py-0.5 rounded border border-blue-200 uppercase tracking-widest shrink-0" title="Has claimed website welcome perk">Perk Claimed</span>}
                                     </div>
-                                    <div className="md:hidden text-xs text-gray-500 font-mono mt-0.5">{c.phone}</div>
+                                    <div className="md:hidden text-xs text-gray-500 font-mono mt-0.5">
+                                        {c.phone ? c.phone : (c.care_of ? `C/O: ${c.care_of}` : 'No Contact')}
+                                    </div>
                                 </div>
                             </div>
 
                             <div className="hidden md:block col-span-3 text-xs text-gray-600 font-mono space-y-0.5">
-                                <div className="flex items-center gap-1.5"><Phone size={12} className="text-gray-400"/> {c.phone || 'No Number'}</div>
+                                <div className="flex items-center gap-1.5">
+                                    <Phone size={12} className="text-gray-400"/> 
+                                    {c.phone ? c.phone : (
+                                        c.care_of ? <span className="text-gold-600 font-bold font-sans">C/O: {c.care_of}</span> : 'No Contact'
+                                    )}
+                                </div>
                                 {c.email && <div className="flex items-center gap-1.5 truncate"><Mail size={12} className="text-gray-400"/> {c.email}</div>}
                             </div>
 
@@ -7600,9 +7651,12 @@ const PhoneBookPage = () => {
                                 <button onClick={(e) => { e.stopPropagation(); setPointsCustomer(c); }} className="p-1.5 text-white bg-gold-600 hover:bg-black rounded shadow-sm transition-colors" title="Award Points">
                                     <Gift size={14}/>
                                 </button>
-                                <button onClick={(e) => handleDelete(c.id, e)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete">
-                                    <Trash2 size={14}/>
-                                </button>
+                                {/* --- ONLY SHOW TRASH BUTTON IF ADMIN --- */}
+                                {isAdmin && (
+                                    <button onClick={(e) => handleDelete(c.id, e)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete">
+                                        <Trash2 size={14}/>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -7634,10 +7688,14 @@ const PhoneBookPage = () => {
                                 <label className={labelClass}>Full Name <span className="text-red-500">*</span></label>
                                 <input required type="text" className={inputClass} placeholder="e.g. John Doe" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                             </div>
+                            
                             <div>
-                                {/* Remove the red asterisk and indicate it is optional */}
+                                <label className={labelClass}>Care Of / Handler (Optional)</label>
+                                <input type="text" className={inputClass} placeholder="e.g. Care of Evelyn" value={formData.care_of} onChange={e => setFormData({...formData, care_of: e.target.value})} />
+                            </div>
+
+                            <div>
                                 <label className={labelClass}>Phone Number (Optional)</label>
-                                {/* Remove the 'required' attribute here */}
                                 <input type="text" className={inputClass} placeholder="e.g. 0917 123 4567" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
                             </div>
                             <div>
@@ -7704,7 +7762,9 @@ const PhoneBookPage = () => {
                         <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Customer</label>
                         <div className="w-full bg-gray-50 border border-gray-200 p-2.5 text-sm text-gray-900 rounded-sm">
                             <span className="font-bold">{pointsCustomer.name}</span><br/>
-                            <span className="text-xs text-gray-500 font-mono">{pointsCustomer.phone}</span>
+                            <span className="text-xs text-gray-500 font-mono">
+                                {pointsCustomer.phone ? pointsCustomer.phone : (pointsCustomer.care_of ? `C/O: ${pointsCustomer.care_of}` : 'Walk-in')}
+                            </span>
                         </div>
                     </div>
                     <div>
@@ -9372,7 +9432,12 @@ export const getUserRole = () => {
 export const canCancelBooking = () => {
     const role = getUserRole();
     // Allow ALL staff roles to cancel bookings
-    return role === 'Receptionist' || role === 'Supervisor' || role === 'Admin';
+    return role === 'Supervisor' || role === 'Admin';
+};
+
+export const canDeleteCustomer = () => {
+    const role = getUserRole();
+    return role === 'Admin';
 };
 
 export const canManageMarketing = () => {
@@ -9836,7 +9901,7 @@ const LeadCaptureWidget = () => {
   const [formData, setFormData] = useState({ name: '', phone: '', email: '', dob: '' });
 
   useEffect(() => {
-    // Show widget after 15 seconds, but only if they haven't dismissed or submitted it before
+    // Show widget after 1 second, but only if they haven't dismissed or submitted it before
     const hasSeenWidget = localStorage.getItem('gb_vip_widget_seen');
     if (!hasSeenWidget) {
       const timer = setTimeout(() => setIsVisible(true), 1000);
@@ -9849,14 +9914,35 @@ const LeadCaptureWidget = () => {
     localStorage.setItem('gb_vip_widget_seen', 'true');
   };
 
+  // Helper function to capitalize the first letter of each word (Title Case)
+  const toTitleCase = (str) => {
+    return str.replace(
+      /\w\S*/g,
+      (txt) => txt.charAt(0).toUpperCase() + txt.substring(1).toLowerCase()
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // 1. Validate Philippine Phone Number
+    // Removes spaces/dashes and checks for 09..., 639..., or +639... (10 digits after the prefix)
+    const cleanPhone = formData.phone.replace(/[\s-]/g, '');
+    const phRegex = /^(09|\+?639)\d{9}$/;
+    
+    if (!phRegex.test(cleanPhone)) {
+      toast.error("Please enter a valid Philippine mobile number (e.g., 09171234567).");
+      return;
+    }
+
     try {
-      const res = await axiosInstance.post('/api/reservations/lead-capture/', formData);
+      // Pass the cleaned phone number to the backend
+      const payload = { ...formData, phone: cleanPhone };
+      const res = await axiosInstance.post('/api/reservations/lead-capture/', payload);
+      
       setIsSubmitted(true);
       localStorage.setItem('gb_vip_widget_seen', 'true');
       
-      // NEW: Check the status returned from the backend
       if (res.data.status === 'already_joined') {
          toast('You are already on the VIP list!', { icon: '✨', duration: 4000 });
       } else {
@@ -9899,13 +9985,45 @@ const LeadCaptureWidget = () => {
                 <p className="text-xs text-gray-600 mb-4 leading-relaxed">
                   Join our guest list and receive a complimentary dessert on your next visit, plus exclusive birthday rewards.
                 </p>
-                <input required type="text" placeholder="Full Name" className="w-full bg-gray-50 border border-gray-200 p-2.5 text-xs focus:border-gold-500 outline-none rounded-sm transition-colors" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-                <input required type="tel" placeholder="Mobile Number" className="w-full bg-gray-50 border border-gray-200 p-2.5 text-xs focus:border-gold-500 outline-none rounded-sm transition-colors" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                <input type="email" placeholder="Email Address" className="w-full bg-gray-50 border border-gray-200 p-2.5 text-xs focus:border-gold-500 outline-none rounded-sm transition-colors" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                
+                <input 
+                  required 
+                  type="text" 
+                  placeholder="Full Name" 
+                  className="w-full bg-gray-50 border border-gray-200 p-2.5 text-xs focus:border-gold-500 outline-none rounded-sm transition-colors" 
+                  value={formData.name} 
+                  onChange={e => setFormData({...formData, name: toTitleCase(e.target.value)})} 
+                />
+                
+                <input 
+                  required 
+                  type="tel" 
+                  placeholder="Mobile Number (e.g. 0917...)" 
+                  className="w-full bg-gray-50 border border-gray-200 p-2.5 text-xs focus:border-gold-500 outline-none rounded-sm transition-colors" 
+                  value={formData.phone} 
+                  onChange={e => setFormData({...formData, phone: e.target.value})} 
+                />
+                
+                <input 
+                  required 
+                  type="email" 
+                  placeholder="Email Address" 
+                  className="w-full bg-gray-50 border border-gray-200 p-2.5 text-xs focus:border-gold-500 outline-none rounded-sm transition-colors" 
+                  value={formData.email} 
+                  onChange={e => setFormData({...formData, email: e.target.value})} 
+                />
+                
                 <div>
-                  <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 mt-1">Birthday (For special treats)</label>
-                  <input type="date" className="w-full bg-gray-50 border border-gray-200 p-2.5 text-xs text-gray-600 focus:border-gold-500 outline-none rounded-sm transition-colors" value={formData.dob} onChange={e => setFormData({...formData, dob: e.target.value})} />
+                  <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 mt-1">Birthday <span className="text-red-500">*</span></label>
+                  <input 
+                    required 
+                    type="date" 
+                    className="w-full bg-gray-50 border border-gray-200 p-2.5 text-xs text-gray-600 focus:border-gold-500 outline-none rounded-sm transition-colors" 
+                    value={formData.dob} 
+                    onChange={e => setFormData({...formData, dob: e.target.value})} 
+                  />
                 </div>
+                
                 <button type="submit" className="w-full bg-gold-600 text-white font-bold uppercase tracking-widest py-3 text-[10px] mt-2 hover:bg-black transition-colors rounded-sm shadow-md">
                   Claim My Perk
                 </button>

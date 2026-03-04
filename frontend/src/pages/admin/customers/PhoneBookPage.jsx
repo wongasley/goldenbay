@@ -3,6 +3,7 @@ import { Search, Plus, Phone, Mail, Trash2, ArrowUpDown, X, User, StickyNote, Do
 import { FaWeixin, FaViber, FaWhatsapp, FaTelegram } from 'react-icons/fa';
 import axiosInstance from '../../../utils/axiosInstance';
 import toast from 'react-hot-toast';
+import { getUserRole } from '../../../utils/auth'; // <-- ADDED
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
@@ -20,6 +21,8 @@ const PhoneBookPage = () => {
   const [pointsCustomer, setPointsCustomer] = useState(null);
   const [pointsAmount, setPointsAmount] = useState('');
   const [isAwarding, setIsAwarding] = useState(false);
+
+  const isAdmin = getUserRole() === 'Admin'; // <-- Determine if Admin
 
   // Added care_of to state
   const [formData, setFormData] = useState({
@@ -42,16 +45,33 @@ const PhoneBookPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // --- NEW: Strict Phone Validation & Formatting ---
+    // Removes spaces/dashes. If empty, defaults to an empty string safely.
+    let cleanPhone = formData.phone ? formData.phone.replace(/[\s-]/g, '') : '';
+    
+    // Only validate if they actually typed a number (if empty, nothing happens)
+    if (cleanPhone) {
+        const phoneRegex = /^\+?\d+$/;
+        if (!phoneRegex.test(cleanPhone)) {
+            toast.error("Please enter a valid phone number (digits only). Use the 'Care Of' field for handlers like 'C/O Evelyn'.", {
+                duration: 5000,
+                style: { border: '1px solid #ef4444', padding: '16px', color: '#ef4444' }
+            });
+            return; // Stops the submission
+        }
+    }
+
     setIsSubmitting(true);
     
     const url = editingCustomer ? `/api/reservations/customers/${editingCustomer.id}/` : `/api/reservations/customers/`;
     const method = editingCustomer ? 'patch' : 'post';
 
     const payload = { ...formData };
+    payload.phone = cleanPhone || null; // <-- Saves clean string, or null if it was empty
     if (!payload.date_of_birth) payload.date_of_birth = null;
     if (!payload.email) payload.email = null;
-    if (!payload.phone) payload.phone = null;
-    if (!payload.care_of) payload.care_of = null; // Clean up care_of
+    if (!payload.care_of) payload.care_of = null;
 
     try {
         await axiosInstance({ method, url, data: payload });
@@ -288,9 +308,12 @@ const PhoneBookPage = () => {
                                 <button onClick={(e) => { e.stopPropagation(); setPointsCustomer(c); }} className="p-1.5 text-white bg-gold-600 hover:bg-black rounded shadow-sm transition-colors" title="Award Points">
                                     <Gift size={14}/>
                                 </button>
-                                <button onClick={(e) => handleDelete(c.id, e)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete">
-                                    <Trash2 size={14}/>
-                                </button>
+                                {/* --- ONLY SHOW TRASH BUTTON IF ADMIN --- */}
+                                {isAdmin && (
+                                    <button onClick={(e) => handleDelete(c.id, e)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete">
+                                        <Trash2 size={14}/>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -323,7 +346,6 @@ const PhoneBookPage = () => {
                                 <input required type="text" className={inputClass} placeholder="e.g. John Doe" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                             </div>
                             
-                            {/* --- NEW: CARE OF FIELD ADDED HERE --- */}
                             <div>
                                 <label className={labelClass}>Care Of / Handler (Optional)</label>
                                 <input type="text" className={inputClass} placeholder="e.g. Care of Evelyn" value={formData.care_of} onChange={e => setFormData({...formData, care_of: e.target.value})} />
