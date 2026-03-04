@@ -47,8 +47,15 @@ const PhoneBookPage = () => {
     const url = editingCustomer ? `/api/reservations/customers/${editingCustomer.id}/` : `/api/reservations/customers/`;
     const method = editingCustomer ? 'patch' : 'post';
 
+    // --- ADD THIS CLEANUP LOGIC ---
+    // Django expects null instead of empty strings for dates and emails
+    const payload = { ...formData };
+    if (!payload.date_of_birth) payload.date_of_birth = null;
+    if (!payload.email) payload.email = null;
+
     try {
-        await axiosInstance({ method, url, data: formData });
+        // Change formData to payload here
+        await axiosInstance({ method, url, data: payload });
         fetchCustomers();
         closeModal();
         toast.success(`Customer ${editingCustomer ? 'updated' : 'added'} successfully!`);
@@ -57,6 +64,8 @@ const PhoneBookPage = () => {
         if (errorData?.phone) {
             toast.error("This phone number is already registered.");
         } else {
+            // Optional: Temporarily log the exact error to the console if it happens again
+            console.error("Validation Error:", errorData);
             toast.error("Failed to save customer.");
         }
     } finally {
