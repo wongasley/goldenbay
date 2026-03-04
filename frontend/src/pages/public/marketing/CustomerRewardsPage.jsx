@@ -38,6 +38,10 @@ const CustomerRewardsPage = () => {
 
   // Check for existing session on mount
   useEffect(() => {
+    // --- ADD THIS FAILSAFE ---
+    // Guarantees the page can scroll when it loads
+    document.body.style.overflow = 'unset'; 
+
     const storedCustomer = localStorage.getItem('gb_customer_data');
     const token = localStorage.getItem('gb_customer_token');
     

@@ -23,6 +23,12 @@ const Navbar = () => {
     } else {
       document.body.style.overflow = 'unset';
     }
+    
+    // ADD THIS CLEANUP FUNCTION:
+    // If the Navbar unmounts (like when navigating to Rewards), unlock the scroll!
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
   }, [isMobileMenuOpen]);
 
   const navLinks = [

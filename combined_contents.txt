@@ -80,15 +80,17 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
-    # ADD THESE LINES BELOW:
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle'
-    ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/day',      # General API limit for guests
-        'user': '1000/day',     # Limit for logged-in staff
+        'user': '10000/day',    # Increased limit
         'burst': '5/minute',    # Burst limit for sensitive endpoints
+    }
+}
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0'),
     }
 }
 
@@ -2697,6 +2699,12 @@ const Navbar = () => {
     } else {
       document.body.style.overflow = 'unset';
     }
+    
+    // ADD THIS CLEANUP FUNCTION:
+    // If the Navbar unmounts (like when navigating to Rewards), unlock the scroll!
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
   }, [isMobileMenuOpen]);
 
   const navLinks = [
@@ -9939,6 +9947,10 @@ const CustomerRewardsPage = () => {
 
   // Check for existing session on mount
   useEffect(() => {
+    // --- ADD THIS FAILSAFE ---
+    // Guarantees the page can scroll when it loads
+    document.body.style.overflow = 'unset'; 
+
     const storedCustomer = localStorage.getItem('gb_customer_data');
     const token = localStorage.getItem('gb_customer_token');
     
