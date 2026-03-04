@@ -62,15 +62,17 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
-    # ADD THESE LINES BELOW:
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle'
-    ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/day',      # General API limit for guests
-        'user': '1000/day',     # Limit for logged-in staff
+        'user': '10000/day',    # Increased limit
         'burst': '5/minute',    # Burst limit for sensitive endpoints
+    }
+}
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0'),
     }
 }
 
