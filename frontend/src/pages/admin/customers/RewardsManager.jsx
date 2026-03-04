@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Gift, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Gift, CheckCircle, XCircle, Clock, User, Phone } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosInstance from '../../../utils/axiosInstance';
 
@@ -37,54 +37,97 @@ const RewardsManager = () => {
     };
 
     return (
-        <div className="space-y-4 pb-20">
-            <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
-                <h1 className="text-xl font-bold text-gray-900 font-serif flex items-center gap-2">
-                    <Gift size={20} className="text-gold-600"/> Reward Fulfillment
-                </h1>
-                <p className="text-gray-500 text-xs mt-0.5">Manage live customer redemptions here.</p>
+        <div className="space-y-6 pb-20">
+            
+            {/* Header Section */}
+            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900 font-serif flex items-center gap-3">
+                        <div className="p-2 bg-gold-50 rounded-lg border border-gold-100">
+                            <Gift size={24} className="text-gold-600"/> 
+                        </div>
+                        Reward Fulfillment
+                    </h1>
+                    <p className="text-gray-500 text-xs mt-1 uppercase tracking-widest font-medium">Manage live customer redemptions</p>
+                </div>
+                <div className="flex items-center gap-3 text-xs font-medium text-gray-500 bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span> Pending</span>
+                    <span className="flex items-center gap-1.5 ml-2"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Claimed</span>
+                    <span className="flex items-center gap-1.5 ml-2"><span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Cancelled</span>
+                </div>
             </div>
 
             {loading ? (
-                <div className="p-8 text-center text-gray-400 animate-pulse text-xs">Loading tickets...</div>
+                <div className="p-12 text-center text-gray-400 animate-pulse font-medium text-sm bg-white rounded-xl border border-gray-200 shadow-sm">
+                    Fetching live tickets...
+                </div>
             ) : tickets.length === 0 ? (
-                <div className="p-8 text-center text-gray-400 bg-white border border-gray-200 rounded text-xs">No redemption tickets found.</div>
+                <div className="p-16 text-center text-gray-400 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col items-center">
+                    <Gift size={40} className="mb-4 text-gray-300" strokeWidth={1} />
+                    <p className="text-sm font-medium text-gray-600">No active redemption tickets.</p>
+                    <p className="text-xs mt-1">When customers claim rewards, they will appear here instantly.</p>
+                </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                     {tickets.map(ticket => (
-                        <div key={ticket.id} className={`bg-white border rounded-lg p-5 shadow-sm flex flex-col gap-3 transition-colors ${ticket.status === 'PENDING' ? 'border-gold-400 bg-gold-50/10' : 'border-gray-200'}`}>
+                        <div 
+                            key={ticket.id} 
+                            className={`bg-white border rounded-xl p-6 shadow-sm flex flex-col gap-4 relative overflow-hidden transition-all duration-300 hover:shadow-md
+                                ${ticket.status === 'PENDING' ? 'border-l-4 border-l-amber-400 border-t-gray-200 border-r-gray-200 border-b-gray-200 bg-amber-50/10' : 
+                                  ticket.status === 'CLAIMED' ? 'border-l-4 border-l-emerald-500 border-t-gray-200 border-r-gray-200 border-b-gray-200' : 
+                                  'border-l-4 border-l-rose-500 border-t-gray-200 border-r-gray-200 border-b-gray-200 bg-gray-50/50 grayscale'}`}
+                        >
                             
-                            <div className="flex justify-between items-start gap-4">
-                                <div>
-                                    <h3 className="font-bold text-gray-900 text-sm">{ticket.customer_name}</h3>
-                                    <p className="text-xs text-gray-500 font-mono mt-0.5">{ticket.customer_phone}</p>
-                                </div>
-                                <span className={`px-2 py-1 rounded text-[9px] font-bold uppercase tracking-widest border shrink-0
-                                    ${ticket.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 
-                                      ticket.status === 'CLAIMED' ? 'bg-green-50 text-green-700 border-green-200' : 
-                                      'bg-red-50 text-red-700 border-red-200'}`}>
+                            {/* Card Header (Status & Time) */}
+                            <div className="flex justify-between items-start">
+                                <span className={`px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest border shrink-0 shadow-sm
+                                    ${ticket.status === 'PENDING' ? 'bg-amber-100 text-amber-800 border-amber-300' : 
+                                      ticket.status === 'CLAIMED' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 
+                                      'bg-rose-100 text-rose-800 border-rose-300'}`}>
                                     {ticket.status}
                                 </span>
+                                <p className="text-[10px] text-gray-500 font-bold flex items-center gap-1.5 uppercase tracking-widest bg-gray-100 px-2 py-1 rounded-md">
+                                    <Clock size={12} className="text-gray-400"/> 
+                                    {new Date(ticket.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                </p>
                             </div>
 
-                            <div className="bg-gray-50 p-3 rounded border border-gray-100 my-2">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Item to Serve</p>
-                                <p className="font-bold text-gold-700">{ticket.reward_name}</p>
-                                <p className="text-[10px] text-gray-400 mt-2 flex items-center gap-1"><Clock size={10}/> {new Date(ticket.created_at).toLocaleTimeString()}</p>
+                            {/* Customer Details */}
+                            <div>
+                                <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                                    <User size={14} className="text-gray-400"/> {ticket.customer_name}
+                                </h3>
+                                <p className="text-xs text-gray-500 font-mono mt-1.5 flex items-center gap-2">
+                                    <Phone size={12} className="text-gray-400"/> {ticket.customer_phone}
+                                </p>
                             </div>
 
+                            {/* Reward Item Box */}
+                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 my-2">
+                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Action Required: Serve Item</p>
+                                <p className="font-serif font-bold text-gold-600 text-lg leading-tight">{ticket.reward_name}</p>
+                            </div>
+
+                            {/* Actions Footer */}
                             {ticket.status === 'PENDING' ? (
-                                <div className="flex gap-2 mt-auto">
-                                    <button onClick={() => updateTicketStatus(ticket.id, 'CLAIMED', ticket.reward_name)} className="flex-1 bg-green-600 text-white py-2.5 rounded text-[10px] font-bold uppercase tracking-widest shadow-sm flex items-center justify-center gap-1.5 hover:bg-green-700">
-                                        <CheckCircle size={14}/> Mark Claimed
-                                    </button>
-                                    <button onClick={() => updateTicketStatus(ticket.id, 'CANCELLED', ticket.reward_name)} className="px-3 bg-white text-rose-600 border border-rose-200 py-2.5 rounded text-[10px] font-bold uppercase tracking-widest shadow-sm hover:bg-rose-50 flex items-center justify-center">
+                                <div className="flex gap-3 mt-auto pt-2">
+                                    <button 
+                                        onClick={() => updateTicketStatus(ticket.id, 'CANCELLED', ticket.reward_name)} 
+                                        className="px-4 bg-white text-rose-600 border border-rose-200 py-3 rounded-lg text-[10px] font-bold uppercase tracking-widest shadow-sm hover:bg-rose-50 hover:border-rose-300 transform hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center"
+                                    >
                                         Refund
+                                    </button>
+                                    <button 
+                                        onClick={() => updateTicketStatus(ticket.id, 'CLAIMED', ticket.reward_name)} 
+                                        className="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white py-3 rounded-lg text-[10px] font-bold uppercase tracking-widest shadow-sm flex items-center justify-center gap-1.5 hover:shadow-md hover:from-emerald-700 hover:to-emerald-600 transform hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
+                                    >
+                                        <CheckCircle size={16}/> Mark Claimed
                                     </button>
                                 </div>
                             ) : (
-                                <div className="mt-auto text-[10px] text-gray-400 uppercase tracking-widest text-right">
-                                    Handled by {ticket.fulfilled_by_name || 'System'}
+                                <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center text-[10px] uppercase tracking-widest">
+                                    <span className="text-gray-400 font-bold">Processed</span>
+                                    <span className="text-gray-500 bg-gray-100 px-2 py-1 rounded-md">By {ticket.fulfilled_by_name || 'System'}</span>
                                 </div>
                             )}
                         </div>
