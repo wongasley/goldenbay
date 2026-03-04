@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { Plus, Check, X, Phone, Edit, UserCheck, Flag, CheckCircle2, Search, Filter, Users, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { Plus, Check, X, Phone, Edit, UserCheck, Flag, CheckCircle2, Search, Filter, Users, ChevronLeft, ChevronRight, CalendarDays, Sun, Moon } from 'lucide-react';
 import ReservationForm from '../../../components/reservations/ReservationForm';
-import { canCancelBooking, getUserRole } from '../../../utils/auth'; // <-- Added getUserRole
+import { canCancelBooking, getUserRole } from '../../../utils/auth'; 
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { format, addDays, subDays, isToday } from 'date-fns';
@@ -92,7 +92,6 @@ const BookingManager = () => {
     });
   };
 
-  // --- NEW: Intercept Cancellation Clicks for Receptionists ---
   const handleCancelClick = (id, e) => {
       e.stopPropagation();
       if (getUserRole() === 'Receptionist') {
@@ -120,6 +119,20 @@ const BookingManager = () => {
 
       return matchesSearch && matchesDate && matchesStatus;
   });
+
+  // --- NEW: Split into Lunch and Dinner ---
+  const lunchBookings = filteredBookings
+      .filter(b => b.session === 'LUNCH')
+      .sort((a, b) => a.time.localeCompare(b.time)); // Sort chronologically
+
+  const dinnerBookings = filteredBookings
+      .filter(b => b.session === 'DINNER')
+      .sort((a, b) => a.time.localeCompare(b.time)); // Sort chronologically
+
+  const sessionGroups = [
+      { id: 'LUNCH', title: 'Lunch Session', time: '11:00 AM - 2:30 PM', bookings: lunchBookings, icon: Sun },
+      { id: 'DINNER', title: 'Dinner Session', time: '5:00 PM - 10:00 PM', bookings: dinnerBookings, icon: Moon }
+  ];
 
   const generateTimeSlots = (sessionType) => {
       const slots = [];
@@ -240,6 +253,7 @@ const BookingManager = () => {
 
         {/* MAIN CONTENT AREA */}
         <div className="flex-1 space-y-4">
+            {/* MOBILE CALENDAR NAVIGATION */}
             <div className="lg:hidden flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
                 <button onClick={() => { setSelectedDate(subDays(selectedDate, 1)); setSearchQuery(''); }} className="p-2 hover:bg-gray-100 rounded text-gray-500 transition-colors">
                     <ChevronLeft size={20}/>
@@ -255,7 +269,7 @@ const BookingManager = () => {
                 </button>
             </div>
 
-            <div className="flex justify-between items-end pb-2">
+            <div className="flex justify-between items-end pb-2 border-b border-gray-200 lg:border-none">
                 <h2 className="text-lg font-serif text-gray-900">
                     {isSearching ? 'Search Results' : `Bookings for ${format(selectedDate, 'MMMM dd')}`}
                 </h2>
@@ -264,200 +278,245 @@ const BookingManager = () => {
                 </span>
             </div>
 
-            <div className="hidden lg:block bg-white border border-gray-200 rounded-lg overflow-visible shadow-sm">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                        <th className="px-5 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">ID</th>
-                        <th className="px-5 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Customer Info</th>
-                        <th className="px-5 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Schedule</th>
-                        <th className="px-5 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Details</th>
-                        <th className="px-5 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
-                        <th className="px-5 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {loading ? (
-                            <tr><td colSpan="6" className="px-4 py-12 text-center text-gray-400 animate-pulse">Loading data...</td></tr>
-                        ) : filteredBookings.length === 0 ? (
-                            <tr>
-                                <td colSpan="6" className="px-4 py-16 text-center">
-                                    <div className="flex flex-col items-center justify-center text-gray-400">
-                                        <Filter size={32} strokeWidth={1} className="mb-3 opacity-30 text-gold-600" />
-                                        <p className="text-sm font-medium text-gray-600">No reservations found.</p>
-                                        <p className="text-xs mt-1">Try selecting a different date or adjusting filters.</p>
+            {/* --- DESKTOP DIVIDED VIEW --- */}
+            <div className="hidden lg:flex flex-col gap-8">
+                {loading ? (
+                    <div className="p-12 text-center text-gray-400 animate-pulse text-sm bg-white border border-gray-200 rounded-lg">Loading data...</div>
+                ) : filteredBookings.length === 0 ? (
+                    <div className="bg-white p-16 text-center border border-gray-200 rounded-lg shadow-sm">
+                        <div className="flex flex-col items-center justify-center text-gray-400">
+                            <Filter size={32} strokeWidth={1} className="mb-3 opacity-30 text-gold-600" />
+                            <p className="text-sm font-medium text-gray-600">No reservations found.</p>
+                            <p className="text-xs mt-1">Try selecting a different date or adjusting filters.</p>
+                        </div>
+                    </div>
+                ) : (
+                    sessionGroups.map((group) => (
+                        <div key={group.id} className="flex flex-col gap-3">
+                            {/* Session Header */}
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                                    <group.icon size={18} className="text-gold-600" /> {group.title}
+                                    <span className="text-[10px] text-gray-400 normal-case tracking-normal ml-1 hidden xl:inline">({group.time})</span>
+                                </h3>
+                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest bg-white border border-gray-200 px-2 py-1 rounded shadow-sm">
+                                    {group.bookings.length} {group.bookings.length === 1 ? 'Booking' : 'Bookings'}
+                                </span>
+                            </div>
+
+                            {/* Session Table */}
+                            {group.bookings.length === 0 ? (
+                                <div className="bg-gray-50 border border-gray-200 border-dashed rounded-lg p-8 text-center text-gray-400 text-xs">
+                                    No {group.id.toLowerCase()} reservations match your current filters.
+                                </div>
+                            ) : (
+                                <div className="bg-white border border-gray-200 rounded-lg overflow-visible shadow-sm">
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left border-collapse">
+                                        <thead className="bg-gray-50 border-b border-gray-200">
+                                            <tr>
+                                            <th className="px-5 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">ID</th>
+                                            <th className="px-5 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Customer Info</th>
+                                            <th className="px-5 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Schedule</th>
+                                            <th className="px-5 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Details</th>
+                                            <th className="px-5 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
+                                            <th className="px-5 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {group.bookings.map((b) => (
+                                                <tr key={b.id} className={`transition-colors hover:bg-gray-50`}>
+                                                    
+                                                    <td className="px-5 py-4 align-middle">
+                                                        <span className="text-xs font-mono font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">#{b.id}</span>
+                                                    </td>
+                                                    
+                                                    <td className="px-5 py-4 align-middle">
+                                                        <div className="flex flex-col gap-1">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <span className="font-bold text-gray-900 text-sm">{b.customer_name}</span>
+                                                                {b.customer_no_show_count > 0 && (
+                                                                    <span className="text-rose-700 bg-rose-50 px-2 py-0.5 rounded flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest border border-rose-200" title={`${b.customer_no_show_count} previous No-Shows`}>
+                                                                        <Flag size={10} /> {b.customer_no_show_count}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-xs text-gray-500 font-mono flex items-center gap-1.5">
+                                                                <Phone size={12} className="text-gray-400"/> {b.customer_contact}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+
+                                                    <td className="px-5 py-4 align-middle">
+                                                        <div className="flex flex-col gap-1">
+                                                            {isSearching ? (
+                                                                <span className="text-sm font-bold text-gray-800">{b.date}</span>
+                                                            ) : (
+                                                                <span className="text-sm font-bold text-gray-800">{b.time}</span>
+                                                            )}
+                                                            <span className="text-[10px] font-bold text-gold-700 w-max uppercase tracking-wider">
+                                                                {isSearching ? `${b.time} (${b.session})` : b.session}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+
+                                                    <td className="px-5 py-4 align-middle">
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className="text-sm font-bold text-gray-800">{b.room_name || 'Main Dining Hall'}</span>
+                                                            <span className="text-xs text-gray-500 flex items-center gap-1.5">
+                                                                <Users size={12} className="text-gray-400"/> {b.pax} Guests
+                                                            </span>
+                                                        </div>
+                                                    </td>
+
+                                                    <td className="px-5 py-4 align-middle">
+                                                        <div className="flex flex-col gap-1.5 items-start">
+                                                            <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-widest border ${getStatusBadge(b.status)}`}>
+                                                                {b.status.replace('_', '-')}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+
+                                                    <td className="px-5 py-4 align-middle text-right">
+                                                        <div className="flex justify-end items-center gap-2 whitespace-nowrap flex-nowrap">
+                                                            
+                                                            {b.status === 'PENDING' && (
+                                                                <button onClick={(e) => updateStatus(b.id, {status: 'CONFIRMED'}, "Confirmed!", e)} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest shrink-0">
+                                                                    <Check size={14} /> Confirm
+                                                                </button>
+                                                            )}
+
+                                                            {b.status === 'CONFIRMED' && (
+                                                                <>
+                                                                    <button onClick={(e) => updateStatus(b.id, {status: 'SEATED'}, "Guest Seated", e)} className="bg-indigo-600 text-white px-3 py-2 rounded hover:bg-indigo-700 transition-colors shadow-sm flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-widest shrink-0">
+                                                                        <UserCheck size={14} /> Seat
+                                                                    </button>
+                                                                    <button onClick={(e) => updateStatus(b.id, {status: 'NO_SHOW'}, "Marked as No-Show", e)} className="bg-orange-100 text-orange-800 border border-orange-300 px-3 py-2 rounded hover:bg-orange-200 transition-colors shadow-sm flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-widest shrink-0">
+                                                                        <Flag size={14} /> NS
+                                                                    </button>
+                                                                </>
+                                                            )}
+
+                                                            {b.status === 'SEATED' && (
+                                                                <button onClick={(e) => updateStatus(b.id, {status: 'COMPLETED'}, "Booking Completed", e)} className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 transition-colors shadow-sm flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-widest shrink-0">
+                                                                    <CheckCircle2 size={14} /> Complete
+                                                                </button>
+                                                            )}
+
+                                                            {!['CANCELLED', 'COMPLETED', 'NO_SHOW'].includes(b.status) && (
+                                                                <button onClick={(e) => handleOpenEdit(b, e)} className="bg-white text-gray-600 p-2 rounded border border-gray-300 hover:bg-gray-100 shadow-sm transition-colors shrink-0" title="Edit Booking">
+                                                                    <Edit size={14} />
+                                                                </button>
+                                                            )}
+                                                            
+                                                            {['PENDING', 'CONFIRMED'].includes(b.status) && hasCancelPermission && (
+                                                                <button onClick={(e) => handleCancelClick(b.id, e)} className="bg-rose-50 text-rose-600 p-2 rounded border border-rose-200 hover:bg-rose-100 shadow-sm transition-colors shrink-0" title="Cancel Booking">
+                                                                    <X size={14} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        </table>
                                     </div>
-                                </td>
-                            </tr>
-                        ) : (
-                            filteredBookings.map((b) => (
-                            <tr key={b.id} className={`transition-colors hover:bg-gray-50`}>
-                                
-                                <td className="px-5 py-4 align-middle">
-                                    <span className="text-xs font-mono font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">#{b.id}</span>
-                                </td>
-                                
-                                <td className="px-5 py-4 align-middle">
-                                    <div className="flex flex-col gap-1">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="font-bold text-gray-900 text-sm">{b.customer_name}</span>
-                                            {b.customer_no_show_count > 0 && (
-                                                <span className="text-rose-700 bg-rose-50 px-2 py-0.5 rounded flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest border border-rose-200" title={`${b.customer_no_show_count} previous No-Shows`}>
-                                                    <Flag size={10} /> {b.customer_no_show_count}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="text-xs text-gray-500 font-mono flex items-center gap-1.5">
-                                            <Phone size={12} className="text-gray-400"/> {b.customer_contact}
-                                        </div>
-                                    </div>
-                                </td>
-
-                                <td className="px-5 py-4 align-middle">
-                                    <div className="flex flex-col gap-1">
-                                        {isSearching ? (
-                                            <span className="text-sm font-bold text-gray-800">{b.date}</span>
-                                        ) : (
-                                            <span className="text-sm font-bold text-gray-800">{b.time}</span>
-                                        )}
-                                        <span className="text-[10px] font-bold text-gold-700 w-max uppercase tracking-wider">
-                                            {isSearching ? `${b.time} (${b.session})` : b.session}
-                                        </span>
-                                    </div>
-                                </td>
-
-                                <td className="px-5 py-4 align-middle">
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-sm font-bold text-gray-800">{b.room_name || 'Main Dining Hall'}</span>
-                                        <span className="text-xs text-gray-500 flex items-center gap-1.5">
-                                            <Users size={12} className="text-gray-400"/> {b.pax} Guests
-                                        </span>
-                                    </div>
-                                </td>
-
-                                <td className="px-5 py-4 align-middle">
-                                    <div className="flex flex-col gap-1.5 items-start">
-                                        <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-widest border ${getStatusBadge(b.status)}`}>
-                                            {b.status.replace('_', '-')}
-                                        </span>
-                                    </div>
-                                </td>
-
-                                <td className="px-5 py-4 align-middle text-right">
-                                    <div className="flex justify-end items-center gap-2 whitespace-nowrap flex-nowrap">
-                                        
-                                        {b.status === 'PENDING' && (
-                                            <button onClick={(e) => updateStatus(b.id, {status: 'CONFIRMED'}, "Confirmed!", e)} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest shrink-0">
-                                                <Check size={14} /> Confirm
-                                            </button>
-                                        )}
-
-                                        {b.status === 'CONFIRMED' && (
-                                            <>
-                                                <button onClick={(e) => updateStatus(b.id, {status: 'SEATED'}, "Guest Seated", e)} className="bg-indigo-600 text-white px-3 py-2 rounded hover:bg-indigo-700 transition-colors shadow-sm flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-widest shrink-0">
-                                                    <UserCheck size={14} /> Seat
-                                                </button>
-                                                <button onClick={(e) => updateStatus(b.id, {status: 'NO_SHOW'}, "Marked as No-Show", e)} className="bg-orange-100 text-orange-800 border border-orange-300 px-3 py-2 rounded hover:bg-orange-200 transition-colors shadow-sm flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-widest shrink-0">
-                                                    <Flag size={14} /> NS
-                                                </button>
-                                            </>
-                                        )}
-
-                                        {b.status === 'SEATED' && (
-                                            <button onClick={(e) => updateStatus(b.id, {status: 'COMPLETED'}, "Booking Completed", e)} className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 transition-colors shadow-sm flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-widest shrink-0">
-                                                <CheckCircle2 size={14} /> Complete
-                                            </button>
-                                        )}
-
-                                        {!['CANCELLED', 'COMPLETED', 'NO_SHOW'].includes(b.status) && (
-                                            <button onClick={(e) => handleOpenEdit(b, e)} className="bg-white text-gray-600 p-2 rounded border border-gray-300 hover:bg-gray-100 shadow-sm transition-colors shrink-0" title="Edit Booking">
-                                                <Edit size={14} />
-                                            </button>
-                                        )}
-                                        
-                                        {['PENDING', 'CONFIRMED'].includes(b.status) && hasCancelPermission && (
-                                            <button onClick={(e) => handleCancelClick(b.id, e)} className="bg-rose-50 text-rose-600 p-2 rounded border border-rose-200 hover:bg-rose-100 shadow-sm transition-colors shrink-0" title="Cancel Booking">
-                                                <X size={14} />
-                                            </button>
-                                        )}
-                                    </div>
-                                </td>
-                            </tr>
-                            ))
-                        )}
-                    </tbody>
-                    </table>
-                </div>
+                                </div>
+                            )}
+                        </div>
+                    ))
+                )}
             </div>
 
-            {/* MOBILE CARDS */}
-            <div className="lg:hidden flex flex-col gap-4">
+            {/* --- MOBILE DIVIDED CARDS --- */}
+            <div className="lg:hidden flex flex-col gap-8">
                 {loading ? (
-                    <div className="p-8 text-center text-gray-400 animate-pulse text-xs">Loading data...</div>
+                    <div className="p-8 text-center text-gray-400 animate-pulse text-xs bg-white border border-gray-200 rounded-lg">Loading data...</div>
                 ) : filteredBookings.length === 0 ? (
                     <div className="bg-white p-12 rounded-lg border border-gray-200 text-center text-gray-500 text-sm shadow-sm flex flex-col items-center justify-center">
                         <Filter size={32} strokeWidth={1} className="mb-3 opacity-30 text-gold-600" />
                         No reservations found.
                     </div>
                 ) : (
-                    filteredBookings.map((b) => (
-                        <div key={b.id} className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm space-y-4">
-                            
-                            <div className="flex justify-between items-start gap-4">
-                                <div>
-                                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                                        <h3 className="font-bold text-gray-900 text-base">{b.customer_name}</h3>
-                                        {b.customer_no_show_count > 0 && (
-                                            <span className="text-rose-700 bg-rose-50 px-2 py-0.5 rounded flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest border border-rose-200">
-                                                <Flag size={12} /> {b.customer_no_show_count}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <span className="text-xs text-gray-500 font-mono flex items-center gap-1.5"><Phone size={12} className="text-gray-400"/> {b.customer_contact}</span>
-                                </div>
-                                <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-widest border shrink-0 ${getStatusBadge(b.status)}`}>
-                                    {b.status.replace('_', '-')}
+                    sessionGroups.map((group) => (
+                        <div key={group.id} className="flex flex-col gap-3">
+                            {/* Session Header Mobile */}
+                            <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+                                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                                    <group.icon size={16} className="text-gold-600" /> {group.title}
+                                </h3>
+                                <span className="text-[10px] font-bold text-gray-500 bg-white border border-gray-200 px-2 py-0.5 rounded shadow-sm">
+                                    {group.bookings.length}
                                 </span>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3 p-4 bg-gray-50 rounded-md border border-gray-100">
-                                <div>
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Schedule</p>
-                                    <p className="font-bold text-gray-800 text-sm">{isSearching ? b.date : b.time}</p>
-                                    <p className="text-[10px] text-gold-700 font-bold uppercase tracking-widest mt-0.5">{isSearching ? `${b.time} (${b.session})` : b.session}</p>
+                            {/* Session Cards */}
+                            {group.bookings.length === 0 ? (
+                                <div className="bg-gray-50 border border-gray-200 border-dashed rounded-lg p-6 text-center text-gray-400 text-xs">
+                                    No {group.id.toLowerCase()} reservations.
                                 </div>
-                                <div>
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Details</p>
-                                    <p className="font-bold text-gray-800 text-sm line-clamp-1">{b.room_name || 'Main Hall'}</p>
-                                    <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5"><Users size={12} /> {b.pax} Guests</p>
+                            ) : (
+                                <div className="flex flex-col gap-4">
+                                    {group.bookings.map((b) => (
+                                        <div key={b.id} className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm space-y-4">
+                                            <div className="flex justify-between items-start gap-4">
+                                                <div>
+                                                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                                                        <h3 className="font-bold text-gray-900 text-base">{b.customer_name}</h3>
+                                                        {b.customer_no_show_count > 0 && (
+                                                            <span className="text-rose-700 bg-rose-50 px-2 py-0.5 rounded flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest border border-rose-200">
+                                                                <Flag size={12} /> {b.customer_no_show_count}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-xs text-gray-500 font-mono flex items-center gap-1.5"><Phone size={12} className="text-gray-400"/> {b.customer_contact}</span>
+                                                </div>
+                                                <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-widest border shrink-0 ${getStatusBadge(b.status)}`}>
+                                                    {b.status.replace('_', '-')}
+                                                </span>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3 p-4 bg-gray-50 rounded-md border border-gray-100">
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Schedule</p>
+                                                    <p className="font-bold text-gray-800 text-sm">{isSearching ? b.date : b.time}</p>
+                                                    <p className="text-[10px] text-gold-700 font-bold uppercase tracking-widest mt-0.5">{isSearching ? `${b.time} (${b.session})` : b.session}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Details</p>
+                                                    <p className="font-bold text-gray-800 text-sm line-clamp-1">{b.room_name || 'Main Hall'}</p>
+                                                    <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5"><Users size={12} /> {b.pax} Guests</p>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+                                                {b.status === 'PENDING' && (
+                                                    <button onClick={(e) => updateStatus(b.id, {status: 'CONFIRMED'}, "Confirmed!", e)} className="flex-1 bg-blue-600 text-white py-2.5 rounded text-[10px] font-bold uppercase tracking-widest shadow-sm flex items-center justify-center gap-1.5"><Check size={14}/> Confirm</button>
+                                                )}
+                                                {b.status === 'CONFIRMED' && (
+                                                    <>
+                                                        <button onClick={(e) => updateStatus(b.id, {status: 'SEATED'}, "Guest Seated", e)} className="flex-1 bg-indigo-600 text-white py-2.5 rounded text-[10px] font-bold uppercase tracking-widest shadow-sm flex items-center justify-center gap-1.5"><UserCheck size={14}/> Seated</button>
+                                                        <button onClick={(e) => updateStatus(b.id, {status: 'NO_SHOW'}, "Marked as No-Show", e)} className="flex-1 bg-orange-100 text-orange-800 border border-orange-300 py-2.5 rounded text-[10px] font-bold uppercase tracking-widest shadow-sm flex items-center justify-center gap-1.5"><Flag size={12}/> No Show</button>
+                                                    </>
+                                                )}
+                                                {b.status === 'SEATED' && (
+                                                    <button onClick={(e) => updateStatus(b.id, {status: 'COMPLETED'}, "Booking Completed", e)} className="w-full bg-emerald-600 text-white py-2.5 rounded text-[10px] font-bold uppercase tracking-widest shadow-sm flex items-center justify-center gap-1.5"><CheckCircle2 size={14}/> Complete</button>
+                                                )}
+                                                
+                                                <div className="w-full flex gap-2 mt-1">
+                                                    {!['CANCELLED', 'COMPLETED', 'NO_SHOW'].includes(b.status) && (
+                                                        <button onClick={(e) => handleOpenEdit(b, e)} className="flex-1 bg-white text-gray-700 py-2.5 rounded text-[10px] font-bold uppercase tracking-widest border border-gray-300 shadow-sm hover:bg-gray-50 flex items-center justify-center gap-1.5"><Edit size={14} className="text-gray-500"/> Edit</button>
+                                                    )}
+                                                    
+                                                    {['PENDING', 'CONFIRMED'].includes(b.status) && hasCancelPermission && (
+                                                        <button onClick={(e) => handleCancelClick(b.id, e)} className="flex-1 bg-rose-50 text-rose-700 py-2.5 rounded text-[10px] font-bold uppercase tracking-widest border border-rose-200 shadow-sm hover:bg-rose-100 flex items-center justify-center gap-1.5"><X size={14} className="text-rose-500"/> Cancel</button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                            </div>
-                            
-                            <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
-                                {b.status === 'PENDING' && (
-                                    <button onClick={(e) => updateStatus(b.id, {status: 'CONFIRMED'}, "Confirmed!", e)} className="flex-1 bg-blue-600 text-white py-2.5 rounded text-[10px] font-bold uppercase tracking-widest shadow-sm flex items-center justify-center gap-1.5"><Check size={14}/> Confirm</button>
-                                )}
-                                {b.status === 'CONFIRMED' && (
-                                    <>
-                                        <button onClick={(e) => updateStatus(b.id, {status: 'SEATED'}, "Guest Seated", e)} className="flex-1 bg-indigo-600 text-white py-2.5 rounded text-[10px] font-bold uppercase tracking-widest shadow-sm flex items-center justify-center gap-1.5"><UserCheck size={14}/> Seated</button>
-                                        <button onClick={(e) => updateStatus(b.id, {status: 'NO_SHOW'}, "Marked as No-Show", e)} className="flex-1 bg-orange-100 text-orange-800 border border-orange-300 py-2.5 rounded text-[10px] font-bold uppercase tracking-widest shadow-sm flex items-center justify-center gap-1.5"><Flag size={12}/> No Show</button>
-                                    </>
-                                )}
-                                {b.status === 'SEATED' && (
-                                    <button onClick={(e) => updateStatus(b.id, {status: 'COMPLETED'}, "Booking Completed", e)} className="w-full bg-emerald-600 text-white py-2.5 rounded text-[10px] font-bold uppercase tracking-widest shadow-sm flex items-center justify-center gap-1.5"><CheckCircle2 size={14}/> Complete</button>
-                                )}
-                                
-                                <div className="w-full flex gap-2 mt-1">
-                                    {!['CANCELLED', 'COMPLETED', 'NO_SHOW'].includes(b.status) && (
-                                        <button onClick={(e) => handleOpenEdit(b, e)} className="flex-1 bg-white text-gray-700 py-2.5 rounded text-[10px] font-bold uppercase tracking-widest border border-gray-300 shadow-sm hover:bg-gray-50 flex items-center justify-center gap-1.5"><Edit size={14} className="text-gray-500"/> Edit</button>
-                                    )}
-                                    
-                                    {['PENDING', 'CONFIRMED'].includes(b.status) && hasCancelPermission && (
-                                        <button onClick={(e) => handleCancelClick(b.id, e)} className="flex-1 bg-rose-50 text-rose-700 py-2.5 rounded text-[10px] font-bold uppercase tracking-widest border border-rose-200 shadow-sm hover:bg-rose-100 flex items-center justify-center gap-1.5"><X size={14} className="text-rose-500"/> Cancel</button>
-                                    )}
-                                </div>
-                            </div>
+                            )}
                         </div>
                     ))
                 )}
