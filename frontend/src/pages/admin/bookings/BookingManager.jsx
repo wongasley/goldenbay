@@ -607,10 +607,12 @@ const BookingManager = () => {
                               <option value="SEATED" className="text-gray-900 bg-white font-medium">Seated (Arrived)</option>
                               <option value="COMPLETED" className="text-gray-900 bg-white font-medium">Completed</option>
                               <option value="NO_SHOW" className="text-gray-900 bg-white font-medium">No-Show</option>
-                              {/* 👇 ONLY SHOW 'CANCELLED' IF THEY ARE AN ADMIN/SUPERVISOR OR IF IT'S ALREADY CANCELLED 👇 */}
-                                {(hasCancelPermission || editingBooking.status === 'CANCELLED') && (
+                              <option value="CANCELLED" className="text-gray-900 bg-white font-medium">Cancelled</option>
+
+                           {/* 👇 ONLY SHOW 'CANCELLED' IF THEY ARE AN ADMIN/SUPERVISOR OR IF IT'S ALREADY CANCELLED 👇 */}
+                                {/* {(hasCancelPermission || editingBooking.status === 'CANCELLED') && (
                                     <option value="CANCELLED" className="text-gray-900 bg-white font-medium">Cancelled</option>
-                                )}
+                                )} */}
                           </select>
                       </div>
 
