@@ -52,6 +52,7 @@ const PhoneBookPage = () => {
     const payload = { ...formData };
     if (!payload.date_of_birth) payload.date_of_birth = null;
     if (!payload.email) payload.email = null;
+    if (!payload.phone) payload.phone = null;
 
     try {
         // Change formData to payload here
@@ -263,7 +264,7 @@ const PhoneBookPage = () => {
                             </div>
 
                             <div className="hidden md:block col-span-3 text-xs text-gray-600 font-mono space-y-0.5">
-                                <div className="flex items-center gap-1.5"><Phone size={12} className="text-gray-400"/> {c.phone}</div>
+                                <div className="flex items-center gap-1.5"><Phone size={12} className="text-gray-400"/> {c.phone || 'No Number'}</div>
                                 {c.email && <div className="flex items-center gap-1.5 truncate"><Mail size={12} className="text-gray-400"/> {c.email}</div>}
                             </div>
 
@@ -315,8 +316,10 @@ const PhoneBookPage = () => {
                                 <input required type="text" className={inputClass} placeholder="e.g. John Doe" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                             </div>
                             <div>
-                                <label className={labelClass}>Phone Number <span className="text-red-500">*</span></label>
-                                <input required type="text" className={inputClass} placeholder="e.g. 0917 123 4567" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                                {/* Remove the red asterisk and indicate it is optional */}
+                                <label className={labelClass}>Phone Number (Optional)</label>
+                                {/* Remove the 'required' attribute here */}
+                                <input type="text" className={inputClass} placeholder="e.g. 0917 123 4567" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
                             </div>
                             <div>
                                 <label className={labelClass}>Email Address</label>

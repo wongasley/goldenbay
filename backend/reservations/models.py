@@ -110,7 +110,7 @@ class Reservation(models.Model):
     
 class Customer(models.Model):
     name = models.CharField(max_length=200)
-    phone = models.CharField(max_length=50, unique=True) # Phone is the unique key
+    phone = models.CharField(max_length=50, unique=True, null=True, blank=True)
     email = models.EmailField(blank=True, null=True)
     date_of_birth = models.DateField(blank=True, null=True, help_text="Used for automated birthday promos")
     last_birthday_promo_year = models.IntegerField(blank=True, null=True, help_text="Prevents sending multiple times a year")
@@ -136,7 +136,8 @@ class Customer(models.Model):
         ordering = ['name']
 
     def __str__(self):
-        return f"{self.name} ({self.phone})"
+        # UPDATE THIS LINE: Safely handle missing phone numbers
+        return f"{self.name} ({self.phone or 'No Phone'})"
     
 class RewardItem(models.Model):
     """ Food items that customers can redeem using their points """
