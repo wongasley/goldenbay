@@ -17,13 +17,13 @@ const PhoneBookPage = () => {
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- NEW: Award Points Modal State ---
   const [pointsCustomer, setPointsCustomer] = useState(null);
   const [pointsAmount, setPointsAmount] = useState('');
   const [isAwarding, setIsAwarding] = useState(false);
 
+  // Added care_of to state
   const [formData, setFormData] = useState({
-    name: '', phone: '', email: '', wechat: '', viber: '', whatsapp: '', telegram: '', notes: '', date_of_birth: ''
+    name: '', phone: '', care_of: '', email: '', wechat: '', viber: '', whatsapp: '', telegram: '', notes: '', date_of_birth: ''
   });
 
   const fetchCustomers = async () => {
@@ -47,15 +47,13 @@ const PhoneBookPage = () => {
     const url = editingCustomer ? `/api/reservations/customers/${editingCustomer.id}/` : `/api/reservations/customers/`;
     const method = editingCustomer ? 'patch' : 'post';
 
-    // --- ADD THIS CLEANUP LOGIC ---
-    // Django expects null instead of empty strings for dates and emails
     const payload = { ...formData };
     if (!payload.date_of_birth) payload.date_of_birth = null;
     if (!payload.email) payload.email = null;
     if (!payload.phone) payload.phone = null;
+    if (!payload.care_of) payload.care_of = null; // Clean up care_of
 
     try {
-        // Change formData to payload here
         await axiosInstance({ method, url, data: payload });
         fetchCustomers();
         closeModal();
@@ -65,8 +63,6 @@ const PhoneBookPage = () => {
         if (errorData?.phone) {
             toast.error("This phone number is already registered.");
         } else {
-            // Optional: Temporarily log the exact error to the console if it happens again
-            console.error("Validation Error:", errorData);
             toast.error("Failed to save customer.");
         }
     } finally {
@@ -79,14 +75,14 @@ const PhoneBookPage = () => {
       setIsAwarding(true);
       try {
           const res = await axiosInstance.post('/api/reservations/award-points/', {
-              phone: pointsCustomer.phone,
+              phone: pointsCustomer.phone || pointsCustomer.care_of || 'Walk-in',
               name: pointsCustomer.name,
               amount_spent: pointsAmount
           });
           
           if (res.data.points_earned > 0) {
               toast.success(`Success! ${res.data.customer_name} earned ${res.data.points_earned} points.`);
-              fetchCustomers(); // Refresh to show new total
+              fetchCustomers(); 
           } else {
               toast('Amount too low to earn points.', { icon: 'ℹ️' });
           }
@@ -116,7 +112,8 @@ const PhoneBookPage = () => {
       setEditingCustomer(customer);
       setFormData({
           name: customer.name,
-          phone: customer.phone,
+          phone: customer.phone || '',
+          care_of: customer.care_of || '', // Load care_of
           email: customer.email || '',
           wechat: customer.wechat || '',
           viber: customer.viber || '',
@@ -130,7 +127,7 @@ const PhoneBookPage = () => {
 
   const openCreate = () => {
       setEditingCustomer(null);
-      setFormData({ name: '', phone: '', email: '', wechat: '', viber: '', whatsapp: '', telegram: '', notes: '', date_of_birth: '' });
+      setFormData({ name: '', phone: '', care_of: '', email: '', wechat: '', viber: '', whatsapp: '', telegram: '', notes: '', date_of_birth: '' });
       setShowModal(true);
   };
 
@@ -141,17 +138,20 @@ const PhoneBookPage = () => {
 
   const filtered = customers
     .filter(c => {
-        const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search);
+        const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) || 
+                              (c.phone && c.phone.includes(search)) || 
+                              (c.care_of && c.care_of.toLowerCase().includes(search.toLowerCase()));
         const matchesLetter = activeLetter === 'ALL' || c.name.toUpperCase().startsWith(activeLetter);
         return matchesSearch && matchesLetter;
     })
     .sort((a, b) => sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
 
   const exportToCSV = () => {
-      const headers = ['Name', 'Phone', 'Email', 'WeChat', 'Viber', 'WhatsApp', 'Telegram', 'Notes', 'DOB', 'Last Visit', 'Points Balance'];
+      const headers = ['Name', 'Phone', 'Care Of', 'Email', 'WeChat', 'Viber', 'WhatsApp', 'Telegram', 'Notes', 'DOB', 'Last Visit', 'Points Balance'];
       const csvData = filtered.map(c => [
           `"${c.name}"`, 
-          `"${c.phone}"`, 
+          `"${c.phone || ''}"`, 
+          `"${c.care_of || ''}"`, // Export care_of
           `"${c.email || ''}"`, 
           `"${c.wechat || ''}"`, 
           `"${c.viber || ''}"`, 
@@ -181,7 +181,7 @@ const PhoneBookPage = () => {
   return (
     <div className="space-y-4 pb-20">
       
-      {/* 1. COMPACT HEADER */}
+      {/* HEADER */}
       <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-gray-100 pb-3 mb-4">
             <div>
@@ -203,7 +203,7 @@ const PhoneBookPage = () => {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                   <input 
                       type="text" 
-                      placeholder="Search name or phone..." 
+                      placeholder="Search name, phone, or handler..." 
                       className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-900 focus:bg-white focus:border-gold-500 outline-none transition-all"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
@@ -226,7 +226,7 @@ const PhoneBookPage = () => {
           </div>
       </div>
 
-      {/* 2. COMPACT LIST VIEW */}
+      {/* LIST VIEW */}
       {loading ? (
           <div className="p-8 text-center text-gray-400 animate-pulse text-xs">Loading contacts...</div>
       ) : (
@@ -259,12 +259,19 @@ const PhoneBookPage = () => {
                                         {c.is_vip && <span className="bg-gold-100 text-gold-700 text-[8px] font-bold px-1.5 py-0.5 rounded border border-gold-200 uppercase tracking-widest shrink-0">VIP</span>}
                                         {c.has_claimed_vip_perk && <span className="bg-blue-50 text-blue-600 text-[8px] font-bold px-1.5 py-0.5 rounded border border-blue-200 uppercase tracking-widest shrink-0" title="Has claimed website welcome perk">Perk Claimed</span>}
                                     </div>
-                                    <div className="md:hidden text-xs text-gray-500 font-mono mt-0.5">{c.phone}</div>
+                                    <div className="md:hidden text-xs text-gray-500 font-mono mt-0.5">
+                                        {c.phone ? c.phone : (c.care_of ? `C/O: ${c.care_of}` : 'No Contact')}
+                                    </div>
                                 </div>
                             </div>
 
                             <div className="hidden md:block col-span-3 text-xs text-gray-600 font-mono space-y-0.5">
-                                <div className="flex items-center gap-1.5"><Phone size={12} className="text-gray-400"/> {c.phone || 'No Number'}</div>
+                                <div className="flex items-center gap-1.5">
+                                    <Phone size={12} className="text-gray-400"/> 
+                                    {c.phone ? c.phone : (
+                                        c.care_of ? <span className="text-gold-600 font-bold font-sans">C/O: {c.care_of}</span> : 'No Contact'
+                                    )}
+                                </div>
                                 {c.email && <div className="flex items-center gap-1.5 truncate"><Mail size={12} className="text-gray-400"/> {c.email}</div>}
                             </div>
 
@@ -315,10 +322,15 @@ const PhoneBookPage = () => {
                                 <label className={labelClass}>Full Name <span className="text-red-500">*</span></label>
                                 <input required type="text" className={inputClass} placeholder="e.g. John Doe" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                             </div>
+                            
+                            {/* --- NEW: CARE OF FIELD ADDED HERE --- */}
                             <div>
-                                {/* Remove the red asterisk and indicate it is optional */}
+                                <label className={labelClass}>Care Of / Handler (Optional)</label>
+                                <input type="text" className={inputClass} placeholder="e.g. Care of Evelyn" value={formData.care_of} onChange={e => setFormData({...formData, care_of: e.target.value})} />
+                            </div>
+
+                            <div>
                                 <label className={labelClass}>Phone Number (Optional)</label>
-                                {/* Remove the 'required' attribute here */}
                                 <input type="text" className={inputClass} placeholder="e.g. 0917 123 4567" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
                             </div>
                             <div>
@@ -385,7 +397,9 @@ const PhoneBookPage = () => {
                         <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Customer</label>
                         <div className="w-full bg-gray-50 border border-gray-200 p-2.5 text-sm text-gray-900 rounded-sm">
                             <span className="font-bold">{pointsCustomer.name}</span><br/>
-                            <span className="text-xs text-gray-500 font-mono">{pointsCustomer.phone}</span>
+                            <span className="text-xs text-gray-500 font-mono">
+                                {pointsCustomer.phone ? pointsCustomer.phone : (pointsCustomer.care_of ? `C/O: ${pointsCustomer.care_of}` : 'Walk-in')}
+                            </span>
                         </div>
                     </div>
                     <div>
