@@ -122,6 +122,9 @@ FILES_TO_READ = [
     'frontend/src/pages/admin/customers/RewardsManager.jsx',
     'backend/menu/management/commands/seed_rewards.py',
     '.gitignore',
+    'goldenbay-mobile/src/api.js',
+    'goldenbay-mobile/App.js',
+    'goldenbay-mobile/index.js',
 
 ]
 
