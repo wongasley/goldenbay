@@ -376,10 +376,10 @@ class LeadCaptureView(APIView):
         if len(clean_phone) >= 10:
             sms_body = (
                 f"GOLDEN BAY VIP E-PASS: Welcome, {name}! Present this to our receptionist "
-                f"to claim your complimentary Signature Dessert. "
-                f"✨ Welcome to Golden Bay Rewards! "
+                f"to claim your complimentary Signature Dessert. ✨ Welcome to Golden Bay Rewards! "
                 f"Earn points on every visit and receive exclusive rewards. "
-                f"To book a table, contact our mobile: +63 917 580 7166."
+                f"To log in, go to https://goldenbay.com.ph/rewards "
+                f"For reservations, contact our mobile: +63 917 580 7166."
             )
             send_sms(customer.phone, sms_body)
 
