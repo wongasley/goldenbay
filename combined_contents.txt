@@ -1375,7 +1375,7 @@ class ChatbotBookingWebhook(APIView):
                 elif 24 < pax <= 60:
                     suitable_rooms_query = suitable_rooms_query.filter(name='MANILA VIP Room')
                 else:
-                    return Response({"messages": [{"text": f"Sorry! We don't have a single VIP room large enough for {pax} guests. Please call us at (02) 8804-0332 for banquet options."}]}, status=200)
+                    return Response({"messages": [{"text": f"Sorry! We don't have a single VIP room large enough for {pax} guests. Please call us at +63 917 580 7166 for banquet options."}]}, status=200)
 
                 for room in suitable_rooms_query.order_by('capacity'):
                     is_booked = Reservation.objects.filter(
@@ -1439,7 +1439,7 @@ class ChatbotBookingWebhook(APIView):
 
         except Exception as e:
             print(f"Chatbot Webhook Error: {e}") 
-            return Response({"messages": [{"text": "Something went wrong. Please try again or call us at (02) 8804-0332."}]}, status=200)
+            return Response({"messages": [{"text": "Something went wrong. Please try again or call us at +63 917 580 7166."}]}, status=200)
         
 class LeadCaptureView(APIView):
     """ Public endpoint for the frontend VIP Perk Widget """
@@ -1488,8 +1488,13 @@ class LeadCaptureView(APIView):
 
         # --- SEND THE ACTUAL SMS COUPON ---
         if len(clean_phone) >= 10:
-            # Removed the emoji and upgraded the copy to feel like a professional coupon
-            sms_body = f"GOLDEN BAY VIP E-PASS: Welcome, {name}! Present this message to our receptionist on your next dine-in visit to claim your complimentary Signature Dessert. To reserve a table, call (02) 8804-0332."
+            sms_body = (
+                f"GOLDEN BAY VIP E-PASS: Welcome, {name}! Present this to our receptionist "
+                f"to claim your complimentary Signature Dessert. ✨ Welcome to Golden Bay Rewards! "
+                f"Earn points on every visit and receive exclusive rewards. "
+                f"To log in, go to https://goldenbay.com.ph/rewards "
+                f"For reservations, contact our mobile: +63 917 580 7166."
+            )
             send_sms(customer.phone, sms_body)
 
         return Response({
@@ -1821,7 +1826,7 @@ def send_status_update_notifications(reservation_id, new_status, send_sms_flag=T
                  sms_body = f"Great news, {reservation.customer_name}! Your table for {reservation.pax} on {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')} is CONFIRMED. See you soon! - GOLDENBAY"
                  send_sms(reservation.customer_contact, sms_body)
              elif new_status == 'CANCELLED':
-                 sms_body = f"Hi {reservation.customer_name}, your reservation request has been cancelled. Please call (02) 8804-0332 to reschedule. - GOLDENBAY"
+                 sms_body = f"Hi {reservation.customer_name}, your reservation request has been cancelled. Please call +63 917 580 7166 to reschedule. - GOLDENBAY"
                  send_sms(reservation.customer_contact, sms_body)
 
     except Exception as e:
@@ -1921,7 +1926,7 @@ def send_we_miss_you_automation():
         # 2. SEND SMS (If phone exists)
         contact_digits = ''.join(filter(str.isdigit, str(customer.phone)))
         if len(contact_digits) >= 10:
-            sms_body = f"Hi {customer.name}, we miss you at Golden Bay! It's been a while. Show this text for a complimentary dessert on your next dine-in visit with us. Call (02) 8804-0332 to reserve."
+            sms_body = f"Hi {customer.name}, we miss you at Golden Bay! It's been a while. Show this text for a complimentary dessert on your next dine-in visit with us. Call +63 917 580 7166 to reserve."
             send_sms(customer.phone, sms_body)
             sent_any = True
             
@@ -1967,7 +1972,7 @@ def send_birthday_promos():
     for customer in birthday_customers:
         contact_digits = ''.join(filter(str.isdigit, str(customer.phone)))
         if len(contact_digits) >= 10:
-            sms_body = f"Advance Happy Birthday, {customer.name}! 🎉 Celebrate your special day at Golden Bay. Show this text within your birthday month for a complimentary Longevity Peach Bun on us! Reserve at (02) 8804-0332"
+            sms_body = f"Advance Happy Birthday, {customer.name}! 🎉 Celebrate your special day at Golden Bay. Show this text within your birthday month for a complimentary Longevity Peach Bun on us! Reserve at +63 917 580 7166"
             send_sms(customer.phone, sms_body)
             
             # Mark as sent for this year

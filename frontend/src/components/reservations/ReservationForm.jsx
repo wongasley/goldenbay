@@ -15,8 +15,9 @@ const ReservationForm = ({
     onSuccess, 
     onCancel 
 }) => {
+    // Added separate care_of state to match the Phone Book
     const [formData, setFormData] = useState({
-        name: '', contact: '', email: '', pax: 2, message: ''
+        name: '', phone: '', care_of: '', email: '', pax: 2, message: ''
     });
     
     const [manualDate, setManualDate] = useState(date ? format(date, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'));
@@ -27,12 +28,10 @@ const ReservationForm = ({
     const [manualSource, setManualSource] = useState('PHONE'); 
     const [submitStatus, setSubmitStatus] = useState(null);
 
-    // NEW: Automatically reset time when date or session changes in admin view
     useEffect(() => {
         setManualTime('');
     }, [manualDate, manualSession]);
 
-    // UPDATED: Time slot generation with time-blocking for today
     const generateTimeSlots = (sessionType, selectedDateStr) => {
         const slots = [];
         const startHour = sessionType === 'LUNCH' ? 11 : 17; 
@@ -49,7 +48,6 @@ const ReservationForm = ({
             const displayHour = hour > 12 ? hour - 12 : hour;
             const ampm = hour >= 12 ? 'PM' : 'AM';
             
-            // Allow admins to override time block. Otherwise, block past times.
             const blockZero = !isManualEntry && isToday && hour <= now.getHours();
             if (!blockZero) {
                 slots.push({ value: `${hour}:00:00`, label: `${displayHour}:00 ${ampm}` });
@@ -83,27 +81,45 @@ const ReservationForm = ({
         }
     }, [isManualEntry, manualDate, manualSession]);
 
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        if (!formData.name || !formData.contact || !formData.pax) {
-            toast.error("Please fill in Name, Contact, and Guests.");
+        if (!formData.name || !formData.pax) {
+            toast.error("Please fill in Name and Guests.");
             return;
         }
 
-        // --- NEW: Strict Phone Validation & Formatting ---
-        // This removes spaces and dashes instantly: "0917 123 4567" -> "09171234567"
-        let cleanContact = formData.contact.replace(/[\s-]/g, '');
-        
-        // Check if it contains ONLY numbers (and an optional '+' at the start)
-        const phoneRegex = /^\+?\d+$/;
-        if (!phoneRegex.test(cleanContact)) {
-            toast.error("Please enter a valid contact number (digits only). Text like 'N/A' or 'C/O' is not allowed.", {
-                duration: 5000,
-                style: { border: '1px solid #ef4444', padding: '16px', color: '#ef4444' }
-            });
-            return; // Stops the submission
+        let finalContact = "";
+        let finalMessage = formData.message ? formData.message.trim() : "";
+
+        if (!isManualEntry) {
+            // STRICT VALIDATION FOR PUBLIC WEBSITE
+            if (!formData.phone) {
+                toast.error("Please provide a contact number.");
+                return;
+            }
+            finalContact = formData.phone.replace(/[\s-]/g, '');
+            if (!/^\+?\d+$/.test(finalContact)) {
+                toast.error("Please enter a valid contact number (digits only).");
+                return; 
+            }
+        } else {
+            // RELAXED VALIDATION FOR ADMINS
+            if (!formData.phone && !formData.care_of) {
+                toast.error("Please provide either a Phone Number OR a Care Of handler.");
+                return;
+            }
+            
+            // If they provided a phone, use it. If no phone, pass the care_of string to the backend.
+            if (formData.phone) {
+                finalContact = formData.phone.replace(/[\s-]/g, '');
+                // If they provided BOTH, we append the handler to the notes so it isn't lost
+                if (formData.care_of) {
+                    finalMessage = `[Handler: ${formData.care_of.trim()}]\n` + finalMessage;
+                }
+            } else {
+                finalContact = formData.care_of.trim();
+            }
         }
 
         const finalRoomId = isManualEntry ? manualRoomId : selectedRoom;
@@ -122,14 +138,14 @@ const ReservationForm = ({
 
         const payload = {
             customer_name: formData.name.trim(),
-            customer_contact: cleanContact, // <-- We now send the perfectly clean number
+            customer_contact: finalContact,
             customer_email: formData.email ? formData.email.trim() : null,
             date: isManualEntry ? manualDate : format(date, 'yyyy-MM-dd'),
             session: isManualEntry ? manualSession : session,
             time: finalTime,
             pax: parseInt(formData.pax, 10) || 1, 
             dining_area: parseInt(finalRoomId, 10),
-            special_request: formData.message ? formData.message.trim() : "",
+            special_request: finalMessage,
             status: isManualEntry ? 'CONFIRMED' : 'PENDING',
             source: isManualEntry ? manualSource : 'WEB' 
         };
@@ -143,7 +159,6 @@ const ReservationForm = ({
 
             setSubmitStatus('success');
             
-            // --- PLAY SUCCESS SOUND ---
             const audio = new Audio('/audio/success.mp3');
             audio.play().catch(err => console.warn("Audio blocked by browser:", err));
 
@@ -151,7 +166,6 @@ const ReservationForm = ({
             
         } catch (error) {
             let errorMessage = "Booking failed.";
-            
             if (error.response && error.response.data) {
                 const errData = error.response.data;
                 if (errData.non_field_errors) {
@@ -163,10 +177,7 @@ const ReservationForm = ({
                     const firstError = errData[firstKey];
                     errorMessage = `${firstKey.toUpperCase()}: ${Array.isArray(firstError) ? firstError[0] : firstError}`;
                 }
-            } else {
-                errorMessage = "Network connection refused or fatal server error.";
             }
-            
             toast.error(errorMessage);
             setSubmitStatus('error');
         }
@@ -285,37 +296,90 @@ const ReservationForm = ({
             <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label className={labelClass}>Customer Name</label>
+                        <label className={labelClass}>Customer Name <span className="text-red-500">*</span></label>
                         <input required type="text" className={inputClass} 
                             placeholder="e.g. John Doe"
+                            value={formData.name}
                             onChange={e => setFormData({...formData, name: e.target.value})} />
                     </div>
-                    <div>
-                        <label className={labelClass}>Contact No.</label>
-                        <input required type="text" className={inputClass} 
-                            placeholder="e.g. 0917..."
-                            onChange={e => setFormData({...formData, contact: e.target.value})} />
-                    </div>
+                    
+                    {!isManualEntry ? (
+                        // PUBLIC VIEW
+                        <div>
+                            <label className={labelClass}>Contact No. <span className="text-red-500">*</span></label>
+                            <input required type="text" className={inputClass} 
+                                placeholder="e.g. 0917..."
+                                value={formData.phone}
+                                onChange={e => setFormData({...formData, phone: e.target.value})} />
+                        </div>
+                    ) : (
+                        // ADMIN VIEW: Care Of Field
+                        <div>
+                            <label className={labelClass}>Care Of / Handler</label>
+                            <input type="text" className={inputClass} 
+                                placeholder="e.g. C/O Evelyn"
+                                value={formData.care_of}
+                                onChange={e => setFormData({...formData, care_of: e.target.value})} />
+                        </div>
+                    )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className={labelClass}>Email (Optional)</label>
-                        <input type="email" className={inputClass} 
-                            placeholder="name@example.com"
-                            onChange={e => setFormData({...formData, email: e.target.value})} />
+                {isManualEntry && (
+                    // ADMIN VIEW: Phone and Email side by side
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className={labelClass}>Phone Number</label>
+                            <input type="text" className={inputClass} 
+                                placeholder="e.g. 0917 123 4567"
+                                value={formData.phone}
+                                onChange={e => setFormData({...formData, phone: e.target.value})} />
+                        </div>
+                        <div>
+                            <label className={labelClass}>Email (Optional)</label>
+                            <input type="email" className={inputClass} 
+                                placeholder="name@example.com"
+                                value={formData.email}
+                                onChange={e => setFormData({...formData, email: e.target.value})} />
+                        </div>
                     </div>
-                    <div>
-                        <label className={labelClass}>Pax</label>
-                        <input required type="number" min="1" className={inputClass} 
-                            onChange={e => setFormData({...formData, pax: e.target.value})} />
+                )}
+
+                {!isManualEntry && (
+                    // PUBLIC VIEW: Email and Pax side by side
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className={labelClass}>Email (Optional)</label>
+                            <input type="email" className={inputClass} 
+                                placeholder="name@example.com"
+                                value={formData.email}
+                                onChange={e => setFormData({...formData, email: e.target.value})} />
+                        </div>
+                        <div>
+                            <label className={labelClass}>Pax <span className="text-red-500">*</span></label>
+                            <input required type="number" min="1" className={inputClass} 
+                                value={formData.pax}
+                                onChange={e => setFormData({...formData, pax: e.target.value})} />
+                        </div>
                     </div>
-                </div>
+                )}
+
+                {isManualEntry && (
+                    // ADMIN VIEW: Just Pax alone on a row
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className={labelClass}>Pax <span className="text-red-500">*</span></label>
+                            <input required type="number" min="1" className={inputClass} 
+                                value={formData.pax}
+                                onChange={e => setFormData({...formData, pax: e.target.value})} />
+                        </div>
+                    </div>
+                )}
 
                 <div>
                     <label className={labelClass}>Special Request / Notes</label>
                     <textarea className={`${inputClass} h-20 resize-none`} 
                         placeholder="Allergies, special occasion, high chair..."
+                        value={formData.message}
                         onChange={e => setFormData({...formData, message: e.target.value})}></textarea>
                 </div>
             </div>
