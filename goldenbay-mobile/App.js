@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, createContext, useContext } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useState, useEffect, useMemo, createContext, useContext, useCallback, useRef } from 'react';
+import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { 
   StyleSheet, Text, View, TouchableOpacity, 
@@ -22,6 +22,22 @@ axiosInstance.interceptors.request.use(async (config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 }, (error) => Promise.reject(error));
+
+const Stack = createNativeStackNavigator();
+
+// --- BASE THEME ---
+const COLORS = {
+  background: '#F8F9FA', 
+  surface: '#FFFFFF',
+  primary: '#D4AF37',
+  primaryDark: '#B5952F',
+  text: '#111827',
+  textMuted: '#6B7280',
+  border: '#E5E7EB',
+  danger: '#EF4444',
+  success: '#10B981',
+  cardBg: '#FFFFFF'
+};
 
 // --- TRANSLATIONS DICTIONARY ---
 const translations = {
@@ -99,7 +115,6 @@ export const SettingsProvider = ({ children }) => {
       return result;
   };
 
-  // Helper to extract translated data from API models (Name, Desc)
   const getLocData = (obj, fieldName) => {
     if (!obj) return "";
     if (lang === 'en') return obj[fieldName];
@@ -121,18 +136,7 @@ export const SettingsProvider = ({ children }) => {
               cardBg: '#1A1A1A'
           };
       }
-      return {
-          background: '#F8F9FA', 
-          surface: '#FFFFFF',
-          primary: '#D4AF37',
-          primaryDark: '#B5952F',
-          text: '#111827',
-          textMuted: '#6B7280',
-          border: '#E5E7EB',
-          danger: '#EF4444',
-          success: '#10B981',
-          cardBg: '#FFFFFF'
-      };
+      return COLORS;
   };
 
   return (
@@ -272,20 +276,24 @@ const MenuScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState(null);
 
-  useEffect(() => {
-    const fetchMenu = async () => {
-      try {
-        const res = await axiosInstance.get('/api/menu/');
-        setCategories(res.data);
-        if (res.data.length > 0) setActiveCategory(res.data[0].name);
-      } catch (err) {
-        Alert.alert("Error", "Could not load menu. Please check your connection.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchMenu();
-  }, []);
+  // Focus effect ensures we fetch the data fresh every time we visit
+  useFocusEffect(
+    useCallback(() => {
+      const fetchMenu = async () => {
+        try {
+          // Use plain axios to bypass token checks on public endpoints
+          const res = await axios.get(`${BACKEND_URL}/api/menu/`);
+          setCategories(res.data);
+          if (res.data.length > 0 && !activeCategory) setActiveCategory(res.data[0].name);
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchMenu();
+    }, [])
+  );
 
   const activeItems = categories.find(c => c.name === activeCategory)?.items || [];
 
@@ -378,7 +386,8 @@ const BookingScreen = ({ navigation }) => {
     setStep(2);
     setSelectedRoom(null); 
     try {
-      const response = await axiosInstance.get(`/api/reservations/check/?date=${date}&session=${session}`);
+      // Use plain axios for public availability check to prevent token blocks
+      const response = await axios.get(`${BACKEND_URL}/api/reservations/check/?date=${date}&session=${session}`);
       const sortedRooms = response.data.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
       setRooms(sortedRooms);
     } catch (error) {
@@ -417,7 +426,8 @@ const BookingScreen = ({ navigation }) => {
     };
 
     try {
-        await axiosInstance.post('/api/reservations/create/', payload);
+        // We can use plain axios here as well since Booking Create allows any user
+        await axios.post(`${BACKEND_URL}/api/reservations/create/`, payload);
         Alert.alert("Success!", "Reservation requested! We will confirm via SMS shortly.", [
           { text: "OK", onPress: () => navigation.navigate('Home') }
         ]);
@@ -586,6 +596,7 @@ const RewardsScreen = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [customer, setCustomer] = useState(null);
   const [rewards, setRewards] = useState([]);
+  const [receiptData, setReceiptData] = useState(null);
 
   const groupedRewards = useMemo(() => {
     return rewards.reduce((acc, reward) => {
@@ -598,32 +609,41 @@ const RewardsScreen = ({ navigation }) => {
     }, {});
   }, [rewards]);
 
-  useEffect(() => { checkSession(); }, []);
+  // Use plain axios to bypass interceptor blocks for the public catalog
+  const fetchRewards = async () => {
+    try {
+      const res = await axios.get(`${BACKEND_URL}/api/reservations/rewards/`);
+      setRewards(res.data);
+    } catch (err) { console.log("Failed to fetch rewards", err); }
+  };
 
   const checkSession = async () => {
     const token = await AsyncStorage.getItem('gb_customer_token');
     const data = await AsyncStorage.getItem('gb_customer_data');
+    
+    // Always fetch rewards so catalog isn't empty!
+    await fetchRewards();
+
     if (token && data) {
       setCustomer(JSON.parse(data));
       setStep('DASHBOARD');
-      fetchRewards();
     } else {
       setStep('LOGIN');
     }
   };
 
-  const fetchRewards = async () => {
-    try {
-      const res = await axiosInstance.get('/api/reservations/rewards/');
-      setRewards(res.data);
-    } catch (err) { console.log("Failed to fetch rewards"); }
-  };
+  // Refresh every time screen focuses
+  useFocusEffect(
+    useCallback(() => {
+      checkSession();
+    }, [])
+  );
 
   const handleRequestOTP = async () => {
     setIsLoading(true);
     const cleanPhone = phone.replace(/[\s-]/g, '');
     try {
-      await axiosInstance.post('/api/users/request-otp/', { phone: cleanPhone });
+      await axios.post(`${BACKEND_URL}/api/users/request-otp/`, { phone: cleanPhone });
       setStep('OTP');
     } catch (err) {
       Alert.alert("Error", err.response?.data?.error || "Failed to send code.");
@@ -634,12 +654,11 @@ const RewardsScreen = ({ navigation }) => {
     setIsLoading(true);
     const cleanPhone = phone.replace(/[\s-]/g, '');
     try {
-      const res = await axiosInstance.post('/api/users/verify-otp/', { phone: cleanPhone, otp });
+      const res = await axios.post(`${BACKEND_URL}/api/users/verify-otp/`, { phone: cleanPhone, otp });
       await AsyncStorage.setItem('gb_customer_token', res.data.access);
       await AsyncStorage.setItem('gb_customer_data', JSON.stringify(res.data.customer));
       setCustomer(res.data.customer);
       setStep('DASHBOARD');
-      fetchRewards();
     } catch (err) {
       Alert.alert("Error", "Invalid or expired code.");
     } finally { setIsLoading(false); }
@@ -651,10 +670,25 @@ const RewardsScreen = ({ navigation }) => {
         { text: "Confirm", onPress: async () => {
             try {
               const res = await axiosInstance.post('/api/reservations/rewards/redeem/', { reward_id: reward.id });
+              
               setCustomer(prev => ({ ...prev, points_balance: res.data.new_balance }));
-              Alert.alert("Success!", "Reward redeemed. Please show the active dashboard to your waiter.");
+              await AsyncStorage.setItem('gb_customer_data', JSON.stringify({ ...customer, points_balance: res.data.new_balance }));
+              
+              setReceiptData({
+                rewardName: reward.name,
+                rewardSize: reward.size || 'Regular',
+                points: reward.points_required,
+                customerName: customer.name,
+                timestamp: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
+                ticketId: Math.random().toString(36).substr(2, 8).toUpperCase()
+              });
             } catch (err) {
-              Alert.alert("Error", err.response?.data?.error || "Redemption failed.");
+              if (err.response && err.response.status === 401) {
+                  Alert.alert("Session Expired", "Please log in again.");
+                  handleLogout();
+              } else {
+                  Alert.alert("Error", err.response?.data?.error || "Redemption failed.");
+              }
             }
         }}
     ]);
@@ -664,6 +698,8 @@ const RewardsScreen = ({ navigation }) => {
     await AsyncStorage.removeItem('gb_customer_token');
     await AsyncStorage.removeItem('gb_customer_data');
     setCustomer(null);
+    setPhone('');
+    setOtp('');
     setStep('LOGIN');
   };
 
@@ -711,6 +747,39 @@ const RewardsScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+      {receiptData && (
+          <View style={styles.receiptOverlay}>
+            <View style={styles.receiptCard}>
+                <View style={styles.receiptHeader}>
+                  <Feather name="check-circle" size={48} color="#10B981" style={{ marginBottom: 12 }} />
+                  <Text style={styles.receiptTitle}>Reward Claimed</Text>
+                  <Text style={styles.receiptId}>Ref: #{receiptData.ticketId}</Text>
+                </View>
+                <View style={styles.receiptBody}>
+                  <Text style={styles.receiptInstruction}>⚠️ Show this screen to your server</Text>
+                  <Text style={styles.receiptItem}>{receiptData.rewardName}</Text>
+                  <Text style={styles.receiptSize}>Portion: {receiptData.rewardSize}</Text>
+                  
+                  <View style={styles.receiptDetailsRow}>
+                    <Text style={styles.receiptDetailsLabel}>Guest Name</Text>
+                    <Text style={styles.receiptDetailsValue}>{receiptData.customerName}</Text>
+                  </View>
+                  <View style={styles.receiptDetailsRow}>
+                    <Text style={styles.receiptDetailsLabel}>Points Deducted</Text>
+                    <Text style={[styles.receiptDetailsValue, { color: COLORS.danger }]}>-{receiptData.points} PTS</Text>
+                  </View>
+                  <View style={styles.receiptDetailsRow}>
+                    <Text style={styles.receiptDetailsLabel}>Time</Text>
+                    <Text style={styles.receiptDetailsValue}>{receiptData.timestamp}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity style={styles.receiptCloseBtn} onPress={() => setReceiptData(null)}>
+                  <Text style={styles.receiptCloseBtnText}>CLOSE TICKET</Text>
+                </TouchableOpacity>
+            </View>
+          </View>
+      )}
+
       <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}><Feather name="chevron-left" size={24} color={colors.text}/></TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>{t('rewards.title')}</Text>
@@ -776,6 +845,10 @@ const RewardsScreen = ({ navigation }) => {
             </View>
         ))}
         
+        <View style={[styles.policyBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <h4 style={[styles.policyTitle, { color: colors.text }]}><Feather name="clock" size={16} color={colors.primary} /> {t('rewards.policy')}</h4>
+            <Text style={[styles.policyText, { color: colors.textMuted }]}>{t('rewards.policyDesc')}</Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -845,7 +918,7 @@ const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   
   // Headers
-  homeHeader: { paddingTop: 10, paddingBottom: 15, borderBottomWidth: 1 },
+  homeHeader: { paddingTop: 10, paddingBottom: 15, borderBottomWidth: 1, alignItems: 'center' },
   homeTitle: { fontSize: 22, fontWeight: '800', color: COLORS.primaryDark, letterSpacing: 4 },
   homeSubtitle: { fontSize: 10, color: COLORS.textMuted, letterSpacing: 2, marginTop: 4, fontWeight: '600' },
   
@@ -939,6 +1012,26 @@ const styles = StyleSheet.create({
   rewardOptionPoints: { fontSize: 12, fontWeight: '800', marginTop: 2 },
   redeemBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
   redeemBtnText: { color: '#FFF', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+
+  policyBox: { marginTop: 16, padding: 20, borderRadius: 16, borderWidth: 1 },
+  policyTitle: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', marginBottom: 6 },
+  policyText: { fontSize: 12, lineHeight: 18 },
+
+  // Digital Receipt Modal
+  receiptOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 100, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  receiptCard: { width: '100%', maxWidth: 340, backgroundColor: COLORS.surface, borderRadius: 16, overflow: 'hidden' },
+  receiptHeader: { backgroundColor: '#111827', padding: 30, alignItems: 'center' },
+  receiptTitle: { color: COLORS.primary, fontSize: 20, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2 },
+  receiptId: { color: '#9CA3AF', fontSize: 12, fontFamily: 'monospace', marginTop: 5 },
+  receiptBody: { padding: 30, backgroundColor: '#F9FAFB' },
+  receiptInstruction: { fontSize: 12, color: COLORS.primaryDark, fontWeight: 'bold', textAlign: 'center', marginBottom: 20, backgroundColor: '#Fefce8', padding: 10, borderRadius: 6, overflow: 'hidden' },
+  receiptItem: { fontSize: 24, fontWeight: '800', color: COLORS.text, textAlign: 'center', marginBottom: 5 },
+  receiptSize: { fontSize: 12, color: COLORS.textMuted, textAlign: 'center', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: 25 },
+  receiptDetailsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  receiptDetailsLabel: { fontSize: 12, color: COLORS.textMuted },
+  receiptDetailsValue: { fontSize: 12, color: COLORS.text, fontWeight: 'bold' },
+  receiptCloseBtn: { padding: 20, borderTopWidth: 1, borderColor: COLORS.border, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  receiptCloseBtnText: { color: COLORS.textMuted, fontWeight: 'bold', letterSpacing: 1 },
 
   // Contact
   contactCard: { borderRadius: 16, padding: 10, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 8, elevation: 2, borderWidth: 1 },
