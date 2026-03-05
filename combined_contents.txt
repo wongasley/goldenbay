@@ -10968,24 +10968,23 @@ axiosInstance.interceptors.request.use(async (config) => {
 
 export default axiosInstance;
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { 
   StyleSheet, Text, View, TouchableOpacity, 
-  ImageBackground, StatusBar, TextInput, Alert, ScrollView, ActivityIndicator, FlatList
+  StatusBar, TextInput, Alert, ScrollView, ActivityIndicator, FlatList
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Calendar } from 'react-native-calendars';
-import { format } from 'date-fns';
+import { format, addDays, subDays, isToday } from 'date-fns';
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
-// --- CONFIGURATION ---
-// Change to 'https://goldenbay.com.ph' for production!
-const BACKEND_URL = 'http://10.0.2.2:8000'; 
+// --- CONNECTION ---
+const BACKEND_URL = 'https://goldenbay.com.ph'; 
 
 const axiosInstance = axios.create({ baseURL: BACKEND_URL });
 axiosInstance.interceptors.request.use(async (config) => {
@@ -10996,12 +10995,12 @@ axiosInstance.interceptors.request.use(async (config) => {
 
 const Stack = createNativeStackNavigator();
 
-// --- THEME CONSTANTS ---
+// --- PREMIUM LIGHT THEME ---
 const COLORS = {
-  background: '#F9F9F9',
+  background: '#F8F9FA', 
   surface: '#FFFFFF',
   primary: '#D4AF37',
-  primaryDark: '#C5A028',
+  primaryDark: '#B5952F',
   text: '#111827',
   textMuted: '#6B7280',
   border: '#E5E7EB',
@@ -11010,55 +11009,55 @@ const COLORS = {
 };
 
 // --------------------------------------------------------
-// 1. HOME SCREEN (App Hub)
+// 1. HOME SCREEN
 // --------------------------------------------------------
 const HomeScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
       
-      {/* Header */}
       <View style={styles.homeHeader}>
         <Text style={styles.homeTitle}>GOLDEN BAY</Text>
         <Text style={styles.homeSubtitle}>FRESH SEAFOOD RESTAURANT</Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20 }}>
-        {/* Hero Banner */}
-        <ImageBackground 
-          source={{ uri: `${BACKEND_URL}/static/assets/images/golden_bay_cover.webp` }} 
-          style={styles.heroBanner}
-          imageStyle={{ borderRadius: 12 }}
-        >
-          <View style={styles.heroOverlay}>
-            <Text style={styles.heroText}>Experience Luxury Dining</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        
+        {/* Sleek Luxury Hero Card */}
+        <View style={styles.heroWrapper}>
+          <View style={styles.heroBanner}>
+            <View style={styles.heroOverlay}>
+              <Feather name="star" size={24} color={COLORS.primary} style={{ marginBottom: 12 }} />
+              <Text style={styles.heroLogoText}>GOLDEN BAY</Text>
+              <Text style={styles.heroLogoSub}>VIP MOBILE ACCESS</Text>
+            </View>
           </View>
-        </ImageBackground>
+        </View>
 
         {/* Action Grid */}
         <View style={styles.grid}>
-          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Booking')}>
-            <View style={styles.iconCircle}><Feather name="calendar" size={24} color={COLORS.primary} /></View>
+          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Booking')} activeOpacity={0.7}>
+            <View style={styles.iconCircle}><Feather name="calendar" size={22} color={COLORS.primaryDark} /></View>
             <Text style={styles.cardTitle}>Book a Table</Text>
-            <Text style={styles.cardDesc}>Reserve VIP rooms or Hall</Text>
+            <Text style={styles.cardDesc} numberOfLines={2}>Reserve VIP or Hall</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Menu')}>
-            <View style={styles.iconCircle}><Feather name="book-open" size={24} color={COLORS.primary} /></View>
+          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Menu')} activeOpacity={0.7}>
+            <View style={styles.iconCircle}><Feather name="book-open" size={22} color={COLORS.primaryDark} /></View>
             <Text style={styles.cardTitle}>Our Menu</Text>
-            <Text style={styles.cardDesc}>Explore live seafood</Text>
+            <Text style={styles.cardDesc} numberOfLines={2}>Explore live seafood</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Rewards')}>
-            <View style={styles.iconCircle}><Feather name="gift" size={24} color={COLORS.primary} /></View>
+          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Rewards')} activeOpacity={0.7}>
+            <View style={styles.iconCircle}><Feather name="gift" size={22} color={COLORS.primaryDark} /></View>
             <Text style={styles.cardTitle}>Rewards</Text>
-            <Text style={styles.cardDesc}>View & redeem points</Text>
+            <Text style={styles.cardDesc} numberOfLines={2}>View & redeem points</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Contact')}>
-            <View style={styles.iconCircle}><Feather name="map-pin" size={24} color={COLORS.primary} /></View>
+          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Contact')} activeOpacity={0.7}>
+            <View style={styles.iconCircle}><Feather name="map-pin" size={22} color={COLORS.primaryDark} /></View>
             <Text style={styles.cardTitle}>Contact</Text>
-            <Text style={styles.cardDesc}>Location & Hours</Text>
+            <Text style={styles.cardDesc} numberOfLines={2}>Location & Hours</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -11081,7 +11080,7 @@ const MenuScreen = ({ navigation }) => {
         setCategories(res.data);
         if (res.data.length > 0) setActiveCategory(res.data[0].name);
       } catch (err) {
-        Alert.alert("Error", "Could not load menu.");
+        Alert.alert("Error", "Could not load menu. Please check your connection.");
       } finally {
         setLoading(false);
       }
@@ -11096,15 +11095,14 @@ const MenuScreen = ({ navigation }) => {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}><Feather name="chevron-left" size={24} color={COLORS.text}/></TouchableOpacity>
         <Text style={styles.headerTitle}>OUR MENU</Text>
-        <View style={{ width: 24 }} />
+        <View style={{ width: 32 }} />
       </View>
 
       {loading ? (
         <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 50 }} />
       ) : (
         <>
-          {/* Category Tabs */}
-          <View style={{ height: 60, borderBottomWidth: 1, borderColor: COLORS.border }}>
+          <View style={styles.tabWrapper}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabContainer}>
               {categories.map(cat => (
                 <TouchableOpacity 
@@ -11118,25 +11116,29 @@ const MenuScreen = ({ navigation }) => {
             </ScrollView>
           </View>
 
-          {/* Items List */}
           <FlatList
             data={activeItems}
             keyExtractor={item => item.id.toString()}
-            contentContainerStyle={{ padding: 16 }}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
               <View style={styles.menuCard}>
-                {item.image && (
+                {item.image ? (
                   <Image source={{ uri: item.image.startsWith('http') ? item.image : `${BACKEND_URL}${item.image}` }} style={styles.menuImage} />
+                ) : (
+                  <View style={[styles.menuImage, { backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' }]}>
+                    <Feather name="image" size={24} color="#D1D5DB" />
+                  </View>
                 )}
                 <View style={styles.menuContent}>
-                  <Text style={styles.menuName}>{item.name}</Text>
+                  <Text style={styles.menuName} numberOfLines={2}>{item.name}</Text>
                   {item.description ? <Text style={styles.menuDesc} numberOfLines={2}>{item.description}</Text> : null}
                   
                   <View style={styles.priceRow}>
                     {item.prices.map(p => (
                       <Text key={p.id} style={styles.menuPrice}>
                         {p.size !== 'Regular' ? `${p.size}: ` : ''}
-                        {p.is_seasonal ? <Text style={{ fontStyle: 'italic', color: COLORS.primary }}>Seasonal Price</Text> : `₱${Number(p.price).toLocaleString()}`}
+                        {p.is_seasonal ? <Text style={{ fontStyle: 'italic', color: COLORS.primaryDark }}>Seasonal</Text> : `₱${Number(p.price).toLocaleString()}`}
                       </Text>
                     ))}
                   </View>
@@ -11174,12 +11176,13 @@ const BookingScreen = ({ navigation }) => {
   const handleNextToRooms = async () => {
     setLoadingRooms(true);
     setStep(2);
+    setSelectedRoom(null); 
     try {
       const response = await axiosInstance.get(`/api/reservations/check/?date=${date}&session=${session}`);
       const sortedRooms = response.data.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
       setRooms(sortedRooms);
     } catch (error) {
-      Alert.alert("Error", "Could not fetch availability.");
+      Alert.alert("Connection Error", "Could not fetch availability from the live database.");
       setStep(1);
     } finally {
       setLoadingRooms(false);
@@ -11188,15 +11191,13 @@ const BookingScreen = ({ navigation }) => {
 
   const handleSubmitBooking = async () => {
     if (!formData.name || !formData.contact || !formData.time || !formData.pax) {
-      Alert.alert("Missing Fields", "Please fill out all required fields.");
+      Alert.alert("Required Fields", "Please fill out Name, Contact, Pax, and Time.");
       return;
     }
 
     const cleanPhone = formData.contact.replace(/[\s-]/g, '');
-    const phRegex = /^(09|\+?639)\d{9}$/;
-    
-    if (!phRegex.test(cleanPhone)) {
-      Alert.alert("Invalid Number", "Please enter a valid Philippine mobile number (e.g., 09171234567).");
+    if (!/^(09|\+?639)\d{9}$/.test(cleanPhone)) {
+      Alert.alert("Invalid Number", "Please enter a valid Philippine mobile number.");
       return;
     }
 
@@ -11207,20 +11208,21 @@ const BookingScreen = ({ navigation }) => {
         customer_email: formData.email,
         date: date, 
         session: session, 
-        time: `${formData.time}:00`,
+        time: `${formData.time}:00`, 
         pax: parseInt(formData.pax, 10),
         dining_area: selectedRoom.id, 
         special_request: formData.message, 
-        status: 'PENDING'
+        status: 'PENDING',
+        source: 'MOBILE_APP' 
     };
 
     try {
         await axiosInstance.post('/api/reservations/create/', payload);
-        Alert.alert("Success!", "Your reservation request has been submitted. We will confirm shortly.", [
-          { text: "Return Home", onPress: () => navigation.navigate('Home') }
+        Alert.alert("Success!", "Reservation requested! We will confirm via SMS shortly.", [
+          { text: "OK", onPress: () => navigation.navigate('Home') }
         ]);
     } catch (error) {
-        Alert.alert("Booking Failed", error.response?.data?.non_field_errors?.[0] || "Something went wrong.");
+        Alert.alert("Booking Failed", error.response?.data?.non_field_errors?.[0] || error.response?.data?.pax?.[0] || "Something went wrong.");
     } finally {
         setIsSubmitting(false);
     }
@@ -11231,21 +11233,25 @@ const BookingScreen = ({ navigation }) => {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => step > 1 ? setStep(step - 1) : navigation.goBack()} style={styles.backBtn}><Feather name="chevron-left" size={24} color={COLORS.text}/></TouchableOpacity>
         <Text style={styles.headerTitle}>STEP {step} OF 3</Text>
-        <View style={{ width: 24 }} /> 
+        <View style={{ width: 32 }} /> 
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* STEP 1: DATE & SESSION */}
         {step === 1 && (
           <View>
             <Text style={styles.sectionTitle}>Select Date</Text>
-            <View style={styles.card}>
+            <View style={styles.calendarCard}>
               <Calendar
                 onDayPress={day => setDate(day.dateString)}
                 markedDates={{ [date]: { selected: true, selectedColor: COLORS.primary } }}
                 minDate={format(new Date(), 'yyyy-MM-dd')}
-                theme={{ todayTextColor: COLORS.primary, arrowColor: COLORS.primary }}
+                theme={{ 
+                  todayTextColor: COLORS.primaryDark, 
+                  arrowColor: COLORS.primary,
+                  textDayFontWeight: '500',
+                  textMonthFontWeight: 'bold',
+                }}
               />
             </View>
 
@@ -11275,10 +11281,9 @@ const BookingScreen = ({ navigation }) => {
           </View>
         )}
 
-        {/* STEP 2: SELECT ROOM */}
         {step === 2 && (
           <View>
-            <Text style={styles.sectionTitle}>Available Areas</Text>
+            <Text style={styles.sectionTitle}>{bookingType === 'VIP' ? 'Available VIP Rooms' : 'Main Dining Hall'}</Text>
             {loadingRooms ? (
               <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 50 }} />
             ) : (
@@ -11288,14 +11293,26 @@ const BookingScreen = ({ navigation }) => {
                   disabled={!room.is_available}
                   style={[ styles.roomCard, selectedRoom?.id === room.id && styles.roomCardSelected, !room.is_available && { opacity: 0.5 } ]}
                   onPress={() => setSelectedRoom(room)}
+                  activeOpacity={0.8}
                 >
                   <View style={styles.roomCardContent}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.roomName}>{room.name}</Text>
-                      <Text style={styles.roomCapacity}><Feather name="users" size={12}/> Up to {room.capacity} Guests</Text>
+                    <View style={{ flex: 1, paddingRight: 10 }}>
+                      <Text style={styles.roomName} numberOfLines={1}>{room.name}</Text>
+                      {room.area_type === 'HALL' ? (
+                         <Text style={styles.roomCapacity}><Feather name="users" size={12}/> {room.remaining_capacity} Seats Left</Text>
+                      ) : (
+                         <Text style={styles.roomCapacity}><Feather name="users" size={12}/> Up to {room.capacity} Guests</Text>
+                      )}
                       {Number(room.price) > 0 && <Text style={styles.roomPrice}>₱{Number(room.price).toLocaleString()} Consumable</Text>}
                     </View>
-                    {!room.is_available && <Text style={styles.bookedText}>BOOKED</Text>}
+                    
+                    {!room.is_available ? (
+                      <View style={styles.badgeDanger}><Text style={styles.badgeTextDanger}>BOOKED</Text></View>
+                    ) : selectedRoom?.id === room.id ? (
+                      <Feather name="check-circle" size={24} color={COLORS.primaryDark} />
+                    ) : (
+                      <Feather name="circle" size={24} color={COLORS.border} />
+                    )}
                   </View>
                 </TouchableOpacity>
               ))
@@ -11309,41 +11326,44 @@ const BookingScreen = ({ navigation }) => {
           </View>
         )}
 
-        {/* STEP 3: DETAILS FORM */}
         {step === 3 && (
           <View>
             <Text style={styles.sectionTitle}>Contact Details</Text>
             
-            <Text style={styles.label}>Full Name *</Text>
-            <TextInput style={styles.input} placeholder="John Doe" value={formData.name} onChangeText={t => setFormData({...formData, name: t})} />
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Full Name <Text style={{color: COLORS.danger}}>*</Text></Text>
+              <TextInput style={styles.input} placeholder="e.g. John Doe" value={formData.name} onChangeText={t => setFormData({...formData, name: t})} />
+            </View>
 
-            <Text style={styles.label}>Mobile Number *</Text>
-            <TextInput style={styles.input} placeholder="0917 123 4567" keyboardType="phone-pad" value={formData.contact} onChangeText={t => setFormData({...formData, contact: t})} />
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Mobile Number <Text style={{color: COLORS.danger}}>*</Text></Text>
+              <TextInput style={styles.input} placeholder="e.g. 0917 123 4567" keyboardType="phone-pad" value={formData.contact} onChangeText={t => setFormData({...formData, contact: t})} />
+            </View>
 
             <View style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Guests *</Text>
+              <View style={[styles.inputGroup, { flex: 1 }]}>
+                <Text style={styles.label}>Guests <Text style={{color: COLORS.danger}}>*</Text></Text>
                 <TextInput style={styles.input} placeholder="2" keyboardType="number-pad" value={formData.pax} onChangeText={t => setFormData({...formData, pax: t})} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Arrival Time *</Text>
-                <View style={styles.timeGrid}>
-                   {/* Simplified time selection for native */}
-                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      {getAvailableTimes().map(time => (
-                        <TouchableOpacity key={time} style={[styles.timeChip, formData.time === time && styles.timeChipActive]} onPress={() => setFormData({...formData, time})}>
-                          <Text style={[styles.timeText, formData.time === time && styles.timeTextActive]}>{time}</Text>
-                        </TouchableOpacity>
-                      ))}
-                   </ScrollView>
-                </View>
               </View>
             </View>
 
-            <Text style={styles.label}>Special Requests</Text>
-            <TextInput style={[styles.input, { height: 80, textAlignVertical: 'top' }]} placeholder="Allergies, high chair..." multiline value={formData.message} onChangeText={t => setFormData({...formData, message: t})} />
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Arrival Time <Text style={{color: COLORS.danger}}>*</Text></Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 5 }}>
+                  {getAvailableTimes().map(time => (
+                    <TouchableOpacity key={time} style={[styles.timeChip, formData.time === time && styles.timeChipActive]} onPress={() => setFormData({...formData, time})}>
+                      <Text style={[styles.timeText, formData.time === time && styles.timeTextActive]}>{time}</Text>
+                    </TouchableOpacity>
+                  ))}
+              </ScrollView>
+            </View>
 
-            <TouchableOpacity style={styles.buttonPrimary} onPress={handleSubmitBooking} disabled={isSubmitting}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Special Requests</Text>
+              <TextInput style={[styles.input, { height: 80, textAlignVertical: 'top' }]} placeholder="Allergies, high chair..." multiline value={formData.message} onChangeText={t => setFormData({...formData, message: t})} />
+            </View>
+
+            <TouchableOpacity style={styles.buttonPrimary} onPress={handleSubmitBooking} disabled={isSubmitting || !formData.time}>
               {isSubmitting ? <ActivityIndicator color="#FFF" /> : <Text style={styles.buttonTextPrimary}>SUBMIT RESERVATION</Text>}
             </TouchableOpacity>
           </View>
@@ -11355,7 +11375,7 @@ const BookingScreen = ({ navigation }) => {
 };
 
 // --------------------------------------------------------
-// 4. REWARDS SCREEN (Auth & Dashboard)
+// 4. REWARDS SCREEN
 // --------------------------------------------------------
 const RewardsScreen = ({ navigation }) => {
   const [step, setStep] = useState('LOADING'); 
@@ -11364,10 +11384,20 @@ const RewardsScreen = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [customer, setCustomer] = useState(null);
   const [rewards, setRewards] = useState([]);
+  const [receiptData, setReceiptData] = useState(null);
 
-  useEffect(() => {
-    checkSession();
-  }, []);
+  const groupedRewards = useMemo(() => {
+    return rewards.reduce((acc, reward) => {
+      if (!acc[reward.name]) {
+        acc[reward.name] = { name: reward.name, image: reward.image, description: reward.description, options: [] };
+      }
+      acc[reward.name].options.push(reward);
+      acc[reward.name].options.sort((a, b) => a.points_required - b.points_required);
+      return acc;
+    }, {});
+  }, [rewards]);
+
+  useEffect(() => { checkSession(); }, []);
 
   const checkSession = async () => {
     const token = await AsyncStorage.getItem('gb_customer_token');
@@ -11385,9 +11415,7 @@ const RewardsScreen = ({ navigation }) => {
     try {
       const res = await axiosInstance.get('/api/reservations/rewards/');
       setRewards(res.data);
-    } catch (err) {
-      console.log("Failed to fetch rewards");
-    }
+    } catch (err) { console.log("Failed to fetch rewards"); }
   };
 
   const handleRequestOTP = async () => {
@@ -11398,9 +11426,7 @@ const RewardsScreen = ({ navigation }) => {
       setStep('OTP');
     } catch (err) {
       Alert.alert("Error", err.response?.data?.error || "Failed to send code.");
-    } finally {
-      setIsLoading(false);
-    }
+    } finally { setIsLoading(false); }
   };
 
   const handleVerifyOTP = async () => {
@@ -11410,34 +11436,35 @@ const RewardsScreen = ({ navigation }) => {
       const res = await axiosInstance.post('/api/users/verify-otp/', { phone: cleanPhone, otp });
       await AsyncStorage.setItem('gb_customer_token', res.data.access);
       await AsyncStorage.setItem('gb_customer_data', JSON.stringify(res.data.customer));
-      
       setCustomer(res.data.customer);
       setStep('DASHBOARD');
       fetchRewards();
     } catch (err) {
       Alert.alert("Error", "Invalid or expired code.");
-    } finally {
-      setIsLoading(false);
-    }
+    } finally { setIsLoading(false); }
   };
 
   const handleRedeem = async (reward) => {
-    Alert.alert(
-      "Confirm Redemption",
-      `Redeem ${reward.name} for ${reward.points_required} points?`,
-      [
+    Alert.alert("Confirm", `Redeem ${reward.name} for ${reward.points_required} points?`, [
         { text: "Cancel", style: "cancel" },
         { text: "Confirm", onPress: async () => {
             try {
               const res = await axiosInstance.post('/api/reservations/rewards/redeem/', { reward_id: reward.id });
               setCustomer(prev => ({ ...prev, points_balance: res.data.new_balance }));
-              Alert.alert("Success!", "Reward redeemed. Please show this to your waiter.");
+              
+              setReceiptData({
+                rewardName: reward.name,
+                rewardSize: reward.size || 'Regular',
+                points: reward.points_required,
+                customerName: customer.name,
+                timestamp: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
+                ticketId: Math.random().toString(36).substr(2, 8).toUpperCase()
+              });
             } catch (err) {
               Alert.alert("Error", err.response?.data?.error || "Redemption failed.");
             }
         }}
-      ]
-    );
+    ]);
   };
 
   const handleLogout = async () => {
@@ -11455,17 +11482,20 @@ const RewardsScreen = ({ navigation }) => {
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}><Feather name="chevron-left" size={24} color={COLORS.text}/></TouchableOpacity>
           <Text style={styles.headerTitle}>MEMBER LOGIN</Text>
-          <View style={{ width: 24 }} />
+          <View style={{ width: 32 }} />
         </View>
         <View style={styles.formContainer}>
           <View style={styles.authCard}>
-            <View style={styles.iconCircle}><Feather name="award" size={32} color={COLORS.primary}/></View>
-            <Text style={styles.authTitle}>Golden Rewards</Text>
+            <View style={styles.iconCircleLarge}><Feather name="award" size={32} color={COLORS.primaryDark}/></View>
+            <Text style={styles.authTitle}>Golden Bay Rewards</Text>
             
             {step === 'LOGIN' ? (
               <>
                 <Text style={styles.label}>Mobile Number</Text>
-                <TextInput style={styles.input} placeholder="0917 123 4567" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
+                <View style={styles.inputIconWrapper}>
+                  <Feather name="phone" size={18} color={COLORS.textMuted} style={styles.inputIcon} />
+                  <TextInput style={styles.inputWithIcon} placeholder="0917 123 4567" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
+                </View>
                 <TouchableOpacity style={styles.buttonPrimary} onPress={handleRequestOTP} disabled={isLoading}>
                   {isLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.buttonTextPrimary}>SEND CODE</Text>}
                 </TouchableOpacity>
@@ -11473,11 +11503,11 @@ const RewardsScreen = ({ navigation }) => {
             ) : (
               <>
                 <Text style={styles.label}>Enter 6-Digit Code</Text>
-                <TextInput style={[styles.input, { fontSize: 24, textAlign: 'center', letterSpacing: 5 }]} placeholder="000000" keyboardType="number-pad" maxLength={6} value={otp} onChangeText={setOtp} />
+                <TextInput style={[styles.input, { fontSize: 24, textAlign: 'center', letterSpacing: 8, fontWeight: 'bold' }]} placeholder="000000" keyboardType="number-pad" maxLength={6} value={otp} onChangeText={setOtp} />
                 <TouchableOpacity style={styles.buttonPrimary} onPress={handleVerifyOTP} disabled={isLoading}>
                   {isLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.buttonTextPrimary}>VERIFY</Text>}
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setStep('LOGIN')} style={{ marginTop: 15 }}><Text style={styles.linkText}>Wrong number? Go back</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => setStep('LOGIN')} style={{ marginTop: 20 }}><Text style={styles.linkText}>Wrong number? Go back</Text></TouchableOpacity>
               </>
             )}
           </View>
@@ -11486,47 +11516,110 @@ const RewardsScreen = ({ navigation }) => {
     );
   }
 
-  // REWARDS DASHBOARD
   return (
     <SafeAreaView style={styles.container}>
+      {receiptData && (
+          <View style={styles.receiptOverlay}>
+            <View style={styles.receiptCard}>
+                <View style={styles.receiptHeader}>
+                  <Feather name="check-circle" size={48} color="#10B981" style={{ marginBottom: 12 }} />
+                  <Text style={styles.receiptTitle}>Reward Claimed</Text>
+                  <Text style={styles.receiptId}>Ref: #{receiptData.ticketId}</Text>
+                </View>
+                <View style={styles.receiptBody}>
+                  <Text style={styles.receiptInstruction}>⚠️ Show this screen to your server</Text>
+                  <Text style={styles.receiptItem}>{receiptData.rewardName}</Text>
+                  <Text style={styles.receiptSize}>Portion: {receiptData.rewardSize}</Text>
+                  
+                  <View style={styles.receiptDetailsRow}>
+                    <Text style={styles.receiptDetailsLabel}>Guest Name</Text>
+                    <Text style={styles.receiptDetailsValue}>{receiptData.customerName}</Text>
+                  </View>
+                  <View style={styles.receiptDetailsRow}>
+                    <Text style={styles.receiptDetailsLabel}>Points Deducted</Text>
+                    <Text style={[styles.receiptDetailsValue, { color: COLORS.danger }]}>-{receiptData.points} PTS</Text>
+                  </View>
+                  <View style={styles.receiptDetailsRow}>
+                    <Text style={styles.receiptDetailsLabel}>Time</Text>
+                    <Text style={styles.receiptDetailsValue}>{receiptData.timestamp}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity 
+                  style={styles.receiptCloseBtn}
+                  onClick={() => setReceiptData(null)}
+                  onPress={() => setReceiptData(null)}
+                >
+                  <Text style={styles.receiptCloseBtnText}>CLOSE TICKET</Text>
+                </TouchableOpacity>
+            </View>
+          </View>
+      )}
+
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}><Feather name="chevron-left" size={24} color={COLORS.text}/></TouchableOpacity>
         <Text style={styles.headerTitle}>REWARDS</Text>
-        <TouchableOpacity onPress={handleLogout}><Feather name="log-out" size={20} color={COLORS.text}/></TouchableOpacity>
+        <TouchableOpacity onPress={handleLogout} style={styles.backBtn}><Feather name="log-out" size={20} color={COLORS.text}/></TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
-        {/* Profile Card */}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.profileCard}>
-          <Text style={styles.profileName}>{customer?.name}</Text>
-          {customer?.is_vip && <View style={styles.vipBadge}><Text style={styles.vipText}>VIP MEMBER</Text></View>}
-          <View style={styles.pointsRow}>
-            <Text style={styles.pointsLabel}>Available Balance</Text>
-            <Text style={styles.pointsValue}>{customer?.points_balance?.toLocaleString()} <Text style={{fontSize: 14, color: COLORS.textMuted}}>PTS</Text></Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+             <View style={{ flex: 1 }}>
+                <Text style={styles.profileName} numberOfLines={1}>{customer?.name}</Text>
+                {customer?.is_vip ? (
+                  <View style={styles.vipBadge}><Text style={styles.vipText}>VIP MEMBER</Text></View>
+                ) : (
+                  <Text style={{color: COLORS.textMuted, fontSize: 12}}>Active Member</Text>
+                )}
+             </View>
+             <View style={styles.pointsCircle}>
+                <Text style={styles.pointsValue}>{customer?.points_balance?.toLocaleString() || 0}</Text>
+                <Text style={styles.pointsLabel}>PTS</Text>
+             </View>
           </View>
         </View>
 
         <Text style={styles.sectionTitle}>Redeem Rewards</Text>
-        {rewards.map(reward => {
-          const canAfford = customer?.points_balance >= reward.points_required;
-          return (
-            <View key={reward.id} style={styles.rewardCard}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rewardName}>{reward.name}</Text>
-                <Text style={styles.rewardCost}>{reward.points_required} PTS</Text>
-              </View>
-              <TouchableOpacity 
-                style={[styles.redeemBtn, !canAfford && { backgroundColor: COLORS.border }]}
-                disabled={!canAfford}
-                onPress={() => handleRedeem(reward)}
-              >
-                <Text style={[styles.redeemBtnText, !canAfford && { color: COLORS.textMuted }]}>
-                  {canAfford ? 'REDEEM' : 'LOCKED'}
-                </Text>
-              </TouchableOpacity>
+        {Object.values(groupedRewards).map((group) => (
+            <View key={group.name} style={styles.menuCard}>
+            <View style={styles.menuImageContainer}>
+                {group.image ? (
+                <Image source={{ uri: group.image.startsWith('http') ? group.image : `${BACKEND_URL}${group.image}` }} style={styles.menuImageFull} />
+                ) : (
+                <View style={styles.menuImagePlaceholder}><Feather name="image" size={24} color="#D1D5DB" /></View>
+                )}
             </View>
-          );
-        })}
+
+            <View style={styles.menuContent}>
+                <Text style={styles.menuName}>{group.name}</Text>
+                {group.description && <Text style={styles.menuDesc} numberOfLines={2}>{group.description}</Text>}
+                
+                <View style={{ marginTop: 10 }}>
+                {group.options.map((option) => {
+                    const canAfford = (customer?.points_balance || 0) >= option.points_required;
+                    return (
+                    <View key={option.id} style={styles.rewardOptionRow}>
+                        <View>
+                          <Text style={styles.rewardOptionSize}>{option.size || 'Regular'}</Text>
+                          <Text style={styles.rewardOptionPoints}>{option.points_required.toLocaleString()} PTS</Text>
+                        </View>
+                        <TouchableOpacity 
+                          style={[styles.redeemBtn, !canAfford && styles.redeemBtnDisabled]}
+                          disabled={!canAfford}
+                          onPress={() => handleRedeem(option)}
+                        >
+                          <Text style={[styles.redeemBtnText, !canAfford && { color: COLORS.textMuted }]}>
+                            {canAfford ? 'REDEEM' : 'LOCKED'}
+                          </Text>
+                        </TouchableOpacity>
+                    </View>
+                    );
+                })}
+                </View>
+            </View>
+            </View>
+        ))}
+        
       </ScrollView>
     </SafeAreaView>
   );
@@ -11540,20 +11633,22 @@ const ContactScreen = ({ navigation }) => (
     <View style={styles.header}>
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}><Feather name="chevron-left" size={24} color={COLORS.text}/></TouchableOpacity>
       <Text style={styles.headerTitle}>CONTACT US</Text>
-      <View style={{ width: 24 }} />
+      <View style={{ width: 32 }} />
     </View>
-    <ScrollView contentContainerStyle={{ padding: 20 }}>
-      <View style={styles.card}>
+    <ScrollView contentContainerStyle={styles.scrollContent}>
+      <View style={styles.contactCard}>
         <View style={styles.contactRow}>
-          <Feather name="map-pin" size={20} color={COLORS.primary} />
+          <View style={styles.contactIconBg}><Feather name="map-pin" size={20} color={COLORS.primaryDark} /></View>
           <Text style={styles.contactText}>Lot 3&4 Block A2, Diosdado Macapagal Blvd, Pasay City</Text>
         </View>
+        <View style={styles.divider} />
         <View style={styles.contactRow}>
-          <Feather name="phone" size={20} color={COLORS.primary} />
+          <View style={styles.contactIconBg}><Feather name="phone" size={20} color={COLORS.primaryDark} /></View>
           <Text style={styles.contactText}>(02) 8804-0332{'\n'}+63 917 580 7166</Text>
         </View>
+        <View style={styles.divider} />
         <View style={styles.contactRow}>
-          <Feather name="clock" size={20} color={COLORS.primary} />
+          <View style={styles.contactIconBg}><Feather name="clock" size={20} color={COLORS.primaryDark} /></View>
           <Text style={styles.contactText}>Lunch: 11:00 AM – 2:30 PM{'\n'}Dinner: 5:00 PM – 9:30 PM</Text>
         </View>
       </View>
@@ -11581,105 +11676,138 @@ export default function App() {
 }
 
 // --------------------------------------------------------
-// STYLES (Light Theme)
+// STYLES (Premium Light Theme)
 // --------------------------------------------------------
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
   
   // Headers
-  homeHeader: { padding: 20, alignItems: 'center', backgroundColor: COLORS.surface, borderBottomWidth: 1, borderColor: COLORS.border },
-  homeTitle: { fontSize: 24, fontWeight: 'bold', color: COLORS.primary, letterSpacing: 3 },
-  homeSubtitle: { fontSize: 10, color: COLORS.textMuted, letterSpacing: 2, marginTop: 4 },
+  homeHeader: { padding: 20, paddingTop: 10, alignItems: 'center', backgroundColor: COLORS.surface, borderBottomWidth: 1, borderColor: COLORS.border },
+  homeTitle: { fontSize: 22, fontWeight: '800', color: COLORS.primaryDark, letterSpacing: 4 },
+  homeSubtitle: { fontSize: 10, color: COLORS.textMuted, letterSpacing: 2, marginTop: 4, fontWeight: '600' },
   
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 15, backgroundColor: COLORS.surface, borderBottomWidth: 1, borderColor: COLORS.border },
-  headerTitle: { color: COLORS.text, fontSize: 14, letterSpacing: 2, fontWeight: 'bold' },
-  backBtn: { padding: 4 },
+  headerTitle: { color: COLORS.text, fontSize: 14, letterSpacing: 2, fontWeight: '700' },
+  backBtn: { padding: 6 },
 
   // Home Elements
-  heroBanner: { width: '100%', height: 200, marginBottom: 20, overflow: 'hidden', borderRadius: 12 },
-  heroOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
-  heroText: { color: '#FFF', fontSize: 22, fontWeight: 'bold', letterSpacing: 1 },
+  heroWrapper: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 5, marginBottom: 25 },
+  heroBanner: { width: '100%', height: 180, borderRadius: 16, backgroundColor: '#0a0a0a', overflow: 'hidden' },
+  heroOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  heroLogoText: { color: '#FFFFFF', fontSize: 26, fontWeight: '800', letterSpacing: 6, marginBottom: 6 },
+  heroLogoSub: { color: COLORS.primary, fontSize: 10, fontWeight: 'bold', letterSpacing: 4, textTransform: 'uppercase' },
   
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 15 },
-  gridCard: { width: '47%', backgroundColor: COLORS.surface, padding: 20, borderRadius: 12, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  iconCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#Fef6e3', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  cardTitle: { fontSize: 14, fontWeight: 'bold', color: COLORS.text, marginBottom: 4 },
-  cardDesc: { fontSize: 10, color: COLORS.textMuted, textAlign: 'center' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 15, justifyContent: 'space-between' },
+  gridCard: { width: '47.5%', backgroundColor: COLORS.surface, padding: 20, borderRadius: 16, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#F3F4F6' },
+  iconCircle: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#Fef6e3', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  cardTitle: { fontSize: 14, fontWeight: '700', color: COLORS.text, marginBottom: 4, textAlign: 'center' },
+  cardDesc: { fontSize: 11, color: COLORS.textMuted, textAlign: 'center', lineHeight: 16 },
 
-  // Shared Form Elements
+  // Shared Structure
   scrollContent: { padding: 20, paddingBottom: 50 },
-  sectionTitle: { color: COLORS.text, fontSize: 12, fontWeight: 'bold', letterSpacing: 1, textTransform: 'uppercase', marginTop: 25, marginBottom: 10 },
-  card: { backgroundColor: COLORS.surface, borderRadius: 12, padding: 10, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  sectionTitle: { color: COLORS.text, fontSize: 13, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 25, marginBottom: 12 },
   row: { flexDirection: 'row', gap: 10 },
+  divider: { height: 1, backgroundColor: COLORS.border, marginVertical: 5 },
   
-  label: { color: COLORS.textMuted, fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, marginTop: 15, fontWeight: 'bold' },
-  input: { backgroundColor: COLORS.surface, color: COLORS.text, padding: 15, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, fontSize: 16 },
+  // Forms & Inputs
+  inputGroup: { marginBottom: 16 },
+  label: { color: COLORS.textMuted, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, fontWeight: '700' },
+  input: { backgroundColor: COLORS.surface, color: COLORS.text, padding: 16, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, fontSize: 16, fontWeight: '500' },
+  inputIconWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 10 },
+  inputIcon: { paddingLeft: 16 },
+  inputWithIcon: { flex: 1, padding: 16, fontSize: 16, color: COLORS.text, fontWeight: '500' },
   
-  buttonPrimary: { backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: 8, alignItems: 'center', marginTop: 30, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 },
-  buttonTextPrimary: { color: '#FFF', fontWeight: 'bold', fontSize: 12, letterSpacing: 2 },
+  buttonPrimary: { backgroundColor: COLORS.primaryDark, paddingVertical: 16, borderRadius: 10, alignItems: 'center', marginTop: 20, shadowColor: COLORS.primaryDark, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 3 },
+  buttonTextPrimary: { color: '#FFF', fontWeight: '800', fontSize: 13, letterSpacing: 2 },
 
   // Toggles
-  toggleBtn: { flex: 1, padding: 15, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, alignItems: 'center' },
-  toggleBtnActive: { backgroundColor: '#Fef6e3', borderColor: COLORS.primary },
-  toggleText: { color: COLORS.textMuted, fontSize: 12, fontWeight: 'bold', letterSpacing: 1 },
+  toggleBtn: { flex: 1, padding: 16, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 10, alignItems: 'center' },
+  toggleBtnActive: { backgroundColor: '#Fef6e3', borderColor: COLORS.primaryDark },
+  toggleText: { color: COLORS.textMuted, fontSize: 12, fontWeight: '700', letterSpacing: 1 },
   toggleTextActive: { color: COLORS.primaryDark },
 
-  // Rooms
-  roomCard: { backgroundColor: COLORS.surface, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: COLORS.border, overflow: 'hidden' },
-  roomCardSelected: { borderColor: COLORS.primary, borderWidth: 2 },
-  roomImage: { width: '100%', height: 140 },
-  roomCardContent: { padding: 15 },
-  roomName: { color: COLORS.text, fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
+  // Rooms View
+  calendarCard: { backgroundColor: COLORS.surface, borderRadius: 16, padding: 10, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: COLORS.border },
+  roomCard: { backgroundColor: COLORS.surface, borderRadius: 16, marginBottom: 15, borderWidth: 1, borderColor: COLORS.border, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 5, elevation: 1 },
+  roomCardSelected: { borderColor: COLORS.primaryDark, borderWidth: 2, backgroundColor: '#Fefce8' },
+  roomCardContent: { padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  roomName: { color: COLORS.text, fontSize: 16, fontWeight: '800', marginBottom: 6 },
   roomCapacity: { color: COLORS.textMuted, fontSize: 12, fontWeight: '600' },
-  roomPrice: { color: COLORS.primaryDark, fontSize: 12, fontWeight: 'bold', marginTop: 4 },
-  bookedText: { color: COLORS.danger, fontSize: 12, fontWeight: 'bold', position: 'absolute', right: 15, bottom: 15 },
+  roomPrice: { color: COLORS.primaryDark, fontSize: 13, fontWeight: '800', marginTop: 6 },
+  badgeDanger: { backgroundColor: '#FEE2E2', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#FCA5A5' },
+  badgeTextDanger: { color: COLORS.danger, fontSize: 10, fontWeight: 'bold', letterSpacing: 1 },
 
   // Time Chips
   timeGrid: { flexDirection: 'row' },
-  timeChip: { paddingVertical: 10, paddingHorizontal: 15, backgroundColor: COLORS.surface, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, marginRight: 8 },
-  timeChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  timeText: { color: COLORS.text, fontSize: 14 },
-  timeTextActive: { color: '#FFF', fontWeight: 'bold' },
+  timeChip: { paddingVertical: 12, paddingHorizontal: 16, backgroundColor: COLORS.surface, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, marginRight: 10 },
+  timeChipActive: { backgroundColor: COLORS.primaryDark, borderColor: COLORS.primaryDark },
+  timeText: { color: COLORS.text, fontSize: 14, fontWeight: '600' },
+  timeTextActive: { color: '#FFF' },
+
+  // Menu List (Shared by Menu and Rewards)
+  tabWrapper: { height: 60, borderBottomWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  tabContainer: { paddingHorizontal: 16, alignItems: 'center' },
+  tab: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, backgroundColor: COLORS.background, borderWidth: 1, borderColor: COLORS.border, marginRight: 10 },
+  tabActive: { backgroundColor: COLORS.primaryDark, borderColor: COLORS.primaryDark },
+  tabText: { fontSize: 13, color: COLORS.textMuted, fontWeight: '700' },
+  tabTextActive: { color: '#FFF' },
+
+  listContent: { padding: 16, paddingBottom: 40 },
+  menuCard: { flexDirection: 'row', backgroundColor: COLORS.surface, borderRadius: 16, marginBottom: 16, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 5, elevation: 1 },
+  menuImage: { width: 110, height: '100%' },
+  menuImageContainer: { width: 110, backgroundColor: COLORS.border },
+  menuImageFull: { width: '100%', height: '100%' },
+  menuImagePlaceholder: { width: '100%', height: '100%', backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
+  menuContent: { flex: 1, padding: 15, justifyContent: 'center' },
+  menuName: { fontSize: 15, fontWeight: '800', color: COLORS.text, marginBottom: 4, lineHeight: 20 },
+  menuDesc: { fontSize: 12, color: COLORS.textMuted, marginBottom: 10, lineHeight: 16 },
+  priceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  menuPrice: { fontSize: 13, fontWeight: '800', color: COLORS.primaryDark },
 
   // Auth / Rewards
   formContainer: { flex: 1, padding: 20, justifyContent: 'center' },
-  authCard: { backgroundColor: COLORS.surface, padding: 30, borderRadius: 16, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
-  authTitle: { fontSize: 20, fontWeight: 'bold', color: COLORS.text, textAlign: 'center', marginBottom: 20 },
-  linkText: { color: COLORS.primaryDark, textAlign: 'center', fontSize: 12, fontWeight: 'bold' },
+  authCard: { backgroundColor: COLORS.surface, padding: 30, borderRadius: 20, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 15, elevation: 3, borderWidth: 1, borderColor: COLORS.border },
+  iconCircleLarge: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#Fefce8', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 15 },
+  authTitle: { fontSize: 22, fontWeight: '800', color: COLORS.text, textAlign: 'center', marginBottom: 25 },
+  linkText: { color: COLORS.primaryDark, textAlign: 'center', fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
 
-  profileCard: { backgroundColor: COLORS.surface, padding: 24, borderRadius: 16, marginBottom: 30, borderWidth: 1, borderColor: '#Fef6e3', shadowColor: COLORS.primary, shadowOpacity: 0.1, shadowRadius: 10, elevation: 3 },
-  profileName: { fontSize: 24, fontWeight: 'bold', color: COLORS.text, marginBottom: 5 },
-  vipBadge: { backgroundColor: '#Fef6e3', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginBottom: 15 },
-  vipText: { color: COLORS.primaryDark, fontSize: 10, fontWeight: 'bold', letterSpacing: 1 },
-  pointsRow: { borderTopWidth: 1, borderColor: COLORS.border, paddingTop: 15, marginTop: 5 },
-  pointsLabel: { fontSize: 10, color: COLORS.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
-  pointsValue: { fontSize: 32, fontWeight: 'bold', color: COLORS.primaryDark },
+  profileCard: { backgroundColor: COLORS.surface, padding: 24, borderRadius: 16, marginBottom: 30, borderWidth: 1, borderColor: COLORS.border, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
+  profileName: { fontSize: 22, fontWeight: '800', color: COLORS.text, marginBottom: 8 },
+  vipBadge: { backgroundColor: '#Fefce8', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: '#FEF08A' },
+  vipText: { color: COLORS.primaryDark, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  pointsCircle: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#Fefce8', width: 80, height: 80, borderRadius: 40, borderWidth: 2, borderColor: COLORS.primaryDark },
+  pointsValue: { fontSize: 22, fontWeight: '800', color: COLORS.primaryDark },
+  pointsLabel: { fontSize: 10, color: COLORS.primaryDark, fontWeight: '700' },
 
-  rewardCard: { flexDirection: 'row', backgroundColor: COLORS.surface, padding: 16, borderRadius: 12, marginBottom: 12, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
-  rewardName: { fontSize: 14, fontWeight: 'bold', color: COLORS.text, marginBottom: 4 },
-  rewardCost: { fontSize: 12, color: COLORS.primaryDark, fontWeight: 'bold' },
-  redeemBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6 },
-  redeemBtnText: { color: '#FFF', fontSize: 10, fontWeight: 'bold', letterSpacing: 1 },
+  rewardOptionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderColor: COLORS.border },
+  rewardOptionSize: { fontSize: 12, fontWeight: '700', color: COLORS.text, textTransform: 'uppercase' },
+  rewardOptionPoints: { fontSize: 12, color: COLORS.primaryDark, fontWeight: '800', marginTop: 2 },
+  redeemBtn: { backgroundColor: COLORS.primaryDark, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
+  redeemBtnDisabled: { backgroundColor: COLORS.background, borderWidth: 1, borderColor: COLORS.border },
+  redeemBtnText: { color: '#FFF', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
 
-  // Menu
-  tabContainer: { paddingHorizontal: 16, alignItems: 'center' },
-  tab: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, marginRight: 10 },
-  tabActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  tabText: { fontSize: 12, color: COLORS.textMuted, fontWeight: '600' },
-  tabTextActive: { color: '#FFF' },
-
-  menuCard: { flexDirection: 'row', backgroundColor: COLORS.surface, borderRadius: 12, marginBottom: 16, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border },
-  menuImage: { width: 100, height: '100%', backgroundColor: COLORS.border },
-  menuContent: { flex: 1, padding: 12 },
-  menuName: { fontSize: 14, fontWeight: 'bold', color: COLORS.text, marginBottom: 4 },
-  menuDesc: { fontSize: 11, color: COLORS.textMuted, marginBottom: 8 },
-  priceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  menuPrice: { fontSize: 12, fontWeight: 'bold', color: COLORS.text },
+  // Digital Receipt Modal
+  receiptOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 100, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  receiptCard: { width: '100%', maxWidth: 340, backgroundColor: COLORS.surface, borderRadius: 16, overflow: 'hidden' },
+  receiptHeader: { backgroundColor: '#111827', padding: 30, alignItems: 'center' },
+  receiptTitle: { color: COLORS.primary, fontSize: 20, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2 },
+  receiptId: { color: '#9CA3AF', fontSize: 12, fontFamily: 'monospace', marginTop: 5 },
+  receiptBody: { padding: 30, backgroundColor: '#F9FAFB' },
+  receiptInstruction: { fontSize: 12, color: COLORS.primaryDark, fontWeight: 'bold', textAlign: 'center', marginBottom: 20, backgroundColor: '#Fefce8', padding: 10, borderRadius: 6, overflow: 'hidden' },
+  receiptItem: { fontSize: 24, fontWeight: '800', color: COLORS.text, textAlign: 'center', marginBottom: 5 },
+  receiptSize: { fontSize: 12, color: COLORS.textMuted, textAlign: 'center', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: 25 },
+  receiptDetailsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  receiptDetailsLabel: { fontSize: 12, color: COLORS.textMuted },
+  receiptDetailsValue: { fontSize: 12, color: COLORS.text, fontWeight: 'bold' },
+  receiptCloseBtn: { padding: 20, borderTopWidth: 1, borderColor: COLORS.border, alignItems: 'center' },
+  receiptCloseBtnText: { color: COLORS.textMuted, fontWeight: 'bold', letterSpacing: 1 },
 
   // Contact
-  contactRow: { flexDirection: 'row', alignItems: 'center', gap: 15, paddingVertical: 15, borderBottomWidth: 1, borderColor: COLORS.border },
-  contactText: { fontSize: 14, color: COLORS.text, lineHeight: 22 }
+  contactCard: { backgroundColor: COLORS.surface, borderRadius: 16, padding: 10, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: COLORS.border },
+  contactRow: { flexDirection: 'row', alignItems: 'center', gap: 15, paddingVertical: 16, paddingHorizontal: 10 },
+  contactIconBg: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#Fefce8', alignItems: 'center', justifyContent: 'center' },
+  contactText: { flex: 1, fontSize: 15, color: COLORS.text, lineHeight: 24, fontWeight: '500' }
 });
 
 import { registerRootComponent } from 'expo';
