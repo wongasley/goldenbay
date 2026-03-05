@@ -72,7 +72,7 @@ FILES_TO_READ = [
     # 'frontend/package.json',
     # 'frontend/postcss.config.js',
     'frontend/tailwind.config.js',
-    # 'frontend/vite.config.js',
+    'frontend/vite.config.js',
 
     'frontend/src/components/layout/Navbar.jsx',
     'frontend/src/pages/admin/dashboard/AdminDashboardPage.jsx',

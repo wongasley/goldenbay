@@ -10,6 +10,7 @@ import FloatingWidget from './components/layout/FloatingWidget';
 import { LanguageProvider } from './context/LanguageContext';
 import PixelTracker from './components/layout/PixelTracker';
 import LeadCaptureWidget from './components/marketing/LeadCaptureWidget';
+import ErrorBoundary from './components/layout/ErrorBoundary';
 
 // --- LAZY LOAD PUBLIC PAGES ---
 const HomePage = lazy(() => import('./pages/public/home/HomePage'));
@@ -70,39 +71,41 @@ function App() {
         />
 
         {/* Wrap all routes in Suspense for Lazy Loading */}
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            {/* --- PUBLIC ROUTES --- */}
-            <Route path="/" element={<><Navbar /><HomePage /></>} />
-            <Route path="/menu" element={<><Navbar /><MenuPage /><Footer /></>} />
-            <Route path="/reservations" element={<><Navbar /><ReservationPage /><Footer /></>} />
-            <Route path="/events" element={<><Navbar /><EventInquiriesPage /><Footer /></>} />
-            <Route path="/about" element={<><Navbar /><AboutPage /><Footer /></>} />
-            <Route path="/news" element={<><Navbar /><NewsPage /><Footer /></>} />
-            <Route path="/news/:slug" element={<><Navbar /><SinglePostPage /><Footer /></>} />
-            <Route path="/promotions" element={<><Navbar /><NewsPage /><Footer /></>} />
-            <Route path="/vip-rooms" element={<><Navbar /><VIPRoomsPage /><Footer /></>} />
-            <Route path="/contact" element={<><Navbar /><ContactPage /><Footer /></>} />
-            <Route path="*" element={<><Navbar /><NotFoundPage /><Footer /></>} />
-            <Route path="/rewards" element={<CustomerRewardsPage />} />
-            
-            <Route path="/login" element={<LoginPage />} />
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* --- PUBLIC ROUTES --- */}
+              <Route path="/" element={<><Navbar /><HomePage /></>} />
+              <Route path="/menu" element={<><Navbar /><MenuPage /><Footer /></>} />
+              <Route path="/reservations" element={<><Navbar /><ReservationPage /><Footer /></>} />
+              <Route path="/events" element={<><Navbar /><EventInquiriesPage /><Footer /></>} />
+              <Route path="/about" element={<><Navbar /><AboutPage /><Footer /></>} />
+              <Route path="/news" element={<><Navbar /><NewsPage /><Footer /></>} />
+              <Route path="/news/:slug" element={<><Navbar /><SinglePostPage /><Footer /></>} />
+              <Route path="/promotions" element={<><Navbar /><NewsPage /><Footer /></>} />
+              <Route path="/vip-rooms" element={<><Navbar /><VIPRoomsPage /><Footer /></>} />
+              <Route path="/contact" element={<><Navbar /><ContactPage /><Footer /></>} />
+              <Route path="*" element={<><Navbar /><NotFoundPage /><Footer /></>} />
+              <Route path="/rewards" element={<CustomerRewardsPage />} />
+              
+              <Route path="/login" element={<LoginPage />} />
 
-            {/* --- ADMIN ROUTES --- */}
-            <Route path="/staff" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
-              <Route index element={<AdminDashboardPage />} />
-              <Route path="bookings" element={<BookingManager />} />
-              <Route path="customers" element={<PhoneBookPage />} />
-              <Route path="marketing" element={<MarketingManager />} />
-              <Route path="marketing/create" element={<PostEditor />} />
-              <Route path="marketing/edit/:id" element={<PostEditor />} />
-              <Route path="marketing/blast" element={<CampaignBuilder />} />
-              <Route path="menu" element={<MenuManager />} />
-              <Route path="rewards" element={<RewardsManager />} />
-            </Route>
-            
-          </Routes>
-        </Suspense>
+              {/* --- ADMIN ROUTES --- */}
+              <Route path="/staff" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
+                <Route index element={<AdminDashboardPage />} />
+                <Route path="bookings" element={<BookingManager />} />
+                <Route path="customers" element={<PhoneBookPage />} />
+                <Route path="marketing" element={<MarketingManager />} />
+                <Route path="marketing/create" element={<PostEditor />} />
+                <Route path="marketing/edit/:id" element={<PostEditor />} />
+                <Route path="marketing/blast" element={<CampaignBuilder />} />
+                <Route path="menu" element={<MenuManager />} />
+                <Route path="rewards" element={<RewardsManager />} />
+              </Route>
+              
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
 
         {/* Widget Component (Old manual widget was removed from here) */}
         <FloatingWidget />
