@@ -65,8 +65,12 @@ const Footer = () => {
         <div className="h-px w-full bg-white/5 mb-8"></div>
 
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className={`text-[10px] text-gray-600 uppercase tracking-widest flex items-center gap-4 ${getFontClass()}`}>
+          <div className={`text-[10px] text-gray-600 uppercase tracking-widest flex flex-wrap items-center gap-4 ${getFontClass()}`}>
             <span>© {new Date().getFullYear()} {t('footer.rights')}</span>
+            
+            {/* PRIVACY POLICY LINK ADDED HERE */}
+            <Link to="/privacy" className="hover:text-gray-400 transition-colors duration-300">Privacy Policy</Link>
+            
             <Link to="/login" className="opacity-0 hover:opacity-50 transition-opacity duration-300">Staff Access</Link>
           </div>
 
