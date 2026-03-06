@@ -24,6 +24,7 @@ const EventInquiriesPage = lazy(() => import('./pages/public/events/EventInquiri
 const VIPRoomsPage = lazy(() => import('./pages/public/vip/VIPRoomsPage'));
 const NotFoundPage = lazy(() => import('./pages/public/NotFoundPage'));
 const CustomerRewardsPage = lazy(() => import('./pages/public/marketing/CustomerRewardsPage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/public/about/PrivacyPolicyPage'));
 
 // --- LAZY LOAD ADMIN PAGES ---
 const LoginPage = lazy(() => import('./pages/admin/auth/LoginPage')); 
@@ -87,6 +88,7 @@ function App() {
               <Route path="/contact" element={<><Navbar /><ContactPage /><Footer /></>} />
               <Route path="*" element={<><Navbar /><NotFoundPage /><Footer /></>} />
               <Route path="/rewards" element={<CustomerRewardsPage />} />
+              <Route path="/privacy" element={<><Navbar /><PrivacyPolicyPage /><Footer /></>} />
               
               <Route path="/login" element={<LoginPage />} />
 

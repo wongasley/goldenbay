@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, createContext, useContext, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, createContext, useContext, useCallback } from 'react';
 import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { 
@@ -97,10 +97,12 @@ export const SettingsProvider = ({ children }) => {
 
   useEffect(() => {
       const loadSettings = async () => {
-          const storedTheme = await AsyncStorage.getItem('gb_theme');
-          const storedLang = await AsyncStorage.getItem('gb_lang');
-          if (storedTheme) setTheme(storedTheme);
-          if (storedLang) setLang(storedLang);
+          try {
+              const storedTheme = await AsyncStorage.getItem('gb_theme');
+              const storedLang = await AsyncStorage.getItem('gb_lang');
+              if (storedTheme) setTheme(storedTheme);
+              if (storedLang) setLang(storedLang);
+          } catch (e) {}
       };
       loadSettings();
   }, []);
@@ -276,23 +278,26 @@ const MenuScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState(null);
 
-  // Focus effect ensures we fetch the data fresh every time we visit
   useFocusEffect(
     useCallback(() => {
+      let isActive = true;
       const fetchMenu = async () => {
         try {
-          // Use plain axios to bypass token checks on public endpoints
           const res = await axios.get(`${BACKEND_URL}/api/menu/`);
-          setCategories(res.data);
-          if (res.data.length > 0 && !activeCategory) setActiveCategory(res.data[0].name);
+          if (isActive) {
+             const data = Array.isArray(res.data) ? res.data : [];
+             setCategories(data);
+             if (data.length > 0 && !activeCategory) setActiveCategory(data[0].name);
+          }
         } catch (err) {
           console.error(err);
         } finally {
-          setLoading(false);
+          if (isActive) setLoading(false);
         }
       };
       fetchMenu();
-    }, [])
+      return () => { isActive = false; };
+    }, [activeCategory])
   );
 
   const activeItems = categories.find(c => c.name === activeCategory)?.items || [];
@@ -331,7 +336,11 @@ const MenuScreen = ({ navigation }) => {
             renderItem={({ item }) => (
               <View style={[styles.menuCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
                 {item.image ? (
-                  <Image source={{ uri: item.image.startsWith('http') ? item.image : `${BACKEND_URL}${item.image}` }} style={styles.menuImage} />
+                  <Image 
+                    source={{ uri: item.image.startsWith('http') ? item.image : `${BACKEND_URL}${item.image}` }} 
+                    style={styles.menuImage} 
+                    contentFit="cover"
+                  />
                 ) : (
                   <View style={[styles.menuImage, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
                     <Feather name="image" size={24} color={colors.textMuted} />
@@ -386,9 +395,9 @@ const BookingScreen = ({ navigation }) => {
     setStep(2);
     setSelectedRoom(null); 
     try {
-      // Use plain axios for public availability check to prevent token blocks
       const response = await axios.get(`${BACKEND_URL}/api/reservations/check/?date=${date}&session=${session}`);
-      const sortedRooms = response.data.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+      const data = Array.isArray(response.data) ? response.data : [];
+      const sortedRooms = data.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
       setRooms(sortedRooms);
     } catch (error) {
       Alert.alert("Connection Error", "Could not fetch availability from the live database.");
@@ -426,7 +435,6 @@ const BookingScreen = ({ navigation }) => {
     };
 
     try {
-        // We can use plain axios here as well since Booking Create allows any user
         await axios.post(`${BACKEND_URL}/api/reservations/create/`, payload);
         Alert.alert("Success!", "Reservation requested! We will confirm via SMS shortly.", [
           { text: "OK", onPress: () => navigation.navigate('Home') }
@@ -609,33 +617,51 @@ const RewardsScreen = ({ navigation }) => {
     }, {});
   }, [rewards]);
 
-  // Use plain axios to bypass interceptor blocks for the public catalog
-  const fetchRewards = async () => {
-    try {
-      const res = await axios.get(`${BACKEND_URL}/api/reservations/rewards/`);
-      setRewards(res.data);
-    } catch (err) { console.log("Failed to fetch rewards", err); }
-  };
-
-  const checkSession = async () => {
-    const token = await AsyncStorage.getItem('gb_customer_token');
-    const data = await AsyncStorage.getItem('gb_customer_data');
-    
-    // Always fetch rewards so catalog isn't empty!
-    await fetchRewards();
-
-    if (token && data) {
-      setCustomer(JSON.parse(data));
-      setStep('DASHBOARD');
-    } else {
-      setStep('LOGIN');
-    }
-  };
-
-  // Refresh every time screen focuses
   useFocusEffect(
     useCallback(() => {
-      checkSession();
+      let isActive = true;
+
+      async function initializeScreen() {
+        try {
+          const token = await AsyncStorage.getItem('gb_customer_token');
+          const dataString = await AsyncStorage.getItem('gb_customer_data');
+          
+          let parsedData = null;
+          if (dataString) {
+             try {
+               parsedData = JSON.parse(dataString);
+             } catch (e) {
+               await AsyncStorage.removeItem('gb_customer_token');
+               await AsyncStorage.removeItem('gb_customer_data');
+             }
+          }
+
+          // Always fetch rewards so catalog is never empty
+          let fetchedRewards = [];
+          try {
+            const res = await axios.get(`${BACKEND_URL}/api/reservations/rewards/`);
+            if (Array.isArray(res.data)) {
+               fetchedRewards = res.data;
+            }
+          } catch (err) {}
+
+          if (isActive) {
+             setRewards(fetchedRewards);
+             if (token && parsedData) {
+               setCustomer(parsedData);
+               setStep('DASHBOARD');
+             } else {
+               setStep('LOGIN');
+             }
+          }
+        } catch (error) {
+          if (isActive) setStep('LOGIN');
+        }
+      }
+
+      initializeScreen();
+
+      return () => { isActive = false; };
     }, [])
   );
 
@@ -674,12 +700,13 @@ const RewardsScreen = ({ navigation }) => {
               setCustomer(prev => ({ ...prev, points_balance: res.data.new_balance }));
               await AsyncStorage.setItem('gb_customer_data', JSON.stringify({ ...customer, points_balance: res.data.new_balance }));
               
+              // Safely format date using date-fns to prevent Android JSC crash
               setReceiptData({
                 rewardName: reward.name,
                 rewardSize: reward.size || 'Regular',
                 points: reward.points_required,
-                customerName: customer.name,
-                timestamp: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
+                customerName: customer.name || 'Guest',
+                timestamp: format(new Date(), 'MMM dd, yyyy h:mm a'),
                 ticketId: Math.random().toString(36).substr(2, 8).toUpperCase()
               });
             } catch (err) {
@@ -749,20 +776,20 @@ const RewardsScreen = ({ navigation }) => {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       {receiptData && (
           <View style={styles.receiptOverlay}>
-            <View style={styles.receiptCard}>
+            <View style={[styles.receiptCard, { backgroundColor: colors.surface }]}>
                 <View style={styles.receiptHeader}>
                   <Feather name="check-circle" size={48} color="#10B981" style={{ marginBottom: 12 }} />
                   <Text style={styles.receiptTitle}>Reward Claimed</Text>
                   <Text style={styles.receiptId}>Ref: #{receiptData.ticketId}</Text>
                 </View>
-                <View style={styles.receiptBody}>
+                <View style={[styles.receiptBody, { backgroundColor: colors.background }]}>
                   <Text style={styles.receiptInstruction}>⚠️ Show this screen to your server</Text>
-                  <Text style={styles.receiptItem}>{receiptData.rewardName}</Text>
+                  <Text style={[styles.receiptItem, { color: colors.text }]}>{receiptData.rewardName}</Text>
                   <Text style={styles.receiptSize}>Portion: {receiptData.rewardSize}</Text>
                   
                   <View style={styles.receiptDetailsRow}>
                     <Text style={styles.receiptDetailsLabel}>Guest Name</Text>
-                    <Text style={styles.receiptDetailsValue}>{receiptData.customerName}</Text>
+                    <Text style={[styles.receiptDetailsValue, { color: colors.text }]} numberOfLines={1}>{receiptData.customerName}</Text>
                   </View>
                   <View style={styles.receiptDetailsRow}>
                     <Text style={styles.receiptDetailsLabel}>Points Deducted</Text>
@@ -770,10 +797,10 @@ const RewardsScreen = ({ navigation }) => {
                   </View>
                   <View style={styles.receiptDetailsRow}>
                     <Text style={styles.receiptDetailsLabel}>Time</Text>
-                    <Text style={styles.receiptDetailsValue}>{receiptData.timestamp}</Text>
+                    <Text style={[styles.receiptDetailsValue, { color: colors.text }]}>{receiptData.timestamp}</Text>
                   </View>
                 </View>
-                <TouchableOpacity style={styles.receiptCloseBtn} onPress={() => setReceiptData(null)}>
+                <TouchableOpacity style={[styles.receiptCloseBtn, { borderColor: colors.border }]} onPress={() => setReceiptData(null)}>
                   <Text style={styles.receiptCloseBtnText}>CLOSE TICKET</Text>
                 </TouchableOpacity>
             </View>
@@ -790,7 +817,7 @@ const RewardsScreen = ({ navigation }) => {
         <View style={[styles.profileCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
              <View style={{ flex: 1 }}>
-                <Text style={[styles.profileName, { color: colors.text }]} numberOfLines={1}>{customer?.name}</Text>
+                <Text style={[styles.profileName, { color: colors.text }]} numberOfLines={1}>{customer?.name || 'Guest'}</Text>
                 {customer?.is_vip ? (
                   <View style={styles.vipBadge}><Text style={styles.vipText}>{t('rewards.vip')}</Text></View>
                 ) : (
@@ -805,48 +832,50 @@ const RewardsScreen = ({ navigation }) => {
         </View>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('rewards.redeem')}</Text>
+        
+        {/* REWARDS VERTICAL CARDS */}
         {Object.values(groupedRewards).map((group) => (
-            <View key={group.name} style={[styles.menuCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-            <View style={styles.menuImageContainer}>
+            <View key={group.name} style={[styles.rewardCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
                 {group.image ? (
-                <Image source={{ uri: group.image.startsWith('http') ? group.image : `${BACKEND_URL}${group.image}` }} style={styles.menuImageFull} />
+                   <Image source={{ uri: group.image.startsWith('http') ? group.image : `${BACKEND_URL}${group.image}` }} style={styles.rewardImage} contentFit="cover" />
                 ) : (
-                <View style={[styles.menuImagePlaceholder, { backgroundColor: colors.background }]}><Feather name="image" size={24} color={colors.textMuted} /></View>
+                   <View style={[styles.rewardImage, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+                       <Feather name="image" size={32} color={colors.textMuted} />
+                   </View>
                 )}
-            </View>
 
-            <View style={styles.menuContent}>
-                <Text style={[styles.menuName, { color: colors.text }]}>{getLocData(group, 'name')}</Text>
-                {group.description && <Text style={[styles.menuDesc, { color: colors.textMuted }]} numberOfLines={2}>{group.description}</Text>}
-                
-                <View style={{ marginTop: 10 }}>
-                {group.options.map((option) => {
-                    const canAfford = (customer?.points_balance || 0) >= option.points_required;
-                    return (
-                    <View key={option.id} style={[styles.rewardOptionRow, { borderColor: colors.border }]}>
-                        <View>
-                          <Text style={[styles.rewardOptionSize, { color: colors.text }]}>{option.size || 'Regular'}</Text>
-                          <Text style={[styles.rewardOptionPoints, { color: colors.primaryDark }]}>{option.points_required.toLocaleString()} {t('rewards.pts')}</Text>
-                        </View>
-                        <TouchableOpacity 
-                          style={[styles.redeemBtn, { backgroundColor: colors.primaryDark }, !canAfford && { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }]}
-                          disabled={!canAfford}
-                          onPress={() => handleRedeem(option)}
-                        >
-                          <Text style={[styles.redeemBtnText, !canAfford && { color: colors.textMuted }]}>
-                            {canAfford ? t('rewards.action') : t('rewards.locked')}
-                          </Text>
-                        </TouchableOpacity>
+                <View style={styles.rewardContent}>
+                    <Text style={[styles.rewardTitleText, { color: colors.text }]} numberOfLines={2}>{getLocData(group, 'name')}</Text>
+                    {group.description ? <Text style={[styles.rewardDescText, { color: colors.textMuted }]} numberOfLines={2}>{getLocData(group, 'description')}</Text> : null}
+                    
+                    <View style={{ marginTop: 15 }}>
+                        {group.options.map((option) => {
+                            const canAfford = (customer?.points_balance || 0) >= option.points_required;
+                            return (
+                            <View key={option.id} style={[styles.rewardOptionRow, { borderColor: colors.border }]}>
+                                <View>
+                                    <Text style={[styles.rewardOptionSize, { color: colors.text }]}>{option.size || 'Regular'}</Text>
+                                    <Text style={[styles.rewardOptionPoints, { color: colors.primaryDark }]}>{option.points_required.toLocaleString()} {t('rewards.pts')}</Text>
+                                </View>
+                                <TouchableOpacity 
+                                    style={[styles.redeemBtn, { backgroundColor: colors.primaryDark }, !canAfford && { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }]}
+                                    disabled={!canAfford}
+                                    onPress={() => handleRedeem(option)}
+                                >
+                                    <Text style={[styles.redeemBtnText, !canAfford && { color: colors.textMuted }]}>
+                                        {canAfford ? t('rewards.action') : t('rewards.locked')}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                            );
+                        })}
                     </View>
-                    );
-                })}
                 </View>
-            </View>
             </View>
         ))}
         
         <View style={[styles.policyBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <h4 style={[styles.policyTitle, { color: colors.text }]}><Feather name="clock" size={16} color={colors.primary} /> {t('rewards.policy')}</h4>
+            <Text style={[styles.policyTitle, { color: colors.text }]}><Feather name="clock" size={12} color={colors.primary} /> {t('rewards.policy')}</Text>
             <Text style={[styles.policyText, { color: colors.textMuted }]}>{t('rewards.policyDesc')}</Text>
         </View>
       </ScrollView>
@@ -974,25 +1003,36 @@ const styles = StyleSheet.create({
   timeChip: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, marginRight: 10 },
   timeText: { fontSize: 14, fontWeight: '600' },
 
-  // Menu List
+  // Menu List (Horizontal Card)
   tabWrapper: { height: 60, borderBottomWidth: 1 },
   tabContainer: { paddingHorizontal: 16, alignItems: 'center' },
   tab: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, borderWidth: 1, marginRight: 10 },
   tabText: { fontSize: 13, fontWeight: '700' },
 
   listContent: { padding: 16, paddingBottom: 40 },
-  menuCard: { flexDirection: 'row', borderRadius: 16, marginBottom: 16, overflow: 'hidden', borderWidth: 1, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 5, elevation: 1 },
-  menuImage: { width: 110, height: '100%' },
-  menuImageContainer: { width: 110, backgroundColor: COLORS.border },
-  menuImageFull: { width: '100%', height: '100%' },
-  menuImagePlaceholder: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
-  menuContent: { flex: 1, padding: 15, justifyContent: 'center' },
+  menuCard: { flexDirection: 'row', borderRadius: 16, marginBottom: 16, borderWidth: 1, alignItems: 'center', paddingRight: 15 },
+  menuImage: { width: 90, height: 90, borderRadius: 12, margin: 10 },
+  menuContent: { flex: 1, paddingVertical: 15 },
   menuName: { fontSize: 15, fontWeight: '800', marginBottom: 4, lineHeight: 20 },
   menuDesc: { fontSize: 12, marginBottom: 10, lineHeight: 16 },
   priceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   menuPrice: { fontSize: 13, fontWeight: '800' },
 
-  // Auth / Rewards
+  // Rewards List (Vertical Card)
+  rewardCard: { borderRadius: 16, marginBottom: 20, borderWidth: 1, overflow: 'hidden' },
+  rewardImage: { width: '100%', height: 180 },
+  rewardContent: { padding: 20 },
+  rewardTitleText: { fontSize: 18, fontWeight: '800', marginBottom: 6, lineHeight: 24 },
+  rewardDescText: { fontSize: 12, lineHeight: 18 },
+
+  rewardOptionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1 },
+  rewardOptionSize: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
+  rewardOptionPoints: { fontSize: 12, fontWeight: '800', marginTop: 2 },
+  redeemBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
+  redeemBtnDisabled: { borderWidth: 1 },
+  redeemBtnText: { color: '#FFF', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+
+  // Auth / Rewards Header
   formContainer: { flex: 1, padding: 20, justifyContent: 'center' },
   authCard: { padding: 30, borderRadius: 20, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 15, elevation: 3, borderWidth: 1 },
   iconCircleLarge: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 15 },
@@ -1007,30 +1047,24 @@ const styles = StyleSheet.create({
   pointsValue: { fontSize: 22, fontWeight: '800', color: COLORS.primaryDark },
   pointsLabel: { fontSize: 10, color: COLORS.primaryDark, fontWeight: '700' },
 
-  rewardOptionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1 },
-  rewardOptionSize: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
-  rewardOptionPoints: { fontSize: 12, fontWeight: '800', marginTop: 2 },
-  redeemBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
-  redeemBtnText: { color: '#FFF', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-
   policyBox: { marginTop: 16, padding: 20, borderRadius: 16, borderWidth: 1 },
   policyTitle: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', marginBottom: 6 },
   policyText: { fontSize: 12, lineHeight: 18 },
 
   // Digital Receipt Modal
   receiptOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 100, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  receiptCard: { width: '100%', maxWidth: 340, backgroundColor: COLORS.surface, borderRadius: 16, overflow: 'hidden' },
+  receiptCard: { width: '100%', maxWidth: 340, borderRadius: 16, overflow: 'hidden' },
   receiptHeader: { backgroundColor: '#111827', padding: 30, alignItems: 'center' },
   receiptTitle: { color: COLORS.primary, fontSize: 20, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2 },
   receiptId: { color: '#9CA3AF', fontSize: 12, fontFamily: 'monospace', marginTop: 5 },
-  receiptBody: { padding: 30, backgroundColor: '#F9FAFB' },
+  receiptBody: { padding: 30 },
   receiptInstruction: { fontSize: 12, color: COLORS.primaryDark, fontWeight: 'bold', textAlign: 'center', marginBottom: 20, backgroundColor: '#Fefce8', padding: 10, borderRadius: 6, overflow: 'hidden' },
-  receiptItem: { fontSize: 24, fontWeight: '800', color: COLORS.text, textAlign: 'center', marginBottom: 5 },
+  receiptItem: { fontSize: 24, fontWeight: '800', textAlign: 'center', marginBottom: 5 },
   receiptSize: { fontSize: 12, color: COLORS.textMuted, textAlign: 'center', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: 25 },
   receiptDetailsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   receiptDetailsLabel: { fontSize: 12, color: COLORS.textMuted },
-  receiptDetailsValue: { fontSize: 12, color: COLORS.text, fontWeight: 'bold' },
-  receiptCloseBtn: { padding: 20, borderTopWidth: 1, borderColor: COLORS.border, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  receiptDetailsValue: { fontSize: 12, fontWeight: 'bold', flexShrink: 1, textAlign: 'right' },
+  receiptCloseBtn: { padding: 20, borderTopWidth: 1, alignItems: 'center', backgroundColor: 'transparent' },
   receiptCloseBtnText: { color: COLORS.textMuted, fontWeight: 'bold', letterSpacing: 1 },
 
   // Contact
