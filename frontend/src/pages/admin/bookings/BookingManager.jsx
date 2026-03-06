@@ -5,12 +5,18 @@ import ReservationForm from '../../../components/reservations/ReservationForm';
 import { canCancelBooking, getUserRole } from '../../../utils/auth'; 
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
-import { format, addDays, subDays, isToday } from 'date-fns';
+import { format, addDays, subDays, isToday, parseISO } from 'date-fns';
 import axiosInstance from '../../../utils/axiosInstance';
+import { useLocation } from 'react-router-dom';
 
 const BookingManager = () => {
   const [bookings, setBookings] = useState([]);
-  const [filter, setFilter] = useState('ALL'); 
+  
+  // FIX: Read the initial filter from the URL state if coming from the Dashboard
+  const location = useLocation();
+  const initialFilter = location.state?.filter || 'ALL';
+  const [filter, setFilter] = useState(initialFilter); 
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showManualForm, setShowManualForm] = useState(false);
@@ -107,27 +113,46 @@ const BookingManager = () => {
   const formattedSelectedDate = format(selectedDate, 'yyyy-MM-dd');
   const isSearching = searchQuery.trim() !== '';
 
+  // FIX: The core logic change. If filter is PENDING, ignore the date filter entirely.
+  const isViewingGlobalPending = filter === 'PENDING';
+
   const filteredBookings = bookings.filter(b => {
+      // 1. Search Filter
       const matchesSearch = isSearching ? (
           b.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
           b.customer_contact.includes(searchQuery) ||
           b.id.toString() === searchQuery
       ) : true;
 
-      const matchesDate = isSearching ? true : b.date === formattedSelectedDate;
+      // 2. Status Filter
       const matchesStatus = filter === 'ALL' ? true : b.status === filter;
+
+      // 3. Date Filter (The magic happens here: Ignore date if searching OR viewing global pending)
+      const matchesDate = (isSearching || isViewingGlobalPending) ? true : b.date === formattedSelectedDate;
 
       return matchesSearch && matchesDate && matchesStatus;
   });
 
-  // --- NEW: Split into Lunch and Dinner ---
   const lunchBookings = filteredBookings
       .filter(b => b.session === 'LUNCH')
-      .sort((a, b) => a.time.localeCompare(b.time)); // Sort chronologically
+      .sort((a, b) => {
+          // If viewing global pending, sort by date first, then time
+          if (isViewingGlobalPending) {
+              const dateCompare = a.date.localeCompare(b.date);
+              if (dateCompare !== 0) return dateCompare;
+          }
+          return a.time.localeCompare(b.time);
+      });
 
   const dinnerBookings = filteredBookings
       .filter(b => b.session === 'DINNER')
-      .sort((a, b) => a.time.localeCompare(b.time)); // Sort chronologically
+      .sort((a, b) => {
+          if (isViewingGlobalPending) {
+              const dateCompare = a.date.localeCompare(b.date);
+              if (dateCompare !== 0) return dateCompare;
+          }
+          return a.time.localeCompare(b.time);
+      });
 
   const sessionGroups = [
       { id: 'LUNCH', title: 'Lunch Session', time: '11:00 AM - 2:30 PM', bookings: lunchBookings, icon: Sun },
@@ -205,7 +230,7 @@ const BookingManager = () => {
                 {['ALL', 'PENDING', 'CONFIRMED', 'SEATED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'].map(f => (
                   <button 
                     key={f} 
-                    onClick={() => setFilter(f)} 
+                    onClick={() => { setFilter(f); setSearchQuery(''); }} 
                     className={`text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded transition-all border 
                         ${filter === f 
                             ? 'bg-gray-900 text-white border-gray-900 shadow-sm' 
@@ -237,14 +262,17 @@ const BookingManager = () => {
       <div className="flex flex-col lg:flex-row gap-6">
         {/* LEFT SIDEBAR: DESKTOP CALENDAR */}
         <div className="hidden lg:block w-80 shrink-0">
-            <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm sticky top-24">
+            <div className={`bg-white p-5 rounded-lg border border-gray-200 shadow-sm sticky top-24 transition-opacity ${isViewingGlobalPending ? 'opacity-50 pointer-events-none' : ''}`}>
                 <div className="text-center border-b border-gray-100 pb-3 mb-4">
-                    <h3 className="text-gray-900 font-bold uppercase tracking-widest text-xs">Select Date</h3>
+                    <h3 className="text-gray-900 font-bold uppercase tracking-widest text-xs">
+                        {isViewingGlobalPending ? 'Showing All Pending' : 'Select Date'}
+                    </h3>
                 </div>
                 <Calendar
                     onChange={(date) => {
                         setSelectedDate(date);
                         setSearchQuery('');
+                        if (filter === 'PENDING') setFilter('ALL'); // Reset filter if they explicitly click a date
                     }}
                     value={selectedDate}
                 />
@@ -254,7 +282,7 @@ const BookingManager = () => {
         {/* MAIN CONTENT AREA */}
         <div className="flex-1 space-y-4">
             {/* MOBILE CALENDAR NAVIGATION */}
-            <div className="lg:hidden flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+            <div className={`lg:hidden flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200 shadow-sm ${isViewingGlobalPending ? 'hidden' : ''}`}>
                 <button onClick={() => { setSelectedDate(subDays(selectedDate, 1)); setSearchQuery(''); }} className="p-2 hover:bg-gray-100 rounded text-gray-500 transition-colors">
                     <ChevronLeft size={20}/>
                 </button>
@@ -270,8 +298,8 @@ const BookingManager = () => {
             </div>
 
             <div className="flex justify-between items-end pb-2 border-b border-gray-200 lg:border-none">
-                <h2 className="text-lg font-serif text-gray-900">
-                    {isSearching ? 'Search Results' : `Bookings for ${format(selectedDate, 'MMMM dd')}`}
+                <h2 className="text-lg font-serif text-gray-900 flex items-center gap-2">
+                    {isSearching ? 'Search Results' : isViewingGlobalPending ? <><AlertCircle className="text-amber-500" size={20}/> All Pending Bookings</> : `Bookings for ${format(selectedDate, 'MMMM dd')}`}
                 </h2>
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-widest bg-white border border-gray-200 px-2 py-1 rounded">
                     {filteredBookings.length} {filteredBookings.length === 1 ? 'Record' : 'Records'}
@@ -349,13 +377,13 @@ const BookingManager = () => {
 
                                                     <td className="px-5 py-4 align-middle">
                                                         <div className="flex flex-col gap-1">
-                                                            {isSearching ? (
+                                                            {isSearching || isViewingGlobalPending ? (
                                                                 <span className="text-sm font-bold text-gray-800">{b.date}</span>
                                                             ) : (
                                                                 <span className="text-sm font-bold text-gray-800">{b.time}</span>
                                                             )}
                                                             <span className="text-[10px] font-bold text-gold-700 w-max uppercase tracking-wider">
-                                                                {isSearching ? `${b.time} (${b.session})` : b.session}
+                                                                {isSearching || isViewingGlobalPending ? `${b.time} (${b.session})` : b.session}
                                                             </span>
                                                         </div>
                                                     </td>
@@ -479,8 +507,8 @@ const BookingManager = () => {
                                             <div className="grid grid-cols-2 gap-3 p-4 bg-gray-50 rounded-md border border-gray-100">
                                                 <div>
                                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Schedule</p>
-                                                    <p className="font-bold text-gray-800 text-sm">{isSearching ? b.date : b.time}</p>
-                                                    <p className="text-[10px] text-gold-700 font-bold uppercase tracking-widest mt-0.5">{isSearching ? `${b.time} (${b.session})` : b.session}</p>
+                                                    <p className="font-bold text-gray-800 text-sm">{isSearching || isViewingGlobalPending ? b.date : b.time}</p>
+                                                    <p className="text-[10px] text-gold-700 font-bold uppercase tracking-widest mt-0.5">{isSearching || isViewingGlobalPending ? `${b.time} (${b.session})` : b.session}</p>
                                                 </div>
                                                 <div>
                                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Details</p>
@@ -608,11 +636,6 @@ const BookingManager = () => {
                               <option value="COMPLETED" className="text-gray-900 bg-white font-medium">Completed</option>
                               <option value="NO_SHOW" className="text-gray-900 bg-white font-medium">No-Show</option>
                               <option value="CANCELLED" className="text-gray-900 bg-white font-medium">Cancelled</option>
-
-                           {/* 👇 ONLY SHOW 'CANCELLED' IF THEY ARE AN ADMIN/SUPERVISOR OR IF IT'S ALREADY CANCELLED 👇 */}
-                                {/* {(hasCancelPermission || editingBooking.status === 'CANCELLED') && (
-                                    <option value="CANCELLED" className="text-gray-900 bg-white font-medium">Cancelled</option>
-                                )} */}
                           </select>
                       </div>
 

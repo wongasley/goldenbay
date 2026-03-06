@@ -2392,6 +2392,7 @@ const EventInquiriesPage = lazy(() => import('./pages/public/events/EventInquiri
 const VIPRoomsPage = lazy(() => import('./pages/public/vip/VIPRoomsPage'));
 const NotFoundPage = lazy(() => import('./pages/public/NotFoundPage'));
 const CustomerRewardsPage = lazy(() => import('./pages/public/marketing/CustomerRewardsPage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/public/about/PrivacyPolicyPage'));
 
 // --- LAZY LOAD ADMIN PAGES ---
 const LoginPage = lazy(() => import('./pages/admin/auth/LoginPage')); 
@@ -2455,6 +2456,7 @@ function App() {
               <Route path="/contact" element={<><Navbar /><ContactPage /><Footer /></>} />
               <Route path="*" element={<><Navbar /><NotFoundPage /><Footer /></>} />
               <Route path="/rewards" element={<CustomerRewardsPage />} />
+              <Route path="/privacy" element={<><Navbar /><PrivacyPolicyPage /><Footer /></>} />
               
               <Route path="/login" element={<LoginPage />} />
 
@@ -2890,14 +2892,15 @@ export default Navbar;
 
 import React, { useEffect, useState } from 'react';
 import { Users, Contact, Megaphone, AlertCircle, ArrowRight, Gift, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // FIX: Imported useNavigate
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import toast from 'react-hot-toast';
 import axiosInstance from '../../../utils/axiosInstance';
 import { canManageMarketing, canManageMenu } from '../../../utils/auth';
 
-const StatCard = ({ title, value, icon: Icon, colorClass, linkTo, subText }) => (
-  <Link to={linkTo} className="group block h-full">
+const StatCard = ({ title, value, icon: Icon, colorClass, linkTo, stateParams, subText }) => (
+  // FIX: Passing stateParams down through the Link
+  <Link to={linkTo} state={stateParams} className="group block h-full">
     <div className="bg-white p-4 rounded border border-gray-200 shadow-sm hover:shadow hover:border-gold-300 transition-all duration-200 h-full flex flex-col justify-between relative overflow-hidden">
         <div className={`absolute top-0 right-0 w-16 h-16 bg-${colorClass}-50 rounded-bl-full -mr-2 -mt-2 transition-transform group-hover:scale-110`}></div>
         <div className="relative z-10 flex justify-between items-start mb-2">
@@ -2919,8 +2922,8 @@ const AdminDashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const isMarketingAdmin = canManageMarketing();
   const isMenuAdmin = canManageMenu();
+  const navigate = useNavigate(); // FIX: Initialize navigate
 
-  // --- NEW: Points Modal State ---
   const [showPointsModal, setShowPointsModal] = useState(false);
   const [isAwarding, setIsAwarding] = useState(false);
   const [pointsForm, setPointsForm] = useState({ phone: '', amount: '', name: '' });
@@ -2971,7 +2974,6 @@ const AdminDashboardPage = () => {
             <h1 className="text-xl font-bold text-gray-900 font-serif">Dashboard Overview</h1>
             <p className="text-gray-500 text-xs">Insights for {new Date().toLocaleDateString('en-US', { dateStyle: 'medium' })}</p>
          </div>
-         {/* Quick Action Button for Cashiers */}
          <button onClick={() => setShowPointsModal(true)} className="w-full md:w-auto bg-gold-600 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest rounded-sm shadow-md hover:bg-black transition-colors flex items-center justify-center gap-2">
             <Gift size={16} /> Award Points
          </button>
@@ -2979,15 +2981,13 @@ const AdminDashboardPage = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard title="Today's Guests" value={loading ? "-" : data.stats.today_count} icon={Users} colorClass="blue" linkTo="/staff/bookings" subText="Reservations" />
-          <StatCard title="Pending Actions" value={loading ? "-" : data.stats.pending_count} icon={AlertCircle} colorClass="red" linkTo="/staff/bookings" subText="Urgent" />
+          
+          {/* FIX: Appended stateParams={{ filter: 'PENDING' }} so the manager opens with the correct global filter! */}
+          <StatCard title="Pending Actions" value={loading ? "-" : data.stats.pending_count} icon={AlertCircle} colorClass="red" linkTo="/staff/bookings" stateParams={{ filter: 'PENDING' }} subText="Urgent" />
+          
           <StatCard title="CRM" value="Phone Book" icon={Contact} colorClass="orange" linkTo="/staff/customers" />
           {isMarketingAdmin && (
              <StatCard title="Content" value="Marketing" icon={Megaphone} colorClass="purple" linkTo="/staff/marketing" />
-          )}
-
-          {/* OPTIONAL: SHOW MENU MANAGER CARD TO SUPERVISORS/ADMINS */}
-          {isMenuAdmin && !isMarketingAdmin && (
-             <StatCard title="Menu" value="Menu Manager" icon={Utensils} colorClass="green" linkTo="/staff/menu" />
           )}
       </div>
 
@@ -3948,12 +3948,18 @@ import ReservationForm from '../../../components/reservations/ReservationForm';
 import { canCancelBooking, getUserRole } from '../../../utils/auth'; 
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
-import { format, addDays, subDays, isToday } from 'date-fns';
+import { format, addDays, subDays, isToday, parseISO } from 'date-fns';
 import axiosInstance from '../../../utils/axiosInstance';
+import { useLocation } from 'react-router-dom';
 
 const BookingManager = () => {
   const [bookings, setBookings] = useState([]);
-  const [filter, setFilter] = useState('ALL'); 
+  
+  // FIX: Read the initial filter from the URL state if coming from the Dashboard
+  const location = useLocation();
+  const initialFilter = location.state?.filter || 'ALL';
+  const [filter, setFilter] = useState(initialFilter); 
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showManualForm, setShowManualForm] = useState(false);
@@ -4050,27 +4056,46 @@ const BookingManager = () => {
   const formattedSelectedDate = format(selectedDate, 'yyyy-MM-dd');
   const isSearching = searchQuery.trim() !== '';
 
+  // FIX: The core logic change. If filter is PENDING, ignore the date filter entirely.
+  const isViewingGlobalPending = filter === 'PENDING';
+
   const filteredBookings = bookings.filter(b => {
+      // 1. Search Filter
       const matchesSearch = isSearching ? (
           b.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
           b.customer_contact.includes(searchQuery) ||
           b.id.toString() === searchQuery
       ) : true;
 
-      const matchesDate = isSearching ? true : b.date === formattedSelectedDate;
+      // 2. Status Filter
       const matchesStatus = filter === 'ALL' ? true : b.status === filter;
+
+      // 3. Date Filter (The magic happens here: Ignore date if searching OR viewing global pending)
+      const matchesDate = (isSearching || isViewingGlobalPending) ? true : b.date === formattedSelectedDate;
 
       return matchesSearch && matchesDate && matchesStatus;
   });
 
-  // --- NEW: Split into Lunch and Dinner ---
   const lunchBookings = filteredBookings
       .filter(b => b.session === 'LUNCH')
-      .sort((a, b) => a.time.localeCompare(b.time)); // Sort chronologically
+      .sort((a, b) => {
+          // If viewing global pending, sort by date first, then time
+          if (isViewingGlobalPending) {
+              const dateCompare = a.date.localeCompare(b.date);
+              if (dateCompare !== 0) return dateCompare;
+          }
+          return a.time.localeCompare(b.time);
+      });
 
   const dinnerBookings = filteredBookings
       .filter(b => b.session === 'DINNER')
-      .sort((a, b) => a.time.localeCompare(b.time)); // Sort chronologically
+      .sort((a, b) => {
+          if (isViewingGlobalPending) {
+              const dateCompare = a.date.localeCompare(b.date);
+              if (dateCompare !== 0) return dateCompare;
+          }
+          return a.time.localeCompare(b.time);
+      });
 
   const sessionGroups = [
       { id: 'LUNCH', title: 'Lunch Session', time: '11:00 AM - 2:30 PM', bookings: lunchBookings, icon: Sun },
@@ -4148,7 +4173,7 @@ const BookingManager = () => {
                 {['ALL', 'PENDING', 'CONFIRMED', 'SEATED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'].map(f => (
                   <button 
                     key={f} 
-                    onClick={() => setFilter(f)} 
+                    onClick={() => { setFilter(f); setSearchQuery(''); }} 
                     className={`text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded transition-all border 
                         ${filter === f 
                             ? 'bg-gray-900 text-white border-gray-900 shadow-sm' 
@@ -4180,14 +4205,17 @@ const BookingManager = () => {
       <div className="flex flex-col lg:flex-row gap-6">
         {/* LEFT SIDEBAR: DESKTOP CALENDAR */}
         <div className="hidden lg:block w-80 shrink-0">
-            <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm sticky top-24">
+            <div className={`bg-white p-5 rounded-lg border border-gray-200 shadow-sm sticky top-24 transition-opacity ${isViewingGlobalPending ? 'opacity-50 pointer-events-none' : ''}`}>
                 <div className="text-center border-b border-gray-100 pb-3 mb-4">
-                    <h3 className="text-gray-900 font-bold uppercase tracking-widest text-xs">Select Date</h3>
+                    <h3 className="text-gray-900 font-bold uppercase tracking-widest text-xs">
+                        {isViewingGlobalPending ? 'Showing All Pending' : 'Select Date'}
+                    </h3>
                 </div>
                 <Calendar
                     onChange={(date) => {
                         setSelectedDate(date);
                         setSearchQuery('');
+                        if (filter === 'PENDING') setFilter('ALL'); // Reset filter if they explicitly click a date
                     }}
                     value={selectedDate}
                 />
@@ -4197,7 +4225,7 @@ const BookingManager = () => {
         {/* MAIN CONTENT AREA */}
         <div className="flex-1 space-y-4">
             {/* MOBILE CALENDAR NAVIGATION */}
-            <div className="lg:hidden flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+            <div className={`lg:hidden flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200 shadow-sm ${isViewingGlobalPending ? 'hidden' : ''}`}>
                 <button onClick={() => { setSelectedDate(subDays(selectedDate, 1)); setSearchQuery(''); }} className="p-2 hover:bg-gray-100 rounded text-gray-500 transition-colors">
                     <ChevronLeft size={20}/>
                 </button>
@@ -4213,8 +4241,8 @@ const BookingManager = () => {
             </div>
 
             <div className="flex justify-between items-end pb-2 border-b border-gray-200 lg:border-none">
-                <h2 className="text-lg font-serif text-gray-900">
-                    {isSearching ? 'Search Results' : `Bookings for ${format(selectedDate, 'MMMM dd')}`}
+                <h2 className="text-lg font-serif text-gray-900 flex items-center gap-2">
+                    {isSearching ? 'Search Results' : isViewingGlobalPending ? <><AlertCircle className="text-amber-500" size={20}/> All Pending Bookings</> : `Bookings for ${format(selectedDate, 'MMMM dd')}`}
                 </h2>
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-widest bg-white border border-gray-200 px-2 py-1 rounded">
                     {filteredBookings.length} {filteredBookings.length === 1 ? 'Record' : 'Records'}
@@ -4292,13 +4320,13 @@ const BookingManager = () => {
 
                                                     <td className="px-5 py-4 align-middle">
                                                         <div className="flex flex-col gap-1">
-                                                            {isSearching ? (
+                                                            {isSearching || isViewingGlobalPending ? (
                                                                 <span className="text-sm font-bold text-gray-800">{b.date}</span>
                                                             ) : (
                                                                 <span className="text-sm font-bold text-gray-800">{b.time}</span>
                                                             )}
                                                             <span className="text-[10px] font-bold text-gold-700 w-max uppercase tracking-wider">
-                                                                {isSearching ? `${b.time} (${b.session})` : b.session}
+                                                                {isSearching || isViewingGlobalPending ? `${b.time} (${b.session})` : b.session}
                                                             </span>
                                                         </div>
                                                     </td>
@@ -4422,8 +4450,8 @@ const BookingManager = () => {
                                             <div className="grid grid-cols-2 gap-3 p-4 bg-gray-50 rounded-md border border-gray-100">
                                                 <div>
                                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Schedule</p>
-                                                    <p className="font-bold text-gray-800 text-sm">{isSearching ? b.date : b.time}</p>
-                                                    <p className="text-[10px] text-gold-700 font-bold uppercase tracking-widest mt-0.5">{isSearching ? `${b.time} (${b.session})` : b.session}</p>
+                                                    <p className="font-bold text-gray-800 text-sm">{isSearching || isViewingGlobalPending ? b.date : b.time}</p>
+                                                    <p className="text-[10px] text-gold-700 font-bold uppercase tracking-widest mt-0.5">{isSearching || isViewingGlobalPending ? `${b.time} (${b.session})` : b.session}</p>
                                                 </div>
                                                 <div>
                                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Details</p>
@@ -4551,11 +4579,6 @@ const BookingManager = () => {
                               <option value="COMPLETED" className="text-gray-900 bg-white font-medium">Completed</option>
                               <option value="NO_SHOW" className="text-gray-900 bg-white font-medium">No-Show</option>
                               <option value="CANCELLED" className="text-gray-900 bg-white font-medium">Cancelled</option>
-
-                           {/* 👇 ONLY SHOW 'CANCELLED' IF THEY ARE AN ADMIN/SUPERVISOR OR IF IT'S ALREADY CANCELLED 👇 */}
-                                {/* {(hasCancelPermission || editingBooking.status === 'CANCELLED') && (
-                                    <option value="CANCELLED" className="text-gray-900 bg-white font-medium">Cancelled</option>
-                                )} */}
                           </select>
                       </div>
 
@@ -7493,8 +7516,12 @@ const Footer = () => {
         <div className="h-px w-full bg-white/5 mb-8"></div>
 
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className={`text-[10px] text-gray-600 uppercase tracking-widest flex items-center gap-4 ${getFontClass()}`}>
+          <div className={`text-[10px] text-gray-600 uppercase tracking-widest flex flex-wrap items-center gap-4 ${getFontClass()}`}>
             <span>© {new Date().getFullYear()} {t('footer.rights')}</span>
+            
+            {/* PRIVACY POLICY LINK ADDED HERE */}
+            <Link to="/privacy" className="hover:text-gray-400 transition-colors duration-300">Privacy Policy</Link>
+            
             <Link to="/login" className="opacity-0 hover:opacity-50 transition-opacity duration-300">Staff Access</Link>
           </div>
 
@@ -12052,3 +12079,72 @@ import App from './App';
 // It also ensures that whether you load the app in Expo Go or in a native build,
 // the environment is set up appropriately
 registerRootComponent(App);
+
+
+import React from 'react';
+import { Helmet } from 'react-helmet-async';
+import { Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
+
+const PrivacyPolicyPage = () => {
+  return (
+    <div className="min-h-screen bg-cream-50 text-gray-900 pt-32 pb-20 px-6 md:px-24 font-sans">
+      <Helmet>
+        <title>Privacy Policy | Golden Bay</title>
+      </Helmet>
+
+      <div className="max-w-4xl mx-auto bg-white p-10 md:p-16 shadow-xl border border-gray-200">
+        <Link to="/" className="inline-flex items-center text-gold-600 hover:text-black mb-8 transition-colors text-xs uppercase tracking-widest font-bold">
+            <ArrowLeft size={14} className="mr-2" /> Return Home
+        </Link>
+        
+        <h1 className="text-4xl font-serif text-gray-900 mb-2">Privacy Policy</h1>
+        <p className="text-sm text-gray-500 mb-10">Last Updated: March 2026</p>
+
+        <div className="prose max-w-none text-gray-600 space-y-6 text-sm leading-relaxed">
+            <p>
+                Golden Bay Fresh Seafood Restaurant ("we", "our", or "us") respects your privacy and is committed to protecting the personal information you share with us. This Privacy Policy explains how we collect, use, and safeguard your data when you use our website, mobile application, or in-restaurant digital services.
+            </p>
+
+            <h3 className="text-lg font-bold text-gray-900 mt-8 mb-2">1. Information We Collect</h3>
+            <p>We only collect information necessary to provide our dining and reservation services. This includes:</p>
+            <ul className="list-disc pl-5 space-y-2">
+                <li><strong>Contact Information:</strong> Your name, phone number, and email address when you make a reservation, join our VIP guest list, or log into the Rewards app.</li>
+                <li><strong>Account Data:</strong> Your date of birth (optional) for birthday promotions, and your dining history (visit count and points balance) to facilitate our Golden Rewards program.</li>
+                <li><strong>Reservation Details:</strong> Special requests, dining preferences, and party sizes provided during the booking process.</li>
+            </ul>
+
+            <h3 className="text-lg font-bold text-gray-900 mt-8 mb-2">2. How We Use Your Information</h3>
+            <p>We use the collected information for the following purposes:</p>
+            <ul className="list-disc pl-5 space-y-2">
+                <li>To confirm and manage your table reservations.</li>
+                <li>To send OTP (One-Time Password) SMS messages for secure app login.</li>
+                <li>To administer the Golden Rewards program, track your points, and process redemptions.</li>
+                <li>To send important service updates, such as booking confirmations or cancellations.</li>
+                <li>To occasionally send promotional offers or birthday rewards (you may opt-out of marketing communications at any time).</li>
+            </ul>
+
+            <h3 className="text-lg font-bold text-gray-900 mt-8 mb-2">3. Data Sharing & Security</h3>
+            <p>
+                We do not sell, rent, or trade your personal information to third parties. Your data is stored securely on our private servers. We only share necessary data with trusted service providers (such as SMS gateways to send your login codes) strictly for operational purposes.
+            </p>
+
+            <h3 className="text-lg font-bold text-gray-900 mt-8 mb-2">4. Your Rights & Account Deletion</h3>
+            <p>
+                You have the right to access, correct, or request the deletion of your personal data at any time. If you wish to delete your account, remove your phone number from our system, or opt-out of SMS notifications, please contact us using the details below. Upon your request, your profile and points balance will be permanently erased from our active database.
+            </p>
+
+            <h3 className="text-lg font-bold text-gray-900 mt-8 mb-2">5. Contact Us</h3>
+            <p>If you have any questions or concerns about this Privacy Policy, please contact us at:</p>
+            <ul className="list-none space-y-1">
+                <li><strong>Email:</strong> marketing@goldenbay.com.ph</li>
+                <li><strong>Phone:</strong> (02) 8804-0332 / +63 917 580 7166</li>
+                <li><strong>Address:</strong> Lot 3&4 Block A2, Diosdado Macapagal Blvd, Pasay City, Metro Manila</li>
+            </ul>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PrivacyPolicyPage;

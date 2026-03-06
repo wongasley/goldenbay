@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Users, Contact, Megaphone, AlertCircle, ArrowRight, Gift, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // FIX: Imported useNavigate
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import toast from 'react-hot-toast';
 import axiosInstance from '../../../utils/axiosInstance';
 import { canManageMarketing, canManageMenu } from '../../../utils/auth';
 
-const StatCard = ({ title, value, icon: Icon, colorClass, linkTo, subText }) => (
-  <Link to={linkTo} className="group block h-full">
+const StatCard = ({ title, value, icon: Icon, colorClass, linkTo, stateParams, subText }) => (
+  // FIX: Passing stateParams down through the Link
+  <Link to={linkTo} state={stateParams} className="group block h-full">
     <div className="bg-white p-4 rounded border border-gray-200 shadow-sm hover:shadow hover:border-gold-300 transition-all duration-200 h-full flex flex-col justify-between relative overflow-hidden">
         <div className={`absolute top-0 right-0 w-16 h-16 bg-${colorClass}-50 rounded-bl-full -mr-2 -mt-2 transition-transform group-hover:scale-110`}></div>
         <div className="relative z-10 flex justify-between items-start mb-2">
@@ -29,8 +30,8 @@ const AdminDashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const isMarketingAdmin = canManageMarketing();
   const isMenuAdmin = canManageMenu();
+  const navigate = useNavigate(); // FIX: Initialize navigate
 
-  // --- NEW: Points Modal State ---
   const [showPointsModal, setShowPointsModal] = useState(false);
   const [isAwarding, setIsAwarding] = useState(false);
   const [pointsForm, setPointsForm] = useState({ phone: '', amount: '', name: '' });
@@ -81,7 +82,6 @@ const AdminDashboardPage = () => {
             <h1 className="text-xl font-bold text-gray-900 font-serif">Dashboard Overview</h1>
             <p className="text-gray-500 text-xs">Insights for {new Date().toLocaleDateString('en-US', { dateStyle: 'medium' })}</p>
          </div>
-         {/* Quick Action Button for Cashiers */}
          <button onClick={() => setShowPointsModal(true)} className="w-full md:w-auto bg-gold-600 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest rounded-sm shadow-md hover:bg-black transition-colors flex items-center justify-center gap-2">
             <Gift size={16} /> Award Points
          </button>
@@ -89,15 +89,13 @@ const AdminDashboardPage = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard title="Today's Guests" value={loading ? "-" : data.stats.today_count} icon={Users} colorClass="blue" linkTo="/staff/bookings" subText="Reservations" />
-          <StatCard title="Pending Actions" value={loading ? "-" : data.stats.pending_count} icon={AlertCircle} colorClass="red" linkTo="/staff/bookings" subText="Urgent" />
+          
+          {/* FIX: Appended stateParams={{ filter: 'PENDING' }} so the manager opens with the correct global filter! */}
+          <StatCard title="Pending Actions" value={loading ? "-" : data.stats.pending_count} icon={AlertCircle} colorClass="red" linkTo="/staff/bookings" stateParams={{ filter: 'PENDING' }} subText="Urgent" />
+          
           <StatCard title="CRM" value="Phone Book" icon={Contact} colorClass="orange" linkTo="/staff/customers" />
           {isMarketingAdmin && (
              <StatCard title="Content" value="Marketing" icon={Megaphone} colorClass="purple" linkTo="/staff/marketing" />
-          )}
-
-          {/* OPTIONAL: SHOW MENU MANAGER CARD TO SUPERVISORS/ADMINS */}
-          {isMenuAdmin && !isMarketingAdmin && (
-             <StatCard title="Menu" value="Menu Manager" icon={Utensils} colorClass="green" linkTo="/staff/menu" />
           )}
       </div>
 
