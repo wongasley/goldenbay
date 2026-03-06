@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Python Virtual Environments (The likely culprit for 1.3GB)
+env/
+venv/
+.env/
+bin/
+lib/
+share/
+include/
+__pycache__/
+
+# Build/Expo folders
+.expo/
+dist/
+android/
+ios/
+
+# Git history (Can be huge)
+.git/
+
+# Local logs/OS files
+*.log
+.DS_Store

@@ -126,6 +126,7 @@ FILES_TO_READ = [
     'goldenbay-mobile/App.js',
     'goldenbay-mobile/index.js',
     'frontend/src/pages/public/about/PrivacyPolicyPage.jsx',
+    'goldenbay-mobile/.easignore',
 
 ]
 
