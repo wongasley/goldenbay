@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css'; 
@@ -26,6 +26,17 @@ const ReservationPage = () => {
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [formData, setFormData] = useState({ name: '', contact: '', email: '', pax: 2, message: '' });
   const [submitStatus, setSubmitStatus] = useState(null); 
+
+  // --- NEW: Ref to handle smooth scrolling between steps ---
+  const topRef = useRef(null);
+
+  useEffect(() => {
+    if (topRef.current && step > 1) {
+        // Scroll to the top of the widget smoothly, offset by 100px for the navbar
+        const y = topRef.current.getBoundingClientRect().top + window.scrollY - 100;
+        window.scrollTo({ top: y, behavior: 'smooth' });
+    }
+  }, [step]);
 
   useEffect(() => {
     setSelectedTime('');
@@ -103,15 +114,10 @@ const ReservationPage = () => {
         });
         if (res.ok) { 
           setSubmitStatus('success'); 
-          
           const audio = new Audio('/audio/success.mp3');
           audio.play().catch(err => console.warn("Audio blocked by browser:", err));
-
           if (window.fbq) window.fbq('track', 'Lead');
-          
-          // --- NEW: GOOGLE ANALYTICS TRACKING ---
           if (window.gtag) window.gtag('event', 'generate_lead', { event_category: 'Reservation', value: formData.pax });
-          
         } else { setSubmitStatus('error'); }
     } catch (error) { setSubmitStatus('error'); }
   };
@@ -174,7 +180,7 @@ const ReservationPage = () => {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 md:px-12 py-12">
+      <div ref={topRef} className="max-w-6xl mx-auto px-4 md:px-12 py-12">
         <div className="bg-white shadow-xl rounded-sm border border-gray-200 overflow-hidden min-h-[500px]">
           
           <AnimatePresence mode="wait">
@@ -221,10 +227,12 @@ const ReservationPage = () => {
                         </div>
                     </div>
                     <div className="pt-6 space-y-4">
+                        {/* FIX: Removed disabled prop, added pointer-events-none conditionally */}
                         <button 
-                            disabled={!canProceed} 
-                            onClick={() => setStep(2)} 
-                            className={`w-full ${canProceed ? 'bg-gold-600 hover:bg-black text-white shadow-lg group' : 'bg-gray-200 text-gray-400 cursor-not-allowed'} py-5 font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${getFontClass()}`}
+                            onClick={() => {
+                                if (canProceed) setStep(2);
+                            }} 
+                            className={`w-full py-5 font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${canProceed ? 'bg-gold-600 hover:bg-black text-white shadow-lg group cursor-pointer' : 'bg-gray-200 text-gray-400 cursor-not-allowed pointer-events-none'} ${getFontClass()}`}
                         >
                             {canProceed ? t('reservation.nextSelectTable') : "No Time Slots Left Today"} 
                             {canProceed && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
@@ -252,7 +260,7 @@ const ReservationPage = () => {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
                         {rooms.filter(r => r.area_type === bookingType).map(room => (
-                            <div key={room.id} onClick={() => room.is_available && setSelectedRoom(room.id)} className={`p-6 border rounded-sm cursor-pointer transition-all flex justify-between items-center ${selectedRoom === room.id ? 'border-gold-500 bg-gold-50 ring-1 ring-gold-500' : room.is_available ? 'border-gray-200 hover:border-gold-400/50 bg-white shadow-sm' : 'bg-gray-100 opacity-40 cursor-not-allowed grayscale'}`}>
+                            <div key={room.id} onClick={() => room.is_available && setSelectedRoom(room.id)} className={`p-6 border rounded-sm transition-all flex justify-between items-center ${selectedRoom === room.id ? 'border-gold-500 bg-gold-50 ring-1 ring-gold-500 cursor-pointer' : room.is_available ? 'border-gray-200 hover:border-gold-400/50 bg-white shadow-sm cursor-pointer' : 'bg-gray-100 opacity-40 cursor-not-allowed pointer-events-none grayscale'}`}>
                                 <div>
                                     <h4 className="font-serif text-lg text-gray-900">{room.name}</h4>
                                     
@@ -270,13 +278,23 @@ const ReservationPage = () => {
                                         )}
                                     </div>
                                 </div>
-                                {selectedRoom === room.id ? <CheckCircle className="text-gold-600" size={24}/> : !room.is_available && <span className={`text-[9px] font-bold text-red-500 border border-red-200 px-2 py-1 bg-red-50 rounded-sm ${getFontClass()}`}>{t('vip.booked')}</span>}
+                                
+                                <div className="w-6 h-6 flex items-center justify-center shrink-0">
+                                    {selectedRoom === room.id && <CheckCircle className="text-gold-600" size={24}/>}
+                                    {!room.is_available && <span className={`text-[9px] font-bold text-red-500 border border-red-200 px-2 py-1 bg-red-50 rounded-sm ${getFontClass()}`}>{t('vip.booked')}</span>}
+                                </div>
                             </div>
                         ))}
                     </div>
                 )}
                 
-                <button disabled={!selectedRoom} onClick={() => setStep(3)} className={`w-full max-w-md mx-auto flex bg-gold-600 text-white py-5 font-bold uppercase tracking-widest hover:bg-black transition-all items-center justify-center gap-3 shadow-xl disabled:opacity-30 ${getFontClass()}`}>
+                {/* FIX: Removed disabled prop to prevent aggressive mobile browser jumping */}
+                <button 
+                    onClick={() => {
+                        if (selectedRoom) setStep(3);
+                    }} 
+                    className={`w-full max-w-md mx-auto flex py-5 font-bold uppercase tracking-widest transition-all items-center justify-center gap-3 shadow-xl ${getFontClass()} ${selectedRoom ? 'bg-gold-600 text-white hover:bg-black cursor-pointer' : 'bg-gray-200 text-gray-400 cursor-not-allowed pointer-events-none'}`}
+                >
                     {t('reservation.nextFinalDetails')} <ArrowRight size={18} />
                 </button>
               </motion.div>
@@ -322,6 +340,7 @@ const ReservationPage = () => {
                                 <label className={`text-[10px] font-bold uppercase text-gray-400 tracking-widest ${getFontClass()}`}>{t('reservation.fNotes')}</label>
                                 <textarea className="w-full bg-gray-50 border-b-2 border-gray-200 p-4 focus:border-gold-500 outline-none transition-colors h-24 resize-none" onChange={e => setFormData({...formData, message: e.target.value})}></textarea>
                             </div>
+                            
                             <button type="submit" disabled={submitStatus === 'loading'} className={`w-full bg-gold-600 text-white py-6 font-bold uppercase tracking-[0.3em] hover:bg-black transition-all shadow-xl disabled:opacity-50 ${getFontClass()}`}>
                                 {submitStatus === 'loading' ? t('reservation.proc') : t('reservation.reqRes')}
                             </button>

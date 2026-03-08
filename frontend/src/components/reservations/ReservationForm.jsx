@@ -148,6 +148,8 @@ const ReservationForm = ({
                 return;
             }
             token = await executeRecaptcha('reservation_submit');
+
+            console.log("GOOGLE RECAPTCHA TOKEN:", token);
         }
 
         const payload = {
