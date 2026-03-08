@@ -1,4 +1,3 @@
-// frontend/src/utils/auth.js
 import { jwtDecode } from 'jwt-decode';
 
 export const getUserRole = () => {
@@ -15,20 +14,24 @@ export const getUserRole = () => {
 
 export const canCancelBooking = () => {
     const role = getUserRole();
-    return role === 'Supervisor' || role === 'Admin';
+    // Added Owner
+    return role === 'Owner' || role === 'Admin' || role === 'Supervisor';
 };
 
 export const canDeleteCustomer = () => {
     const role = getUserRole();
-    return role === 'Admin';
+    // Added Owner
+    return role === 'Owner' || role === 'Admin';
 };
 
 export const canManageMarketing = () => {
     const role = getUserRole();
-    return role === 'Admin';
+    // Added Owner
+    return role === 'Owner' || role === 'Admin';
 };
 
 export const canManageMenu = () => {
     const role = getUserRole();
-    return role === 'Supervisor' || role === 'Admin';
+    // Added Owner
+    return role === 'Owner' || role === 'Admin' || role === 'Supervisor';
 };

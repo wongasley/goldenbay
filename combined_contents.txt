@@ -12154,6 +12154,8 @@ const styles = StyleSheet.create({
   contactText: { flex: 1, fontSize: 15, lineHeight: 24, fontWeight: '500' }
 });
 
+//goldenbay-mobile/index.js
+
 import { registerRootComponent } from 'expo';
 
 import App from './App';
