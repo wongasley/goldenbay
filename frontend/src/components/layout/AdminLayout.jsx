@@ -44,8 +44,12 @@ const AdminLayout = () => {
     return <Navigate to="/staff/reports" replace />;
   }
 
-  if (role === 'Receptionist' && !location.pathname.startsWith('/staff/bookings')) {
-    return <Navigate to="/staff/bookings" replace />;
+  if (role === 'Receptionist') {
+    const allowed = ['/staff/bookings', '/staff/rewards'];
+    const isAllowed = allowed.some(path => location.pathname.startsWith(path));
+    if (!isAllowed) {
+      return <Navigate to="/staff/bookings" replace />;
+    }
   }
 
   if (role === 'Supervisor') {
