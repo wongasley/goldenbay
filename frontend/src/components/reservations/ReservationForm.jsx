@@ -3,7 +3,6 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import axiosInstance from '../../utils/axiosInstance';
 import axios from 'axios';
-import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
@@ -16,9 +15,7 @@ const ReservationForm = ({
     onSuccess, 
     onCancel 
 }) => {
-    const { executeRecaptcha } = useGoogleReCaptcha();
 
-    // Added separate care_of state to match the Phone Book
     const [formData, setFormData] = useState({
         name: '', phone: '', care_of: '', email: '', pax: 2, message: ''
     });
@@ -139,19 +136,6 @@ const ReservationForm = ({
 
         setSubmitStatus('loading');
 
-        let token = null;
-        // Only run CAPTCHA if it's a customer booking from the web
-        if (!isManualEntry) {
-            if (!executeRecaptcha) {
-                toast.error("Security verification not ready. Please wait a moment.");
-                setSubmitStatus('error');
-                return;
-            }
-            token = await executeRecaptcha('reservation_submit');
-
-            console.log("GOOGLE RECAPTCHA TOKEN:", token);
-        }
-
         const payload = {
             customer_name: formData.name.trim(),
             customer_contact: finalContact,
@@ -163,8 +147,7 @@ const ReservationForm = ({
             dining_area: parseInt(finalRoomId, 10),
             special_request: finalMessage,
             status: isManualEntry ? 'CONFIRMED' : 'PENDING',
-            source: isManualEntry ? manualSource : 'WEB',
-            captcha_token: token
+            source: isManualEntry ? manualSource : 'WEB'
         };
 
         try {

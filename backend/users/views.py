@@ -9,7 +9,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.throttling import AnonRateThrottle
 from reservations.models import Customer
 from reservations.utils import send_sms
-from core.utils import verify_recaptcha, OTPPhoneNumberThrottle
+from core.utils import OTPPhoneNumberThrottle
 
 class RequestOTPView(APIView):
     """ Step 1: Generate OTP, save to cache, and text it to the customer """
@@ -19,13 +19,9 @@ class RequestOTPView(APIView):
 
     def post(self, request):
         phone = request.data.get('phone')
-        captcha_token = request.data.get('captcha_token') # <--- Get Token
 
         if not phone:
             return Response({"error": "Phone number is required."}, status=status.HTTP_400_BAD_REQUEST)
-            
-        # Verify Bot Status before sending SMS
-        # verify_recaptcha(captcha_token)
 
         # Standardize phone format
         clean_phone = ''.join(filter(str.isdigit, str(phone)))
@@ -81,7 +77,7 @@ class VerifyOTPView(APIView):
         # 4. We map the Customer to a Django User behind the scenes so SimpleJWT works flawlessly
         user, user_created = User.objects.get_or_create(username=clean_phone)
         if user_created:
-            user.set_unusable_password() # <--- ADD THIS
+            user.set_unusable_password() 
             user.save()
 
         # 5. Generate secure JWT

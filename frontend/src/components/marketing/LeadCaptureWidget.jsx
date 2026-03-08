@@ -3,10 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Gift } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosInstance from '../../utils/axiosInstance'; 
-import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 const LeadCaptureWidget = () => {
-  const { executeRecaptcha } = useGoogleReCaptcha();
   const [isVisible, setIsVisible] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [formData, setFormData] = useState({ name: '', phone: '', email: '', dob: '' });
@@ -46,15 +44,9 @@ const LeadCaptureWidget = () => {
       return;
     }
 
-    if (!executeRecaptcha) {
-      toast.error("Security check failed to load.");
-      return;
-    }
-
     try {
-      const token = await executeRecaptcha('lead_capture');
       // Pass the cleaned phone number to the backend
-      const payload = { ...formData, phone: cleanPhone, captcha_token: token };
+      const payload = { ...formData, phone: cleanPhone };
       const res = await axiosInstance.post('/api/reservations/lead-capture/', payload);
       
       setIsSubmitted(true);

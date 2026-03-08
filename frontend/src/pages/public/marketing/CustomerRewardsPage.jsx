@@ -5,13 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import html2canvas from 'html2canvas'; 
-import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 // Backend configuration
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const CustomerRewardsPage = () => {
-  const { executeRecaptcha } = useGoogleReCaptcha();
   const [step, setStep] = useState('LOGIN'); 
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -74,15 +72,8 @@ const CustomerRewardsPage = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    if (!executeRecaptcha) {
-        toast.error("Security check failed to load. Please try again.");
-        setIsLoading(false);
-        return;
-    }
-
     try {
-      const token = await executeRecaptcha('request_otp');
-      await axios.post(`${BACKEND_URL}/api/users/request-otp/`, { phone, captcha_token: token });
+      await axios.post(`${BACKEND_URL}/api/users/request-otp/`, { phone });
       toast.success("Login code sent via SMS.");
       setStep('OTP');
     } catch (err) {

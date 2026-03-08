@@ -22,9 +22,6 @@ from .tasks import (
     send_post_dining_feedback
 )
 from django.shortcuts import get_object_or_404
-# --- NEW: Import the CAPTCHA verifier ---
-from core.utils import verify_recaptcha
-
 
 class AvailableRoomsView(APIView):
     def get(self, request):
@@ -62,16 +59,6 @@ class ReservationCreateView(generics.CreateAPIView):
     queryset = Reservation.objects.all()
     serializer_class = ReservationSerializer
     permission_classes = [AllowAny] 
-
-    # --- NEW: Intercept the request before saving to check CAPTCHA ---
-    def create(self, request, *args, **kwargs):
-        # We only mandate CAPTCHA for website users. Admins skip this.
-        # if not request.user.is_authenticated:
-        #     captcha_token = request.data.get('captcha_token')
-        #     verify_recaptcha(captcha_token)
-            
-        return super().create(request, *args, **kwargs)
-    # -----------------------------------------------------------------
 
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
@@ -348,11 +335,6 @@ class LeadCaptureView(APIView):
     throttle_classes = [AnonRateThrottle]
 
     def post(self, request):
-        # --- NEW: Verify Bot Status before processing Lead ---
-        captcha_token = request.data.get('captcha_token')
-        verify_recaptcha(captcha_token)
-        # ------------------------------------------------------
-
         name = request.data.get('name')
         phone = request.data.get('phone')
         email = request.data.get('email')
@@ -373,7 +355,7 @@ class LeadCaptureView(APIView):
             defaults={'name': name, 'email': email, 'date_of_birth': dob, 'notes': 'Captured via Website VIP Widget'}
         )
 
-        # --- NEW: Check if they already claimed it ---
+        # Check if they already claimed it
         if customer.has_claimed_vip_perk:
             # Update info just in case they added a new email/birthday
             if email and not customer.email: customer.email = email
@@ -384,7 +366,7 @@ class LeadCaptureView(APIView):
                 "message": "You are already on our VIP list! We look forward to seeing you."
             }, status=status.HTTP_200_OK)
 
-        # --- If they haven't claimed it yet ---
+        # If they haven't claimed it yet
         customer.has_claimed_vip_perk = True
         if not created: # Enrich existing profile
             if email and not customer.email: customer.email = email
@@ -392,7 +374,7 @@ class LeadCaptureView(APIView):
             
         customer.save()
 
-        # --- SEND THE ACTUAL SMS COUPON ---
+        # SEND THE ACTUAL SMS COUPON
         if len(clean_phone) >= 10:
             sms_body = (
                 f"GOLDEN BAY VIP E-PASS: Welcome, {name}! Present this to our receptionist "
@@ -444,7 +426,7 @@ class AwardPointsView(APIView):
             customer.name = name
             customer.save(update_fields=['name'])
 
-        # 2. NEW LOGIC: Calculate Points with VIP Multiplier
+        # 2. Calculate Points with VIP Multiplier
         # Base: 100 PHP = 1 Point
         # VIP: 100 PHP = 1.5 Points
         base_rate = amount_spent / 100
