@@ -16,6 +16,8 @@ from datetime import timedelta
 from dotenv import load_dotenv # Import this to read .env
 from celery.schedules import crontab
 
+RECAPTCHA_SECRET_KEY = os.getenv('RECAPTCHA_SECRET_KEY')
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -66,6 +68,7 @@ REST_FRAMEWORK = {
         'anon': '100/day',      # General API limit for guests
         'user': '10000/day',    # Increased limit
         'burst': '5/minute',    # Burst limit for sensitive endpoints
+        'otp_phone': '3/hour',
     }
 }
 

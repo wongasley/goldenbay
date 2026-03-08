@@ -128,7 +128,8 @@ FILES_TO_READ = [
     'frontend/src/pages/public/about/PrivacyPolicyPage.jsx',
     # 'goldenbay-mobile/.easignore',
     'frontend/src/pages/admin/dashboard/OwnerDashboardPage.jsx',
-
+    'backend/core/utils.py',
+    'frontend/src/pages/public/reservations/ManageBookingPage.jsx',
 ]
 
 # 2. Set the name for the final output text file.

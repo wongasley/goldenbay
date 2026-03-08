@@ -4,12 +4,14 @@ import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import html2canvas from 'html2canvas'; // <-- Added for downloading receipt
+import html2canvas from 'html2canvas'; 
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 // Backend configuration
 const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
 
 const CustomerRewardsPage = () => {
+  const { executeRecaptcha } = useGoogleReCaptcha();
   const [step, setStep] = useState('LOGIN'); 
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -21,7 +23,7 @@ const CustomerRewardsPage = () => {
   // State for the Digital Receipt Modal
   const [receiptData, setReceiptData] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
-  const receiptRef = useRef(null); // <-- Ref to target the receipt for download
+  const receiptRef = useRef(null); 
 
   // --- Logic: Group Rewards by Name ---
   const groupedRewards = useMemo(() => {
@@ -71,8 +73,16 @@ const CustomerRewardsPage = () => {
   const handleRequestOTP = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+
+    if (!executeRecaptcha) {
+        toast.error("Security check failed to load. Please try again.");
+        setIsLoading(false);
+        return;
+    }
+
     try {
-      await axios.post(`${BACKEND_URL}/api/users/request-otp/`, { phone });
+      const token = await executeRecaptcha('request_otp');
+      await axios.post(`${BACKEND_URL}/api/users/request-otp/`, { phone, captcha_token: token });
       toast.success("Login code sent via SMS.");
       setStep('OTP');
     } catch (err) {

@@ -1,4 +1,3 @@
-// frontend/src/pages/admin/dashboard/OwnerDashboardPage.jsx
 import React, { useEffect, useState } from 'react';
 import { Users, Crown, CalendarCheck, DoorOpen, BarChart3, TrendingUp, DollarSign, Gift } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -40,7 +39,23 @@ const OwnerDashboardPage = () => {
   }, []);
 
   if (loading) {
-    return <div className="p-12 text-center text-gray-400 animate-pulse font-serif text-lg">Compiling Executive Reports...</div>;
+    return (
+        <div className="space-y-6 pb-20">
+            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm h-24 animate-pulse"></div>
+            <div className="h-6 w-48 bg-gray-200 animate-pulse rounded mt-8 mb-2"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                {[1,2,3,4].map(i => <div key={i} className="bg-white h-32 rounded-xl border border-gray-200 shadow-sm animate-pulse"></div>)}
+            </div>
+            <div className="h-6 w-48 bg-gray-200 animate-pulse rounded mt-8 mb-2"></div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                {[1,2,3].map(i => <div key={i} className="bg-white h-32 rounded-xl border border-gray-200 shadow-sm animate-pulse"></div>)}
+            </div>
+            <div className="h-6 w-48 bg-gray-200 animate-pulse rounded mt-8 mb-2"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {[1,2].map(i => <div key={i} className="bg-white h-96 rounded-xl border border-gray-200 shadow-sm animate-pulse"></div>)}
+            </div>
+        </div>
+    );
   }
 
   return (

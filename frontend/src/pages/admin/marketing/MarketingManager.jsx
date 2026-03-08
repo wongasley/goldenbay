@@ -32,6 +32,23 @@ const MarketingManager = () => {
     }
   };
 
+  // SKELETON COMPONENT FOR DESKTOP
+  const TableSkeleton = () => (
+    <tbody className="divide-y divide-gray-100 text-xs">
+        {[1,2,3,4,5].map(i => (
+            <tr key={i}>
+                <td className="px-4 py-4"><div className="h-4 w-3/4 bg-gray-200 animate-pulse rounded"></div></td>
+                <td className="px-4 py-4"><div className="h-4 w-16 bg-gray-100 animate-pulse rounded"></div></td>
+                <td className="px-4 py-4"><div className="h-4 w-12 bg-gray-100 animate-pulse rounded"></div></td>
+                <td className="px-4 py-4 flex justify-end gap-2">
+                    <div className="h-7 w-7 bg-gray-200 animate-pulse rounded"></div>
+                    <div className="h-7 w-7 bg-gray-200 animate-pulse rounded"></div>
+                </td>
+            </tr>
+        ))}
+    </tbody>
+  );
+
   return (
     <div className="space-y-4">
       
@@ -64,13 +81,13 @@ const MarketingManager = () => {
                     <th className="px-4 py-2.5 text-right">Actions</th>
                 </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 text-xs">
-                {loading ? (
-                    <tr><td colSpan="4" className="px-4 py-8 text-center text-gray-400 animate-pulse">Loading posts...</td></tr>
-                ) : posts.length === 0 ? (
-                    <tr><td colSpan="4" className="px-4 py-8 text-center text-gray-400">No posts found.</td></tr>
-                ) : (
-                    posts.map(post => (
+            {loading ? <TableSkeleton /> : posts.length === 0 ? (
+                <tbody>
+                    <tr><td colSpan="4" className="px-4 py-8 text-center text-gray-400 text-xs">No posts found.</td></tr>
+                </tbody>
+            ) : (
+                <tbody className="divide-y divide-gray-100 text-xs">
+                    {posts.map(post => (
                         <tr key={post.id} className="hover:bg-gray-50 transition-colors">
                             <td className="px-4 py-2.5 font-bold text-gray-900">{post.title}</td>
                             <td className="px-4 py-2.5">
@@ -93,16 +110,25 @@ const MarketingManager = () => {
                                 </button>
                             </td>
                         </tr>
-                    ))
-                )}
-            </tbody>
+                    ))}
+                </tbody>
+            )}
         </table>
       </div>
 
       {/* --- MOBILE VIEW (CARDS) --- */}
       <div className="md:hidden flex flex-col gap-3">
           {loading ? (
-              <div className="p-8 text-center text-gray-400 animate-pulse text-xs">Loading posts...</div>
+             [1,2,3,4].map(i => (
+                 <div key={i} className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm flex flex-col gap-3 animate-pulse">
+                     <div className="h-4 w-3/4 bg-gray-200 rounded"></div>
+                     <div className="h-3 w-1/4 bg-gray-100 rounded mt-1"></div>
+                     <div className="flex justify-between border-t border-gray-100 pt-3 mt-2">
+                         <div className="h-4 w-16 bg-gray-200 rounded"></div>
+                         <div className="flex gap-2"><div className="h-6 w-6 bg-gray-200 rounded"></div></div>
+                     </div>
+                 </div>
+             ))
           ) : posts.length === 0 ? (
               <div className="p-8 text-center text-gray-400 bg-white border border-gray-200 rounded text-xs">No posts found.</div>
           ) : (

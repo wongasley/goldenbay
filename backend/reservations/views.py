@@ -6,6 +6,11 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
+from rest_framework.throttling import AnonRateThrottle
+import math
+from django.db import transaction
+from decimal import Decimal
+
 from .utils import send_sms
 from .models import DiningArea, PointTransaction, Reservation, Customer, RewardItem, RewardRedemption
 from .serializers import AwardPointsSerializer, ReservationSerializer, DiningAreaSerializer, CustomerSerializer, RewardItemSerializer, RewardRedemptionSerializer
@@ -16,10 +21,10 @@ from .tasks import (
     send_booking_modification_notifications, 
     send_post_dining_feedback
 )
-from rest_framework.throttling import AnonRateThrottle
-import math
-from django.db import transaction
-from decimal import Decimal
+from django.shortcuts import get_object_or_404
+# --- NEW: Import the CAPTCHA verifier ---
+from core.utils import verify_recaptcha
+
 
 class AvailableRoomsView(APIView):
     def get(self, request):
@@ -57,6 +62,16 @@ class ReservationCreateView(generics.CreateAPIView):
     queryset = Reservation.objects.all()
     serializer_class = ReservationSerializer
     permission_classes = [AllowAny] 
+
+    # --- NEW: Intercept the request before saving to check CAPTCHA ---
+    def create(self, request, *args, **kwargs):
+        # We only mandate CAPTCHA for website users. Admins skip this.
+        if not request.user.is_authenticated:
+            captcha_token = request.data.get('captcha_token')
+            verify_recaptcha(captcha_token)
+            
+        return super().create(request, *args, **kwargs)
+    # -----------------------------------------------------------------
 
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
@@ -333,6 +348,11 @@ class LeadCaptureView(APIView):
     throttle_classes = [AnonRateThrottle]
 
     def post(self, request):
+        # --- NEW: Verify Bot Status before processing Lead ---
+        captcha_token = request.data.get('captcha_token')
+        verify_recaptcha(captcha_token)
+        # ------------------------------------------------------
+
         name = request.data.get('name')
         phone = request.data.get('phone')
         email = request.data.get('email')
@@ -613,3 +633,30 @@ class OwnerReportView(APIView):
             },
             "chart_data": chart_data
         })
+    
+class ManageBookingByTokenView(APIView):
+    """ Allows guests to view and cancel their booking using their secure email link """
+    permission_classes = [AllowAny]
+
+    def get(self, request, token):
+        reservation = get_object_or_404(Reservation, management_token=token)
+        serializer = ReservationSerializer(reservation)
+        return Response(serializer.data)
+
+    def patch(self, request, token):
+        reservation = get_object_or_404(Reservation, management_token=token)
+        
+        if reservation.status in ['COMPLETED', 'NO_SHOW', 'CANCELLED']:
+            return Response({"error": "This booking can no longer be modified."}, status=status.HTTP_400_BAD_REQUEST)
+
+        action = request.data.get('action')
+        if action == 'CANCEL':
+            reservation.status = 'CANCELLED'
+            reservation.save()
+            
+            # Fire email/SMS cancellation alerts
+            send_status_update_notifications.delay(reservation.id, 'CANCELLED', send_sms_flag=True)
+            
+            return Response({"message": "Reservation successfully cancelled."}, status=status.HTTP_200_OK)
+            
+        return Response({"error": "Invalid action."}, status=status.HTTP_400_BAD_REQUEST)

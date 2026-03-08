@@ -11,11 +11,13 @@ import { LanguageProvider } from './context/LanguageContext';
 import PixelTracker from './components/layout/PixelTracker';
 import LeadCaptureWidget from './components/marketing/LeadCaptureWidget';
 import ErrorBoundary from './components/layout/ErrorBoundary';
+import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 
 // --- LAZY LOAD PUBLIC PAGES ---
 const HomePage = lazy(() => import('./pages/public/home/HomePage'));
 const MenuPage = lazy(() => import('./pages/public/menu/MenuPage'));
 const ReservationPage = lazy(() => import('./pages/public/reservations/ReservationPage'));
+const ManageBookingPage = lazy(() => import('./pages/public/reservations/ManageBookingPage')); // ADDED
 const AboutPage = lazy(() => import('./pages/public/about/AboutPage')); 
 const ContactPage = lazy(() => import('./pages/public/contact/ContactPage'));
 const NewsPage = lazy(() => import('./pages/public/marketing/NewsPage'));
@@ -39,7 +41,6 @@ const MenuManager = lazy(() => import('./pages/admin/menu/MenuManager'));
 const RewardsManager = lazy(() => import('./pages/admin/customers/RewardsManager'));
 const OwnerDashboardPage = lazy(() => import('./pages/admin/dashboard/OwnerDashboardPage'));
 
-// Premium Loading Fallback while splitting code
 const PageLoader = () => (
   <div className="min-h-screen bg-cream-50 flex items-center justify-center text-gold-600 font-serif tracking-widest uppercase animate-pulse">
     Loading Golden Bay...
@@ -50,6 +51,7 @@ function App() {
   return (
     <HelmetProvider>
       <LanguageProvider>
+        <GoogleReCaptchaProvider reCaptchaKey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}>
     <Router>
       <ScrollToTop />
       <PixelTracker />
@@ -72,7 +74,6 @@ function App() {
           }}
         />
 
-        {/* Wrap all routes in Suspense for Lazy Loading */}
         <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
             <Routes>
@@ -80,6 +81,7 @@ function App() {
               <Route path="/" element={<><Navbar /><HomePage /></>} />
               <Route path="/menu" element={<><Navbar /><MenuPage /><Footer /></>} />
               <Route path="/reservations" element={<><Navbar /><ReservationPage /><Footer /></>} />
+              <Route path="/manage-booking/:token" element={<><Navbar /><ManageBookingPage /><Footer /></>} /> {/* ADDED */}
               <Route path="/events" element={<><Navbar /><EventInquiriesPage /><Footer /></>} />
               <Route path="/about" element={<><Navbar /><AboutPage /><Footer /></>} />
               <Route path="/news" element={<><Navbar /><NewsPage /><Footer /></>} />
@@ -111,12 +113,12 @@ function App() {
           </Suspense>
         </ErrorBoundary>
 
-        {/* Widget Component (Old manual widget was removed from here) */}
         <FloatingWidget />
         <LeadCaptureWidget />
 
       </div>
     </Router>
+    </GoogleReCaptchaProvider>
     </LanguageProvider>
     </HelmetProvider>
   );

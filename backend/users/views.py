@@ -9,16 +9,23 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.throttling import AnonRateThrottle
 from reservations.models import Customer
 from reservations.utils import send_sms
+from core.utils import verify_recaptcha, OTPPhoneNumberThrottle
 
 class RequestOTPView(APIView):
     """ Step 1: Generate OTP, save to cache, and text it to the customer """
     permission_classes = [AllowAny]
-    throttle_classes = [AnonRateThrottle] # Prevent SMS spam attacks
+    # Add the custom OTPPhoneNumberThrottle here
+    throttle_classes = [AnonRateThrottle, OTPPhoneNumberThrottle] 
 
     def post(self, request):
         phone = request.data.get('phone')
+        captcha_token = request.data.get('captcha_token') # <--- Get Token
+
         if not phone:
             return Response({"error": "Phone number is required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Verify Bot Status before sending SMS
+        verify_recaptcha(captcha_token)
 
         # Standardize phone format
         clean_phone = ''.join(filter(str.isdigit, str(phone)))
@@ -35,7 +42,6 @@ class RequestOTPView(APIView):
         sms_body = f"Golden Bay Rewards: Your login code is {otp}. It will expire in 5 minutes. Do not share this code with anyone."
         send_sms(clean_phone, sms_body)
 
-        # For local testing purposes (shows in your terminal)
         print(f"🔑 OTP for {clean_phone} is: {otp}")
 
         return Response({"message": "OTP sent successfully. Please check your phone."}, status=status.HTTP_200_OK)

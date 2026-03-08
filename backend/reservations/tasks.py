@@ -10,17 +10,11 @@ from .utils import send_sms
 from .models import Customer, Reservation 
 
 def generate_ics(reservation):
-    """ Helper function to generate iCalendar (.ics) content for a confirmed booking """
-    # Create start time combining date and time
     start_dt = datetime.combine(reservation.date, reservation.time)
-    # Assume a standard dining duration of 2 hours
     end_dt = start_dt + timedelta(hours=2)
-    
-    # Format dates to standard ICS format (e.g., 20260315T110000)
     dtstart = start_dt.strftime("%Y%m%dT%H%M%S")
     dtend = end_dt.strftime("%Y%m%dT%H%M%S")
     now = datetime.now().strftime("%Y%m%dT%H%M%S")
-    
     area_name = reservation.dining_area.name if reservation.dining_area else 'Main Dining Hall'
     
     ics_content = f"""BEGIN:VCALENDAR
@@ -36,17 +30,15 @@ LOCATION:{area_name}, Golden Bay Fresh Seafood Restaurant, Macapagal Blvd, Pasay
 DESCRIPTION:Reservation for {reservation.customer_name}.\\nContact: {reservation.customer_contact}\\nRef: #{reservation.id}\\nWe look forward to serving you.
 END:VEVENT
 END:VCALENDAR"""
-    
     return ics_content
 
 @shared_task
 def send_new_booking_notifications(reservation_id, send_sms_flag=True, notify_customer=True):
-    """ ASYNCHRONOUS: Fired by Celery when a NEW booking is created """
     try:
         reservation = Reservation.objects.get(id=reservation_id)
         area_name = reservation.dining_area.name if reservation.dining_area else "Main Dining Hall"
         
-        # 1. NOTIFY THE RESTAURANT ADMINS (Always fires)
+        # 1. NOTIFY THE RESTAURANT ADMINS
         admin_context = {
             'name': reservation.customer_name,
             'contact': reservation.customer_contact,
@@ -76,7 +68,7 @@ def send_new_booking_notifications(reservation_id, send_sms_flag=True, notify_cu
             for num in admin_numbers:
                 send_sms(num, admin_sms_body)
 
-        # 2. NOTIFY THE CUSTOMER (Only fires if it's a web booking)
+        # 2. NOTIFY THE CUSTOMER
         if notify_customer:
             if reservation.customer_email and '@' in reservation.customer_email:
                 customer_context = {
@@ -86,7 +78,8 @@ def send_new_booking_notifications(reservation_id, send_sms_flag=True, notify_cu
                     'time': reservation.time.strftime('%I:%M %p'),
                     'pax': reservation.pax,
                     'area': area_name,
-                    'id': reservation.id
+                    'id': reservation.id,
+                    'manage_url': f"https://goldenbay.com.ph/manage-booking/{reservation.management_token}" # ADDED URL
                 }
                 customer_html = render_to_string('emails/confirmation.html', customer_context)
                 customer_plain = strip_tags(customer_html)
@@ -110,12 +103,10 @@ def send_new_booking_notifications(reservation_id, send_sms_flag=True, notify_cu
 
 @shared_task
 def send_status_update_notifications(reservation_id, new_status, send_sms_flag=True):
-    """ ASYNCHRONOUS: Fired by Celery when an ADMIN confirms or cancels a booking """
     try:
         reservation = Reservation.objects.get(id=reservation_id)
         area_name = reservation.dining_area.name if reservation.dining_area else "Main Dining Hall"
         
-        # 1. SEND HTML EMAIL (If email exists) - UPDATED TO ATTACH .ICS
         if reservation.customer_email and '@' in reservation.customer_email and new_status in ['CONFIRMED', 'CANCELLED']:
             context = {
                 'name': reservation.customer_name,
@@ -124,12 +115,12 @@ def send_status_update_notifications(reservation_id, new_status, send_sms_flag=T
                 'time': reservation.time.strftime('%I:%M %p'),
                 'pax': reservation.pax,
                 'area': area_name,
-                'id': reservation.id
+                'id': reservation.id,
+                'manage_url': f"https://goldenbay.com.ph/manage-booking/{reservation.management_token}" # ADDED URL
             }
             html_message = render_to_string('emails/confirmation.html', context)
             plain_message = strip_tags(html_message)
 
-            # Using EmailMultiAlternatives to allow .ics file attachment
             msg = EmailMultiAlternatives(
                 subject=f'Reservation {new_status.capitalize()} - Golden Bay',
                 body=plain_message,
@@ -138,18 +129,16 @@ def send_status_update_notifications(reservation_id, new_status, send_sms_flag=T
             )
             msg.attach_alternative(html_message, "text/html")
             
-            # --- NEW: GENERATE AND ATTACH ICS FOR CONFIRMED BOOKINGS ---
             if new_status == 'CONFIRMED':
                 ics_data = generate_ics(reservation)
                 msg.attach('GoldenBay_Reservation.ics', ics_data, 'text/calendar')
 
             msg.send(fail_silently=False)
             
-        # SMS Fallback logic stays exactly the same    
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
         if len(contact_digits) >= 10 and send_sms_flag:
              if new_status == 'CONFIRMED':
-                 sms_body = f"Great news, {reservation.customer_name}! Your table for {reservation.pax} on {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')} is CONFIRMED. See you soon! - GOLDENBAY"
+                 sms_body = f"Great news, {reservation.customer_name}! Your table for {reservation.pax} on {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')} is CONFIRMED. Manage here: https://goldenbay.com.ph/manage-booking/{reservation.management_token}"
                  send_sms(reservation.customer_contact, sms_body)
              elif new_status == 'CANCELLED':
                  sms_body = f"Hi {reservation.customer_name}, your reservation request has been cancelled. Please call +63 917 580 7166 to reschedule. - GOLDENBAY"
@@ -160,21 +149,20 @@ def send_status_update_notifications(reservation_id, new_status, send_sms_flag=T
 
 @shared_task
 def send_booking_modification_notifications(reservation_id, send_sms_flag=True):
-    """ ASYNCHRONOUS: Fired when an admin edits a booking's room, date, or time """
     try:
         reservation = Reservation.objects.get(id=reservation_id)
         area_name = reservation.dining_area.name if reservation.dining_area else "Main Dining Hall"
         
-        # 1. SEND HTML EMAIL
         if reservation.customer_email and '@' in reservation.customer_email:
             context = {
                 'name': reservation.customer_name,
-                'status': 'UPDATED', # Triggers the "Updated" block in your template
+                'status': 'UPDATED',
                 'date': reservation.date.strftime('%B %d, %Y'),
                 'time': reservation.time.strftime('%I:%M %p'),
                 'pax': reservation.pax,
                 'area': area_name,
-                'id': reservation.id
+                'id': reservation.id,
+                'manage_url': f"https://goldenbay.com.ph/manage-booking/{reservation.management_token}"
             }
             html_message = render_to_string('emails/confirmation.html', context)
             plain_message = strip_tags(html_message)
@@ -187,13 +175,11 @@ def send_booking_modification_notifications(reservation_id, send_sms_flag=True):
             )
             msg.attach_alternative(html_message, "text/html")
             
-            # Attach updated ICS calendar event
             ics_data = generate_ics(reservation)
             msg.attach('GoldenBay_Reservation_Updated.ics', ics_data, 'text/calendar')
             
             msg.send(fail_silently=False)
             
-        # 2. SEND SMS
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
         if len(contact_digits) >= 10 and send_sms_flag:
              sms_body = f"Hi {reservation.customer_name}, your Golden Bay reservation has been UPDATED. You are now booked for {reservation.pax} pax on {reservation.date.strftime('%b %d')} at {reservation.time.strftime('%I:%M %p')} in the {area_name}. - GOLDENBAY"
@@ -204,22 +190,18 @@ def send_booking_modification_notifications(reservation_id, send_sms_flag=True):
 
 @shared_task
 def send_post_dining_feedback(reservation_id, send_sms_flag=True):
-    """ ASYNCHRONOUS: Fired 2 hours after a reservation is marked COMPLETED """
     try:
         reservation = Reservation.objects.get(id=reservation_id)
-        
         if reservation.status != 'COMPLETED':
             return
             
         review_link = "https://g.page/r/CVOD2Qu6cEbVEAE/review"
         
-        # 1. SEND SMS
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
         if len(contact_digits) >= 10 and send_sms_flag:
              sms_body = f"Hi {reservation.customer_name}, thank you for dining at Golden Bay today! We hope you enjoyed your meal. If you have a moment, we'd love your feedback: {review_link} - GOLDENBAY"
              send_sms(reservation.customer_contact, sms_body)
 
-        # 2. SEND EMAIL (Optional fallback)
         if reservation.customer_email and '@' in reservation.customer_email:
             send_mail(
                 subject='Thank you for dining with Golden Bay',
@@ -234,7 +216,6 @@ def send_post_dining_feedback(reservation_id, send_sms_flag=True):
 
 @shared_task
 def send_we_miss_you_automation():
-    """ ASYNCHRONOUS: Runs daily to re-engage old customers """
     today = date.today()
     ninety_days_ago = today - timedelta(days=90)
     one_eighty_days_ago = today - timedelta(days=180)
@@ -279,7 +260,6 @@ def send_we_miss_you_automation():
 
 @shared_task
 def send_birthday_promos():
-    """ Runs daily to find customers with a birthday exactly 7 days from now """
     today = date.today()
     target_date = today + timedelta(days=7)
     current_year = today.year
@@ -303,7 +283,6 @@ def send_birthday_promos():
 
 @shared_task
 def send_points_awarded_sms(customer_id, points_earned, total_points):
-    """ ASYNCHRONOUS: Fired when a cashier awards points to a customer """
     try:
         customer = Customer.objects.get(id=customer_id)
         contact_digits = ''.join(filter(str.isdigit, str(customer.phone)))

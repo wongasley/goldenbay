@@ -58,8 +58,16 @@ const RewardsManager = () => {
             </div>
 
             {loading ? (
-                <div className="p-12 text-center text-gray-400 animate-pulse font-medium text-sm bg-white rounded-xl border border-gray-200 shadow-sm">
-                    Fetching live tickets...
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                   {[1,2,3,4,5,6].map(i => (
+                      <div key={i} className="bg-white border rounded-xl p-6 shadow-sm flex flex-col gap-4 animate-pulse border-gray-200">
+                          <div className="flex justify-between"><div className="h-6 w-20 bg-gray-200 rounded"></div><div className="h-6 w-16 bg-gray-100 rounded"></div></div>
+                          <div className="h-5 w-3/4 bg-gray-200 rounded mt-2"></div>
+                          <div className="h-4 w-1/2 bg-gray-100 rounded"></div>
+                          <div className="h-20 w-full bg-gray-50 rounded my-2"></div>
+                          <div className="h-10 w-full bg-gray-200 rounded mt-auto"></div>
+                      </div>
+                   ))}
                 </div>
             ) : tickets.length === 0 ? (
                 <div className="p-16 text-center text-gray-400 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col items-center">

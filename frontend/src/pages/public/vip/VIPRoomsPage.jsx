@@ -28,8 +28,6 @@ const VIPRoomsPage = () => {
     fetchRooms();
   }, []);
 
-  if (loading) return <div className="min-h-screen bg-cream-50 flex items-center justify-center text-gold-600 font-serif tracking-widest uppercase animate-pulse">Loading Private Rooms...</div>;
-
   return (
     <div className="min-h-screen bg-cream-50 text-gray-900 overflow-x-hidden font-sans">
       <SEO 
@@ -49,54 +47,70 @@ const VIPRoomsPage = () => {
       </div>
 
       <div className="px-6 py-12 md:px-24">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {rooms.map((room) => (
-            <motion.div key={room.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="group bg-white border border-gray-200 hover:border-gold-400/50 transition-all duration-500 rounded-sm overflow-hidden flex flex-col shadow-sm hover:shadow-lg">
-                <div className="aspect-[4/3] overflow-hidden relative bg-gray-100 border-b border-gray-100">
-                {room.image ? (
-                    <img src={room.image.startsWith('http') ? room.image : `${BACKEND_URL}${room.image}`} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={room.name} />
-                ) : (
-                    <div className={`w-full h-full flex flex-col items-center justify-center opacity-20 text-gray-400 uppercase text-xs tracking-widest ${getFontClass()}`}>{t('vip.noImage')}</div>
-                )}
-                <div className={`absolute top-0 right-0 bg-white/95 px-4 py-2 text-xs font-bold text-gray-900 border-l border-b border-gray-100 shadow-sm z-10 tracking-widest flex items-center gap-2 ${getFontClass()}`}>
-                    <Users size={12} className="text-gold-600"/> {room.capacity} {t('vip.pax')}
-                </div>
-                </div>
-
-                <div className="p-6 flex-1 flex flex-col">
-                <div className="mb-4">
-                    <h3 className={`text-xl font-bold text-gray-900 uppercase tracking-wider group-hover:text-gold-600 transition-colors leading-tight ${getFontClass()}`}>
-                        {room.name}
-                    </h3>
-                    
-                    {/* Display Room Type and Consumable Price side by side */}
-                    <div className="flex justify-between items-center mt-2">
-                        <p className={`text-xs text-gray-400 uppercase tracking-widest ${getFontClass()}`}>{room.area_type === 'VIP' ? t('vip.roomType1') : t('vip.roomType2')}</p>
-                        {Number(room.price) > 0 && (
-                            <p className={`text-sm font-bold text-gold-600 ${getFontClass()}`}>
-                                ₱{Number(room.price).toLocaleString()} Consumable
-                            </p>
-                        )}
-                    </div>
-                </div>
-
-                <p className={`text-sm text-gray-500 font-light mb-6 line-clamp-3 leading-relaxed ${getFontClass()}`}>
-                    {room.description || "An elegant space designed for privacy and comfort."}
-                </p>
-
-                <div className="mt-auto pt-4 border-t border-gray-100 flex flex-wrap gap-4 text-xs text-gray-400">
-                    {room.has_ktv && <span className="flex items-center gap-1" title="KTV Available"><Mic2 size={14} className="text-gold-600"/> KTV</span>}
-                    {room.has_restroom && <span className="flex items-center gap-1" title="Private Restroom"><Star size={14} className="text-gold-600"/> CR</span>}
-                    {room.has_tv && <span className="flex items-center gap-1" title="Smart TV"><Tv size={14} className="text-gold-600"/> TV</span>}
-                    {room.has_couch && <span className="flex items-center gap-1" title="Lounge Area"><Armchair size={14} className="text-gold-600"/> Lounge</span>}
-                    {!room.has_ktv && !room.has_restroom && !room.has_tv && !room.has_couch && (
-                        <span className={`italic opacity-50 ${getFontClass()}`}>{t('vip.stdSetup')}</span>
-                    )}
-                </div>
-                </div>
-            </motion.div>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div key={i} className="bg-white border border-gray-200 rounded-sm overflow-hidden flex flex-col shadow-sm">
+                 <div className="aspect-[4/3] bg-gray-200 animate-pulse"></div>
+                 <div className="p-6 flex-1 flex flex-col gap-4">
+                    <div className="h-6 bg-gray-200 animate-pulse rounded w-3/4"></div>
+                    <div className="h-4 bg-gray-200 animate-pulse rounded w-1/4"></div>
+                    <div className="h-16 bg-gray-100 animate-pulse rounded w-full mt-2"></div>
+                    <div className="h-4 bg-gray-200 animate-pulse rounded w-full mt-auto"></div>
+                 </div>
+              </div>
             ))}
-        </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {rooms.map((room) => (
+              <motion.div key={room.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="group bg-white border border-gray-200 hover:border-gold-400/50 transition-all duration-500 rounded-sm overflow-hidden flex flex-col shadow-sm hover:shadow-lg">
+                  <div className="aspect-[4/3] overflow-hidden relative bg-gray-100 border-b border-gray-100">
+                  {room.image ? (
+                      <img src={room.image.startsWith('http') ? room.image : `${BACKEND_URL}${room.image}`} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={room.name} />
+                  ) : (
+                      <div className={`w-full h-full flex flex-col items-center justify-center opacity-20 text-gray-400 uppercase text-xs tracking-widest ${getFontClass()}`}>{t('vip.noImage')}</div>
+                  )}
+                  <div className={`absolute top-0 right-0 bg-white/95 px-4 py-2 text-xs font-bold text-gray-900 border-l border-b border-gray-100 shadow-sm z-10 tracking-widest flex items-center gap-2 ${getFontClass()}`}>
+                      <Users size={12} className="text-gold-600"/> {room.capacity} {t('vip.pax')}
+                  </div>
+                  </div>
+
+                  <div className="p-6 flex-1 flex flex-col">
+                  <div className="mb-4">
+                      <h3 className={`text-xl font-bold text-gray-900 uppercase tracking-wider group-hover:text-gold-600 transition-colors leading-tight ${getFontClass()}`}>
+                          {room.name}
+                      </h3>
+                      
+                      {/* Display Room Type and Consumable Price side by side */}
+                      <div className="flex justify-between items-center mt-2">
+                          <p className={`text-xs text-gray-400 uppercase tracking-widest ${getFontClass()}`}>{room.area_type === 'VIP' ? t('vip.roomType1') : t('vip.roomType2')}</p>
+                          {Number(room.price) > 0 && (
+                              <p className={`text-sm font-bold text-gold-600 ${getFontClass()}`}>
+                                  ₱{Number(room.price).toLocaleString()} Consumable
+                              </p>
+                          )}
+                      </div>
+                  </div>
+
+                  <p className={`text-sm text-gray-500 font-light mb-6 line-clamp-3 leading-relaxed ${getFontClass()}`}>
+                      {room.description || "An elegant space designed for privacy and comfort."}
+                  </p>
+
+                  <div className="mt-auto pt-4 border-t border-gray-100 flex flex-wrap gap-4 text-xs text-gray-400">
+                      {room.has_ktv && <span className="flex items-center gap-1" title="KTV Available"><Mic2 size={14} className="text-gold-600"/> KTV</span>}
+                      {room.has_restroom && <span className="flex items-center gap-1" title="Private Restroom"><Star size={14} className="text-gold-600"/> CR</span>}
+                      {room.has_tv && <span className="flex items-center gap-1" title="Smart TV"><Tv size={14} className="text-gold-600"/> TV</span>}
+                      {room.has_couch && <span className="flex items-center gap-1" title="Lounge Area"><Armchair size={14} className="text-gold-600"/> Lounge</span>}
+                      {!room.has_ktv && !room.has_restroom && !room.has_tv && !room.has_couch && (
+                          <span className={`italic opacity-50 ${getFontClass()}`}>{t('vip.stdSetup')}</span>
+                      )}
+                  </div>
+                  </div>
+              </motion.div>
+              ))}
+          </div>
+        )}
       </div>
 
       <div className="py-20 text-center bg-white border-t border-gray-100">
