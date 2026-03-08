@@ -1,13 +1,43 @@
 from celery import shared_task
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMultiAlternatives
 from django.conf import settings
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from django.db.models import Q
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 import os
 from .utils import send_sms
 from .models import Customer, Reservation 
+
+def generate_ics(reservation):
+    """ Helper function to generate iCalendar (.ics) content for a confirmed booking """
+    # Create start time combining date and time
+    start_dt = datetime.combine(reservation.date, reservation.time)
+    # Assume a standard dining duration of 2 hours
+    end_dt = start_dt + timedelta(hours=2)
+    
+    # Format dates to standard ICS format (e.g., 20260315T110000)
+    dtstart = start_dt.strftime("%Y%m%dT%H%M%S")
+    dtend = end_dt.strftime("%Y%m%dT%H%M%S")
+    now = datetime.now().strftime("%Y%m%dT%H%M%S")
+    
+    area_name = reservation.dining_area.name if reservation.dining_area else 'Main Dining Hall'
+    
+    ics_content = f"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Golden Bay Restaurant//EN
+CALSCALE:GREGORIAN
+BEGIN:VEVENT
+DTSTAMP:{now}
+DTSTART;TZID=Asia/Manila:{dtstart}
+DTEND;TZID=Asia/Manila:{dtend}
+SUMMARY:Golden Bay Reservation ({reservation.pax} Pax)
+LOCATION:{area_name}, Golden Bay Fresh Seafood Restaurant, Macapagal Blvd, Pasay City
+DESCRIPTION:Reservation for {reservation.customer_name}.\\nContact: {reservation.customer_contact}\\nRef: #{reservation.id}\\nWe look forward to serving you.
+END:VEVENT
+END:VCALENDAR"""
+    
+    return ics_content
 
 @shared_task
 def send_new_booking_notifications(reservation_id, send_sms_flag=True, notify_customer=True):
@@ -85,7 +115,7 @@ def send_status_update_notifications(reservation_id, new_status, send_sms_flag=T
         reservation = Reservation.objects.get(id=reservation_id)
         area_name = reservation.dining_area.name if reservation.dining_area else "Main Dining Hall"
         
-        # 1. SEND HTML EMAIL (If email exists)
+        # 1. SEND HTML EMAIL (If email exists) - UPDATED TO ATTACH .ICS
         if reservation.customer_email and '@' in reservation.customer_email and new_status in ['CONFIRMED', 'CANCELLED']:
             context = {
                 'name': reservation.customer_name,
@@ -99,15 +129,23 @@ def send_status_update_notifications(reservation_id, new_status, send_sms_flag=T
             html_message = render_to_string('emails/confirmation.html', context)
             plain_message = strip_tags(html_message)
 
-            send_mail(
+            # Using EmailMultiAlternatives to allow .ics file attachment
+            msg = EmailMultiAlternatives(
                 subject=f'Reservation {new_status.capitalize()} - Golden Bay',
-                message=plain_message,
+                body=plain_message,
                 from_email=settings.EMAIL_HOST_USER,
-                recipient_list=[reservation.customer_email],
-                fail_silently=False,
-                html_message=html_message
+                to=[reservation.customer_email]
             )
+            msg.attach_alternative(html_message, "text/html")
             
+            # --- NEW: GENERATE AND ATTACH ICS FOR CONFIRMED BOOKINGS ---
+            if new_status == 'CONFIRMED':
+                ics_data = generate_ics(reservation)
+                msg.attach('GoldenBay_Reservation.ics', ics_data, 'text/calendar')
+
+            msg.send(fail_silently=False)
+            
+        # SMS Fallback logic stays exactly the same    
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
         if len(contact_digits) >= 10 and send_sms_flag:
              if new_status == 'CONFIRMED':
@@ -141,14 +179,19 @@ def send_booking_modification_notifications(reservation_id, send_sms_flag=True):
             html_message = render_to_string('emails/confirmation.html', context)
             plain_message = strip_tags(html_message)
 
-            send_mail(
+            msg = EmailMultiAlternatives(
                 subject='Reservation Updated - Golden Bay',
-                message=plain_message,
+                body=plain_message,
                 from_email=settings.EMAIL_HOST_USER,
-                recipient_list=[reservation.customer_email],
-                fail_silently=False,
-                html_message=html_message
+                to=[reservation.customer_email]
             )
+            msg.attach_alternative(html_message, "text/html")
+            
+            # Attach updated ICS calendar event
+            ics_data = generate_ics(reservation)
+            msg.attach('GoldenBay_Reservation_Updated.ics', ics_data, 'text/calendar')
+            
+            msg.send(fail_silently=False)
             
         # 2. SEND SMS
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
@@ -165,7 +208,6 @@ def send_post_dining_feedback(reservation_id, send_sms_flag=True):
     try:
         reservation = Reservation.objects.get(id=reservation_id)
         
-        # We only send if they actually showed up and completed the dining experience
         if reservation.status != 'COMPLETED':
             return
             
@@ -197,10 +239,6 @@ def send_we_miss_you_automation():
     ninety_days_ago = today - timedelta(days=90)
     one_eighty_days_ago = today - timedelta(days=180)
 
-    # 1. Find customers who:
-    # - Have actually visited before (visit_count > 0)
-    # - Last visited over 90 days ago
-    # - Have NEVER received a retention message, OR haven't received one in 180 days
     eligible_customers = Customer.objects.filter(
         visit_count__gt=0,
         last_visit__lte=ninety_days_ago
@@ -211,21 +249,17 @@ def send_we_miss_you_automation():
     for customer in eligible_customers:
         sent_any = False
         
-        # 2. SEND SMS (If phone exists)
         contact_digits = ''.join(filter(str.isdigit, str(customer.phone)))
         if len(contact_digits) >= 10:
             sms_body = f"Hi {customer.name}, we miss you at Golden Bay! It's been a while. Show this text for a complimentary dessert on your next dine-in visit with us. Call +63 917 580 7166 to reserve."
             send_sms(customer.phone, sms_body)
             sent_any = True
             
-        # 3. SEND EMAIL (If email exists)
         if customer.email and '@' in customer.email:
             subject = "We miss you at Golden Bay!"
-            
-            # Pass the customer's name into the HTML template
             context = {'name': customer.name}
             html_message = render_to_string('emails/we_miss_you.html', context)
-            plain_message = strip_tags(html_message) # Fallback for non-HTML email clients
+            plain_message = strip_tags(html_message) 
             
             send_mail(
                 subject=subject,
@@ -237,7 +271,6 @@ def send_we_miss_you_automation():
             )
             sent_any = True
             
-        # 4. MARK AS SENT
         if sent_any:
             customer.last_retention_sent = today
             customer.save(update_fields=['last_retention_sent'])
@@ -251,7 +284,6 @@ def send_birthday_promos():
     target_date = today + timedelta(days=7)
     current_year = today.year
 
-    # Find customers born on this month & day, who haven't received a promo THIS year
     birthday_customers = Customer.objects.filter(
         date_of_birth__month=target_date.month,
         date_of_birth__day=target_date.day
@@ -263,7 +295,6 @@ def send_birthday_promos():
             sms_body = f"Advance Happy Birthday, {customer.name}! 🎉 Celebrate your special day at Golden Bay. Show this text within your birthday month for a complimentary Longevity Peach Bun on us! Reserve at +63 917 580 7166"
             send_sms(customer.phone, sms_body)
             
-            # Mark as sent for this year
             customer.last_birthday_promo_year = current_year
             customer.save(update_fields=['last_birthday_promo_year'])
 
@@ -278,7 +309,6 @@ def send_points_awarded_sms(customer_id, points_earned, total_points):
         contact_digits = ''.join(filter(str.isdigit, str(customer.phone)))
         
         if len(contact_digits) >= 10:
-            # You can customize this message!
             sms_body = f"Hi {customer.name}! You earned {points_earned} pts at Golden Bay today. Your new balance is {total_points} pts. View rewards at goldenbay.com.ph/rewards"
             send_sms(customer.phone, sms_body)
             

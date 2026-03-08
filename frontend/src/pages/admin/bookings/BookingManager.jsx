@@ -11,12 +11,9 @@ import { useLocation } from 'react-router-dom';
 
 const BookingManager = () => {
   const [bookings, setBookings] = useState([]);
-  
-  // FIX: Read the initial filter from the URL state if coming from the Dashboard
   const location = useLocation();
   const initialFilter = location.state?.filter || 'ALL';
   const [filter, setFilter] = useState(initialFilter); 
-  
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showManualForm, setShowManualForm] = useState(false);
@@ -33,7 +30,6 @@ const BookingManager = () => {
       const res = await axiosInstance.get('/api/reservations/manage/');
       const fetchedBookings = res.data;
       
-      // --- DASHBOARD NOTIFICATION LOGIC ---
       if (fetchedBookings.length > 0) {
         const maxId = Math.max(...fetchedBookings.map(b => b.id));
         if (latestBookingId.current !== null && maxId > latestBookingId.current) {
@@ -112,22 +108,15 @@ const BookingManager = () => {
 
   const formattedSelectedDate = format(selectedDate, 'yyyy-MM-dd');
   const isSearching = searchQuery.trim() !== '';
-
-  // FIX: The core logic change. If filter is PENDING, ignore the date filter entirely.
   const isViewingGlobalPending = filter === 'PENDING';
 
   const filteredBookings = bookings.filter(b => {
-      // 1. Search Filter
       const matchesSearch = isSearching ? (
           b.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
           b.customer_contact.includes(searchQuery) ||
           b.id.toString() === searchQuery
       ) : true;
-
-      // 2. Status Filter
       const matchesStatus = filter === 'ALL' ? true : b.status === filter;
-
-      // 3. Date Filter (The magic happens here: Ignore date if searching OR viewing global pending)
       const matchesDate = (isSearching || isViewingGlobalPending) ? true : b.date === formattedSelectedDate;
 
       return matchesSearch && matchesDate && matchesStatus;
@@ -136,7 +125,6 @@ const BookingManager = () => {
   const lunchBookings = filteredBookings
       .filter(b => b.session === 'LUNCH')
       .sort((a, b) => {
-          // If viewing global pending, sort by date first, then time
           if (isViewingGlobalPending) {
               const dateCompare = a.date.localeCompare(b.date);
               if (dateCompare !== 0) return dateCompare;
@@ -193,6 +181,48 @@ const BookingManager = () => {
           default: return source || 'Unknown';
       }
   };
+
+  // --- SKELETON LOADERS ---
+  const DesktopTableSkeleton = () => (
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm mt-4">
+        <table className="w-full text-left border-collapse">
+            <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                    {[1, 2, 3, 4, 5].map(i => (
+                        <th key={i} className="px-5 py-4">
+                            <div className="h-3 w-16 bg-gray-200 animate-pulse rounded"></div>
+                        </th>
+                    ))}
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+                {[1, 2, 3, 4].map(row => (
+                    <tr key={row}>
+                        {[1, 2, 3, 4, 5].map(col => (
+                            <td key={col} className="px-5 py-4">
+                                <div className="h-4 w-full max-w-[120px] bg-gray-100 animate-pulse rounded"></div>
+                            </td>
+                        ))}
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    </div>
+  );
+
+  const MobileCardSkeleton = () => (
+    <div className="flex flex-col gap-4 mt-4">
+        {[1, 2, 3].map(i => (
+            <div key={i} className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm space-y-4">
+                <div className="flex justify-between">
+                    <div className="h-5 w-32 bg-gray-200 animate-pulse rounded"></div>
+                    <div className="h-5 w-16 bg-gray-100 animate-pulse rounded"></div>
+                </div>
+                <div className="h-16 w-full bg-gray-50 animate-pulse rounded"></div>
+            </div>
+        ))}
+    </div>
+  );
 
   return (
     <div className="pb-20">
@@ -272,7 +302,7 @@ const BookingManager = () => {
                     onChange={(date) => {
                         setSelectedDate(date);
                         setSearchQuery('');
-                        if (filter === 'PENDING') setFilter('ALL'); // Reset filter if they explicitly click a date
+                        if (filter === 'PENDING') setFilter('ALL');
                     }}
                     value={selectedDate}
                 />
@@ -309,7 +339,7 @@ const BookingManager = () => {
             {/* --- DESKTOP DIVIDED VIEW --- */}
             <div className="hidden lg:flex flex-col gap-8">
                 {loading ? (
-                    <div className="p-12 text-center text-gray-400 animate-pulse text-sm bg-white border border-gray-200 rounded-lg">Loading data...</div>
+                    <DesktopTableSkeleton />
                 ) : filteredBookings.length === 0 ? (
                     <div className="bg-white p-16 text-center border border-gray-200 rounded-lg shadow-sm">
                         <div className="flex flex-col items-center justify-center text-gray-400">
@@ -321,7 +351,6 @@ const BookingManager = () => {
                 ) : (
                     sessionGroups.map((group) => (
                         <div key={group.id} className="flex flex-col gap-3">
-                            {/* Session Header */}
                             <div className="flex items-center justify-between">
                                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest flex items-center gap-2">
                                     <group.icon size={18} className="text-gold-600" /> {group.title}
@@ -332,7 +361,6 @@ const BookingManager = () => {
                                 </span>
                             </div>
 
-                            {/* Session Table */}
                             {group.bookings.length === 0 ? (
                                 <div className="bg-gray-50 border border-gray-200 border-dashed rounded-lg p-8 text-center text-gray-400 text-xs">
                                     No {group.id.toLowerCase()} reservations match your current filters.
@@ -459,7 +487,7 @@ const BookingManager = () => {
             {/* --- MOBILE DIVIDED CARDS --- */}
             <div className="lg:hidden flex flex-col gap-8">
                 {loading ? (
-                    <div className="p-8 text-center text-gray-400 animate-pulse text-xs bg-white border border-gray-200 rounded-lg">Loading data...</div>
+                    <MobileCardSkeleton />
                 ) : filteredBookings.length === 0 ? (
                     <div className="bg-white p-12 rounded-lg border border-gray-200 text-center text-gray-500 text-sm shadow-sm flex flex-col items-center justify-center">
                         <Filter size={32} strokeWidth={1} className="mb-3 opacity-30 text-gold-600" />
@@ -468,7 +496,6 @@ const BookingManager = () => {
                 ) : (
                     sessionGroups.map((group) => (
                         <div key={group.id} className="flex flex-col gap-3">
-                            {/* Session Header Mobile */}
                             <div className="flex items-center justify-between border-b border-gray-200 pb-2">
                                 <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest flex items-center gap-2">
                                     <group.icon size={16} className="text-gold-600" /> {group.title}
@@ -478,7 +505,6 @@ const BookingManager = () => {
                                 </span>
                             </div>
 
-                            {/* Session Cards */}
                             {group.bookings.length === 0 ? (
                                 <div className="bg-gray-50 border border-gray-200 border-dashed rounded-lg p-6 text-center text-gray-400 text-xs">
                                     No {group.id.toLowerCase()} reservations.

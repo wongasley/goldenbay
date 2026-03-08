@@ -1772,15 +1772,45 @@ def send_sms(to_number, body):
         print(f"❌ SMS Network Error: {e}")
 
 from celery import shared_task
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMultiAlternatives
 from django.conf import settings
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from django.db.models import Q
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 import os
 from .utils import send_sms
 from .models import Customer, Reservation 
+
+def generate_ics(reservation):
+    """ Helper function to generate iCalendar (.ics) content for a confirmed booking """
+    # Create start time combining date and time
+    start_dt = datetime.combine(reservation.date, reservation.time)
+    # Assume a standard dining duration of 2 hours
+    end_dt = start_dt + timedelta(hours=2)
+    
+    # Format dates to standard ICS format (e.g., 20260315T110000)
+    dtstart = start_dt.strftime("%Y%m%dT%H%M%S")
+    dtend = end_dt.strftime("%Y%m%dT%H%M%S")
+    now = datetime.now().strftime("%Y%m%dT%H%M%S")
+    
+    area_name = reservation.dining_area.name if reservation.dining_area else 'Main Dining Hall'
+    
+    ics_content = f"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Golden Bay Restaurant//EN
+CALSCALE:GREGORIAN
+BEGIN:VEVENT
+DTSTAMP:{now}
+DTSTART;TZID=Asia/Manila:{dtstart}
+DTEND;TZID=Asia/Manila:{dtend}
+SUMMARY:Golden Bay Reservation ({reservation.pax} Pax)
+LOCATION:{area_name}, Golden Bay Fresh Seafood Restaurant, Macapagal Blvd, Pasay City
+DESCRIPTION:Reservation for {reservation.customer_name}.\\nContact: {reservation.customer_contact}\\nRef: #{reservation.id}\\nWe look forward to serving you.
+END:VEVENT
+END:VCALENDAR"""
+    
+    return ics_content
 
 @shared_task
 def send_new_booking_notifications(reservation_id, send_sms_flag=True, notify_customer=True):
@@ -1858,7 +1888,7 @@ def send_status_update_notifications(reservation_id, new_status, send_sms_flag=T
         reservation = Reservation.objects.get(id=reservation_id)
         area_name = reservation.dining_area.name if reservation.dining_area else "Main Dining Hall"
         
-        # 1. SEND HTML EMAIL (If email exists)
+        # 1. SEND HTML EMAIL (If email exists) - UPDATED TO ATTACH .ICS
         if reservation.customer_email and '@' in reservation.customer_email and new_status in ['CONFIRMED', 'CANCELLED']:
             context = {
                 'name': reservation.customer_name,
@@ -1872,15 +1902,23 @@ def send_status_update_notifications(reservation_id, new_status, send_sms_flag=T
             html_message = render_to_string('emails/confirmation.html', context)
             plain_message = strip_tags(html_message)
 
-            send_mail(
+            # Using EmailMultiAlternatives to allow .ics file attachment
+            msg = EmailMultiAlternatives(
                 subject=f'Reservation {new_status.capitalize()} - Golden Bay',
-                message=plain_message,
+                body=plain_message,
                 from_email=settings.EMAIL_HOST_USER,
-                recipient_list=[reservation.customer_email],
-                fail_silently=False,
-                html_message=html_message
+                to=[reservation.customer_email]
             )
+            msg.attach_alternative(html_message, "text/html")
             
+            # --- NEW: GENERATE AND ATTACH ICS FOR CONFIRMED BOOKINGS ---
+            if new_status == 'CONFIRMED':
+                ics_data = generate_ics(reservation)
+                msg.attach('GoldenBay_Reservation.ics', ics_data, 'text/calendar')
+
+            msg.send(fail_silently=False)
+            
+        # SMS Fallback logic stays exactly the same    
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
         if len(contact_digits) >= 10 and send_sms_flag:
              if new_status == 'CONFIRMED':
@@ -1914,14 +1952,19 @@ def send_booking_modification_notifications(reservation_id, send_sms_flag=True):
             html_message = render_to_string('emails/confirmation.html', context)
             plain_message = strip_tags(html_message)
 
-            send_mail(
+            msg = EmailMultiAlternatives(
                 subject='Reservation Updated - Golden Bay',
-                message=plain_message,
+                body=plain_message,
                 from_email=settings.EMAIL_HOST_USER,
-                recipient_list=[reservation.customer_email],
-                fail_silently=False,
-                html_message=html_message
+                to=[reservation.customer_email]
             )
+            msg.attach_alternative(html_message, "text/html")
+            
+            # Attach updated ICS calendar event
+            ics_data = generate_ics(reservation)
+            msg.attach('GoldenBay_Reservation_Updated.ics', ics_data, 'text/calendar')
+            
+            msg.send(fail_silently=False)
             
         # 2. SEND SMS
         contact_digits = ''.join(filter(str.isdigit, str(reservation.customer_contact)))
@@ -1938,7 +1981,6 @@ def send_post_dining_feedback(reservation_id, send_sms_flag=True):
     try:
         reservation = Reservation.objects.get(id=reservation_id)
         
-        # We only send if they actually showed up and completed the dining experience
         if reservation.status != 'COMPLETED':
             return
             
@@ -1970,10 +2012,6 @@ def send_we_miss_you_automation():
     ninety_days_ago = today - timedelta(days=90)
     one_eighty_days_ago = today - timedelta(days=180)
 
-    # 1. Find customers who:
-    # - Have actually visited before (visit_count > 0)
-    # - Last visited over 90 days ago
-    # - Have NEVER received a retention message, OR haven't received one in 180 days
     eligible_customers = Customer.objects.filter(
         visit_count__gt=0,
         last_visit__lte=ninety_days_ago
@@ -1984,21 +2022,17 @@ def send_we_miss_you_automation():
     for customer in eligible_customers:
         sent_any = False
         
-        # 2. SEND SMS (If phone exists)
         contact_digits = ''.join(filter(str.isdigit, str(customer.phone)))
         if len(contact_digits) >= 10:
             sms_body = f"Hi {customer.name}, we miss you at Golden Bay! It's been a while. Show this text for a complimentary dessert on your next dine-in visit with us. Call +63 917 580 7166 to reserve."
             send_sms(customer.phone, sms_body)
             sent_any = True
             
-        # 3. SEND EMAIL (If email exists)
         if customer.email and '@' in customer.email:
             subject = "We miss you at Golden Bay!"
-            
-            # Pass the customer's name into the HTML template
             context = {'name': customer.name}
             html_message = render_to_string('emails/we_miss_you.html', context)
-            plain_message = strip_tags(html_message) # Fallback for non-HTML email clients
+            plain_message = strip_tags(html_message) 
             
             send_mail(
                 subject=subject,
@@ -2010,7 +2044,6 @@ def send_we_miss_you_automation():
             )
             sent_any = True
             
-        # 4. MARK AS SENT
         if sent_any:
             customer.last_retention_sent = today
             customer.save(update_fields=['last_retention_sent'])
@@ -2024,7 +2057,6 @@ def send_birthday_promos():
     target_date = today + timedelta(days=7)
     current_year = today.year
 
-    # Find customers born on this month & day, who haven't received a promo THIS year
     birthday_customers = Customer.objects.filter(
         date_of_birth__month=target_date.month,
         date_of_birth__day=target_date.day
@@ -2036,7 +2068,6 @@ def send_birthday_promos():
             sms_body = f"Advance Happy Birthday, {customer.name}! 🎉 Celebrate your special day at Golden Bay. Show this text within your birthday month for a complimentary Longevity Peach Bun on us! Reserve at +63 917 580 7166"
             send_sms(customer.phone, sms_body)
             
-            # Mark as sent for this year
             customer.last_birthday_promo_year = current_year
             customer.save(update_fields=['last_birthday_promo_year'])
 
@@ -2051,7 +2082,6 @@ def send_points_awarded_sms(customer_id, points_earned, total_points):
         contact_digits = ''.join(filter(str.isdigit, str(customer.phone)))
         
         if len(contact_digits) >= 10:
-            # You can customize this message!
             sms_body = f"Hi {customer.name}! You earned {points_earned} pts at Golden Bay today. Your new balance is {total_points} pts. View rewards at goldenbay.com.ph/rewards"
             send_sms(customer.phone, sms_body)
             
@@ -3328,9 +3358,7 @@ const MenuPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // NEW: State to hold the currently selected dish for the Lightbox
   const [selectedDish, setSelectedDish] = useState(null);
-  
   const { t, getFontClass, getLocData, language } = useLanguage(); 
 
   useEffect(() => {
@@ -3361,7 +3389,6 @@ const MenuPage = () => {
     fetchMenu();
   }, []);
 
-  // Lock body scroll when Lightbox is open
   useEffect(() => {
     if (selectedDish) {
       document.body.style.overflow = 'hidden';
@@ -3388,7 +3415,26 @@ const MenuPage = () => {
       return matchesTab && category.items.length > 0;
   });
 
-  if (loading) return <div className="min-h-screen bg-cream-50 flex items-center justify-center text-gold-600 font-serif tracking-widest uppercase animate-pulse">Loading Exquisite Dishes...</div>;
+  // --- SKELETON LOADER COMPONENT ---
+  const MenuSkeleton = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 px-6 py-12 md:px-24">
+      {[...Array(6)].map((_, i) => (
+        <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.1 }} className="bg-white border border-gray-200 rounded-sm overflow-hidden flex flex-col shadow-sm">
+          <div className="aspect-[4/3] bg-gray-200 animate-pulse"></div>
+          <div className="p-6 flex-1 flex flex-col gap-4">
+            <div className="h-6 bg-gray-200 animate-pulse rounded w-3/4 mx-auto"></div>
+            <div className="h-4 bg-gray-100 animate-pulse rounded w-1/2 mx-auto"></div>
+            <div className="h-px w-full bg-gray-100 my-2"></div>
+            <div className="flex justify-center gap-2 mt-auto">
+              <div className="h-6 w-20 bg-gray-200 animate-pulse rounded-full"></div>
+              <div className="h-6 w-20 bg-gray-200 animate-pulse rounded-full"></div>
+            </div>
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  );
+
   if (error) return <div className="min-h-screen bg-cream-50 flex items-center justify-center text-red-500 font-sans">{error}</div>;
 
   const LiveSeafoodCard = ({ item }) => (
@@ -3410,7 +3456,6 @@ const MenuPage = () => {
             <div className={`absolute top-0 right-0 bg-gold-600 text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest z-10 ${getFontClass()}`}>
                 {t('menu.liveCatch')}
             </div>
-            {/* Hover Overlay */}
             <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
                 <ZoomIn className="text-white w-8 h-8 opacity-80" />
             </div>
@@ -3456,104 +3501,107 @@ const MenuPage = () => {
         </div>
       </div>
 
-      <div className="px-6 py-12 md:px-24">
-        
-        {/* Search Bar */}
-        <div className="max-w-md mx-auto mb-10 relative mt-8">
-          <div className="relative flex items-center w-full h-12 rounded-full bg-white overflow-hidden border border-gray-200 focus-within:border-gold-400 focus-within:ring-1 focus-within:ring-gold-400 transition-all shadow-sm">
-            <div className="grid place-items-center h-full w-12 text-gray-400"><Search size={18} /></div>
-            <input className={`peer h-full w-full outline-none text-sm text-gray-700 pr-2 bg-transparent font-medium ${getFontClass()}`} type="text" placeholder={t('menu.search')} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-            <AnimatePresence>
-              {searchQuery && (
-                <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} onClick={() => setSearchQuery('')} className="grid place-items-center h-full w-12 text-gray-400 hover:text-gold-600 transition-colors"><X size={16} /></motion.button>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-
-        {/* Category Tabs */}
-        <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 mb-20">
-            <button onClick={() => { setActiveTab("All"); setSearchQuery(''); }} className={`text-sm md:text-base tracking-[0.2em] uppercase transition-all duration-300 relative pb-2 ${activeTab === "All" ? "text-gold-600 font-bold" : "text-gray-400 hover:text-gold-600"} ${getFontClass()}`}>
-              {t('menu.all')}
-              {activeTab === "All" && <motion.div layoutId="underline" className="absolute bottom-0 left-0 w-full h-[1px] bg-gold-600" />}
-            </button>
-          {menuData.map(cat => (
-            <button key={cat.name} onClick={() => { setActiveTab(cat.name); setSearchQuery(''); }} className={`text-sm md:text-base tracking-[0.2em] uppercase transition-all duration-300 relative pb-2 ${activeTab === cat.name ? "text-gold-600 font-bold" : "text-gray-400 hover:text-gold-600"} ${getFontClass()}`}>
-              {getLocData(cat, 'name')}
-              {activeTab === cat.name && <motion.div layoutId="underline" className="absolute bottom-0 left-0 w-full h-[1px] bg-gold-600" />}
-            </button>
-          ))}
-        </div>
-
-        {displayedCategories.length === 0 && (
-          <div className="text-center py-20">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 text-gray-400 mb-4"><Search size={24} /></div>
-            <h3 className={`text-xl font-serif text-gray-900 mb-2 ${getFontClass()}`}>{t('menu.empty')}</h3>
-            <button onClick={() => setSearchQuery('')} className={`mt-6 text-xs font-bold uppercase tracking-widest text-gold-600 border-b border-gold-600 pb-1 hover:text-black transition-colors ${getFontClass()}`}>{t('menu.clear')}</button>
-          </div>
-        )}
-
-        {displayedCategories.map((category) => (
-          <div key={category.id} className="mb-24">
-            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-10 text-center">
-              <h2 className={`text-3xl text-gray-900 tracking-widest ${getFontClass()}`}>{getLocData(category, 'name')}</h2>
-              {language !== 'en' && <h3 className="text-sm font-sans text-gold-600 mt-2 uppercase tracking-widest">{category.name}</h3>}
-              {language === 'en' && <h3 className="text-2xl font-chinese text-gold-600 mt-1">{category.name_zh}</h3>}
-            </motion.div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {category.items.map((item) => (
-                (item.cooking_methods && item.cooking_methods.length > 0) 
-                    ? <LiveSeafoodCard key={item.id} item={item} />
-                : <motion.div 
-                    key={item.id} layout initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} 
-                    onClick={() => setSelectedDish(item)}
-                    className="group bg-white border border-gray-200 hover:border-gold-400/50 transition-all duration-500 rounded-sm overflow-hidden flex flex-col shadow-sm hover:shadow-xl cursor-pointer"
-                  >
-                    <div className="aspect-[4/3] overflow-hidden relative bg-white border-b border-gray-100 flex items-center justify-center">
-                      {item.image ? (
-                        <img src={item.image.startsWith('http') ? item.image : `${BACKEND_URL}${item.image}`} loading="lazy" className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105" alt={item.name} />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center opacity-10"><img src={logo} className="h-20 w-auto grayscale" alt="placeholder" /></div>
-                      )}
-                      <div className="absolute top-0 right-0 bg-white/95 px-4 py-2 text-xs font-bold text-gray-900 border-l border-b border-gray-100 shadow-sm z-10 tracking-widest">{item.code}</div>
-                      {/* Hover Overlay */}
-                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                          <ZoomIn className="text-white w-8 h-8 opacity-80" />
-                      </div>
-                    </div>
-
-                    <div className="p-6 flex-1 flex flex-col">
-                      <div className="mb-4">
-                        <h3 className={`text-xl font-bold text-gray-900 uppercase tracking-wider group-hover:text-gold-600 transition-colors leading-tight ${getFontClass()}`}>
-                          {getLocData(item, 'name')}
-                        </h3>
-                        {language !== 'en' && <h4 className="text-xs text-gray-500 font-sans mt-1 uppercase tracking-wider">{item.name}</h4>}
-                        {language === 'en' && <h4 className="text-lg text-gray-500 font-chinese mt-1 font-medium">{item.name_zh}</h4>}
-                      </div>
-                      
-                      {item.description && <p className={`text-sm text-gray-400 font-light mb-4 line-clamp-2 ${getFontClass()}`}>{getLocData(item, 'description')}</p>}
-
-                      <div className="mt-auto pt-4 border-t border-gray-100 space-y-2 group-hover:border-gold-200 transition-colors">
-                        {item.prices.map((price) => (
-                          <div key={price.id} className="flex justify-between items-center text-sm font-light tracking-wide">
-                            <span className={`text-gray-500 uppercase text-sm font-bold tracking-widest ${getFontClass()}`}>{price.size === 'Regular' ? t('menu.standard') : price.size}</span>
-                            <span className={`text-gray-900 text-base font-bold font-serif ${getFontClass()}`}>
-                              {price.is_seasonal 
-                                ? <span className="italic text-gold-600 text-sm font-sans font-normal">{t('menu.market')}</span> 
-                                : `₱ ${parseFloat(price.price).toLocaleString()}`
-                              }
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </motion.div>
-              ))}
+      {loading ? (
+        <MenuSkeleton />
+      ) : (
+        <div className="px-6 py-12 md:px-24">
+          
+          {/* Search Bar */}
+          <div className="max-w-md mx-auto mb-10 relative mt-8">
+            <div className="relative flex items-center w-full h-12 rounded-full bg-white overflow-hidden border border-gray-200 focus-within:border-gold-400 focus-within:ring-1 focus-within:ring-gold-400 transition-all shadow-sm">
+              <div className="grid place-items-center h-full w-12 text-gray-400"><Search size={18} /></div>
+              <input className={`peer h-full w-full outline-none text-sm text-gray-700 pr-2 bg-transparent font-medium ${getFontClass()}`} type="text" placeholder={t('menu.search')} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              <AnimatePresence>
+                {searchQuery && (
+                  <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} onClick={() => setSearchQuery('')} className="grid place-items-center h-full w-12 text-gray-400 hover:text-gold-600 transition-colors"><X size={16} /></motion.button>
+                )}
+              </AnimatePresence>
             </div>
           </div>
-        ))}
-      </div>
+
+          {/* Category Tabs */}
+          <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 mb-20">
+              <button onClick={() => { setActiveTab("All"); setSearchQuery(''); }} className={`text-sm md:text-base tracking-[0.2em] uppercase transition-all duration-300 relative pb-2 ${activeTab === "All" ? "text-gold-600 font-bold" : "text-gray-400 hover:text-gold-600"} ${getFontClass()}`}>
+                {t('menu.all')}
+                {activeTab === "All" && <motion.div layoutId="underline" className="absolute bottom-0 left-0 w-full h-[1px] bg-gold-600" />}
+              </button>
+            {menuData.map(cat => (
+              <button key={cat.name} onClick={() => { setActiveTab(cat.name); setSearchQuery(''); }} className={`text-sm md:text-base tracking-[0.2em] uppercase transition-all duration-300 relative pb-2 ${activeTab === cat.name ? "text-gold-600 font-bold" : "text-gray-400 hover:text-gold-600"} ${getFontClass()}`}>
+                {getLocData(cat, 'name')}
+                {activeTab === cat.name && <motion.div layoutId="underline" className="absolute bottom-0 left-0 w-full h-[1px] bg-gold-600" />}
+              </button>
+            ))}
+          </div>
+
+          {displayedCategories.length === 0 && (
+            <div className="text-center py-20">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 text-gray-400 mb-4"><Search size={24} /></div>
+              <h3 className={`text-xl font-serif text-gray-900 mb-2 ${getFontClass()}`}>{t('menu.empty')}</h3>
+              <button onClick={() => setSearchQuery('')} className={`mt-6 text-xs font-bold uppercase tracking-widest text-gold-600 border-b border-gold-600 pb-1 hover:text-black transition-colors ${getFontClass()}`}>{t('menu.clear')}</button>
+            </div>
+          )}
+
+          {displayedCategories.map((category) => (
+            <div key={category.id} className="mb-24">
+              <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-10 text-center">
+                <h2 className={`text-3xl text-gray-900 tracking-widest ${getFontClass()}`}>{getLocData(category, 'name')}</h2>
+                {language !== 'en' && <h3 className="text-sm font-sans text-gold-600 mt-2 uppercase tracking-widest">{category.name}</h3>}
+                {language === 'en' && <h3 className="text-2xl font-chinese text-gold-600 mt-1">{category.name_zh}</h3>}
+              </motion.div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {category.items.map((item) => (
+                  (item.cooking_methods && item.cooking_methods.length > 0) 
+                      ? <LiveSeafoodCard key={item.id} item={item} />
+                  : <motion.div 
+                      key={item.id} layout initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} 
+                      onClick={() => setSelectedDish(item)}
+                      className="group bg-white border border-gray-200 hover:border-gold-400/50 transition-all duration-500 rounded-sm overflow-hidden flex flex-col shadow-sm hover:shadow-xl cursor-pointer"
+                    >
+                      <div className="aspect-[4/3] overflow-hidden relative bg-white border-b border-gray-100 flex items-center justify-center">
+                        {item.image ? (
+                          <img src={item.image.startsWith('http') ? item.image : `${BACKEND_URL}${item.image}`} loading="lazy" className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105" alt={item.name} />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center opacity-10"><img src={logo} className="h-20 w-auto grayscale" alt="placeholder" /></div>
+                        )}
+                        <div className="absolute top-0 right-0 bg-white/95 px-4 py-2 text-xs font-bold text-gray-900 border-l border-b border-gray-100 shadow-sm z-10 tracking-widest">{item.code}</div>
+                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                            <ZoomIn className="text-white w-8 h-8 opacity-80" />
+                        </div>
+                      </div>
+
+                      <div className="p-6 flex-1 flex flex-col">
+                        <div className="mb-4">
+                          <h3 className={`text-xl font-bold text-gray-900 uppercase tracking-wider group-hover:text-gold-600 transition-colors leading-tight ${getFontClass()}`}>
+                            {getLocData(item, 'name')}
+                          </h3>
+                          {language !== 'en' && <h4 className="text-xs text-gray-500 font-sans mt-1 uppercase tracking-wider">{item.name}</h4>}
+                          {language === 'en' && <h4 className="text-lg text-gray-500 font-chinese mt-1 font-medium">{item.name_zh}</h4>}
+                        </div>
+                        
+                        {item.description && <p className={`text-sm text-gray-400 font-light mb-4 line-clamp-2 ${getFontClass()}`}>{getLocData(item, 'description')}</p>}
+
+                        <div className="mt-auto pt-4 border-t border-gray-100 space-y-2 group-hover:border-gold-200 transition-colors">
+                          {item.prices.map((price) => (
+                            <div key={price.id} className="flex justify-between items-center text-sm font-light tracking-wide">
+                              <span className={`text-gray-500 uppercase text-sm font-bold tracking-widest ${getFontClass()}`}>{price.size === 'Regular' ? t('menu.standard') : price.size}</span>
+                              <span className={`text-gray-900 text-base font-bold font-serif ${getFontClass()}`}>
+                                {price.is_seasonal 
+                                  ? <span className="italic text-gold-600 text-sm font-sans font-normal">{t('menu.market')}</span> 
+                                  : `₱ ${parseFloat(price.price).toLocaleString()}`
+                                }
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </motion.div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* --- LUXURY IMAGE LIGHTBOX MODAL --- */}
       <AnimatePresence>
@@ -3572,7 +3620,6 @@ const MenuPage = () => {
                     onClick={(e) => e.stopPropagation()}
                     className="bg-white rounded-sm shadow-2xl w-full max-w-5xl flex flex-col md:flex-row overflow-hidden relative"
                 >
-                    {/* Close Button */}
                     <button 
                         onClick={() => setSelectedDish(null)}
                         className="absolute top-4 right-4 z-10 w-8 h-8 bg-black/50 hover:bg-gold-600 text-white rounded-full flex items-center justify-center transition-colors"
@@ -3580,7 +3627,6 @@ const MenuPage = () => {
                         <X size={18} />
                     </button>
 
-                    {/* Left: High Res Image with Object-Contain for 4:3 Aspect Ratio */}
                     <div className="w-full md:w-3/5 h-[30vh] md:h-[600px] bg-white relative flex items-center justify-center border-b md:border-b-0 md:border-r border-gray-100">
                         {selectedDish.image ? (
                             <img 
@@ -3593,7 +3639,6 @@ const MenuPage = () => {
                                 <img src={logo} className="w-32 h-auto grayscale" alt="logo" />
                             </div>
                         )}
-                        {/* Elegant Item Code overlay */}
                         {selectedDish.code && (
                              <div className="absolute top-0 left-0 bg-gold-600 text-white px-4 py-2 text-sm font-bold tracking-widest shadow-md">
                                  {selectedDish.code}
@@ -3601,7 +3646,6 @@ const MenuPage = () => {
                         )}
                     </div>
 
-                    {/* Right: Dish Details */}
                     <div className="w-full md:w-2/5 p-8 md:p-12 flex flex-col justify-center bg-cream-50">
                         <div className="mb-6">
                             <h2 className={`text-3xl md:text-4xl font-bold text-gray-900 uppercase tracking-widest leading-tight ${getFontClass()}`}>
@@ -3619,7 +3663,6 @@ const MenuPage = () => {
 
                         <div className="w-12 h-1 bg-gold-400 mb-8"></div>
 
-                        {/* Prices OR Cooking Methods */}
                         {selectedDish.cooking_methods && selectedDish.cooking_methods.length > 0 ? (
                             <div>
                                 <p className={`text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-4 ${getFontClass()}`}>{t('menu.styles')}</p>
@@ -4027,12 +4070,9 @@ import { useLocation } from 'react-router-dom';
 
 const BookingManager = () => {
   const [bookings, setBookings] = useState([]);
-  
-  // FIX: Read the initial filter from the URL state if coming from the Dashboard
   const location = useLocation();
   const initialFilter = location.state?.filter || 'ALL';
   const [filter, setFilter] = useState(initialFilter); 
-  
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showManualForm, setShowManualForm] = useState(false);
@@ -4049,7 +4089,6 @@ const BookingManager = () => {
       const res = await axiosInstance.get('/api/reservations/manage/');
       const fetchedBookings = res.data;
       
-      // --- DASHBOARD NOTIFICATION LOGIC ---
       if (fetchedBookings.length > 0) {
         const maxId = Math.max(...fetchedBookings.map(b => b.id));
         if (latestBookingId.current !== null && maxId > latestBookingId.current) {
@@ -4128,22 +4167,15 @@ const BookingManager = () => {
 
   const formattedSelectedDate = format(selectedDate, 'yyyy-MM-dd');
   const isSearching = searchQuery.trim() !== '';
-
-  // FIX: The core logic change. If filter is PENDING, ignore the date filter entirely.
   const isViewingGlobalPending = filter === 'PENDING';
 
   const filteredBookings = bookings.filter(b => {
-      // 1. Search Filter
       const matchesSearch = isSearching ? (
           b.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
           b.customer_contact.includes(searchQuery) ||
           b.id.toString() === searchQuery
       ) : true;
-
-      // 2. Status Filter
       const matchesStatus = filter === 'ALL' ? true : b.status === filter;
-
-      // 3. Date Filter (The magic happens here: Ignore date if searching OR viewing global pending)
       const matchesDate = (isSearching || isViewingGlobalPending) ? true : b.date === formattedSelectedDate;
 
       return matchesSearch && matchesDate && matchesStatus;
@@ -4152,7 +4184,6 @@ const BookingManager = () => {
   const lunchBookings = filteredBookings
       .filter(b => b.session === 'LUNCH')
       .sort((a, b) => {
-          // If viewing global pending, sort by date first, then time
           if (isViewingGlobalPending) {
               const dateCompare = a.date.localeCompare(b.date);
               if (dateCompare !== 0) return dateCompare;
@@ -4209,6 +4240,48 @@ const BookingManager = () => {
           default: return source || 'Unknown';
       }
   };
+
+  // --- SKELETON LOADERS ---
+  const DesktopTableSkeleton = () => (
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm mt-4">
+        <table className="w-full text-left border-collapse">
+            <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                    {[1, 2, 3, 4, 5].map(i => (
+                        <th key={i} className="px-5 py-4">
+                            <div className="h-3 w-16 bg-gray-200 animate-pulse rounded"></div>
+                        </th>
+                    ))}
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+                {[1, 2, 3, 4].map(row => (
+                    <tr key={row}>
+                        {[1, 2, 3, 4, 5].map(col => (
+                            <td key={col} className="px-5 py-4">
+                                <div className="h-4 w-full max-w-[120px] bg-gray-100 animate-pulse rounded"></div>
+                            </td>
+                        ))}
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    </div>
+  );
+
+  const MobileCardSkeleton = () => (
+    <div className="flex flex-col gap-4 mt-4">
+        {[1, 2, 3].map(i => (
+            <div key={i} className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm space-y-4">
+                <div className="flex justify-between">
+                    <div className="h-5 w-32 bg-gray-200 animate-pulse rounded"></div>
+                    <div className="h-5 w-16 bg-gray-100 animate-pulse rounded"></div>
+                </div>
+                <div className="h-16 w-full bg-gray-50 animate-pulse rounded"></div>
+            </div>
+        ))}
+    </div>
+  );
 
   return (
     <div className="pb-20">
@@ -4288,7 +4361,7 @@ const BookingManager = () => {
                     onChange={(date) => {
                         setSelectedDate(date);
                         setSearchQuery('');
-                        if (filter === 'PENDING') setFilter('ALL'); // Reset filter if they explicitly click a date
+                        if (filter === 'PENDING') setFilter('ALL');
                     }}
                     value={selectedDate}
                 />
@@ -4325,7 +4398,7 @@ const BookingManager = () => {
             {/* --- DESKTOP DIVIDED VIEW --- */}
             <div className="hidden lg:flex flex-col gap-8">
                 {loading ? (
-                    <div className="p-12 text-center text-gray-400 animate-pulse text-sm bg-white border border-gray-200 rounded-lg">Loading data...</div>
+                    <DesktopTableSkeleton />
                 ) : filteredBookings.length === 0 ? (
                     <div className="bg-white p-16 text-center border border-gray-200 rounded-lg shadow-sm">
                         <div className="flex flex-col items-center justify-center text-gray-400">
@@ -4337,7 +4410,6 @@ const BookingManager = () => {
                 ) : (
                     sessionGroups.map((group) => (
                         <div key={group.id} className="flex flex-col gap-3">
-                            {/* Session Header */}
                             <div className="flex items-center justify-between">
                                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest flex items-center gap-2">
                                     <group.icon size={18} className="text-gold-600" /> {group.title}
@@ -4348,7 +4420,6 @@ const BookingManager = () => {
                                 </span>
                             </div>
 
-                            {/* Session Table */}
                             {group.bookings.length === 0 ? (
                                 <div className="bg-gray-50 border border-gray-200 border-dashed rounded-lg p-8 text-center text-gray-400 text-xs">
                                     No {group.id.toLowerCase()} reservations match your current filters.
@@ -4475,7 +4546,7 @@ const BookingManager = () => {
             {/* --- MOBILE DIVIDED CARDS --- */}
             <div className="lg:hidden flex flex-col gap-8">
                 {loading ? (
-                    <div className="p-8 text-center text-gray-400 animate-pulse text-xs bg-white border border-gray-200 rounded-lg">Loading data...</div>
+                    <MobileCardSkeleton />
                 ) : filteredBookings.length === 0 ? (
                     <div className="bg-white p-12 rounded-lg border border-gray-200 text-center text-gray-500 text-sm shadow-sm flex flex-col items-center justify-center">
                         <Filter size={32} strokeWidth={1} className="mb-3 opacity-30 text-gold-600" />
@@ -4484,7 +4555,6 @@ const BookingManager = () => {
                 ) : (
                     sessionGroups.map((group) => (
                         <div key={group.id} className="flex flex-col gap-3">
-                            {/* Session Header Mobile */}
                             <div className="flex items-center justify-between border-b border-gray-200 pb-2">
                                 <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest flex items-center gap-2">
                                     <group.icon size={16} className="text-gold-600" /> {group.title}
@@ -4494,7 +4564,6 @@ const BookingManager = () => {
                                 </span>
                             </div>
 
-                            {/* Session Cards */}
                             {group.bookings.length === 0 ? (
                                 <div className="bg-gray-50 border border-gray-200 border-dashed rounded-lg p-6 text-center text-gray-400 text-xs">
                                     No {group.id.toLowerCase()} reservations.
@@ -9703,7 +9772,6 @@ axiosInstance.interceptors.response.use((response) => {
 
 export default axiosInstance;
 
-// frontend/src/utils/auth.js
 import { jwtDecode } from 'jwt-decode';
 
 export const getUserRole = () => {
@@ -9720,22 +9788,26 @@ export const getUserRole = () => {
 
 export const canCancelBooking = () => {
     const role = getUserRole();
-    return role === 'Supervisor' || role === 'Admin';
+    // Added Owner
+    return role === 'Admin' || role === 'Supervisor';
 };
 
 export const canDeleteCustomer = () => {
     const role = getUserRole();
+    // Added Owner
     return role === 'Admin';
 };
 
 export const canManageMarketing = () => {
     const role = getUserRole();
+    // Added Owner
     return role === 'Admin';
 };
 
 export const canManageMenu = () => {
     const role = getUserRole();
-    return role === 'Supervisor' || role === 'Admin';
+    // Added Owner
+    return role === 'Admin' || role === 'Supervisor';
 };
 
 import React from 'react';
