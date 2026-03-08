@@ -12,44 +12,65 @@ import {
 } from 'lucide-react';
 import LogoutButton from '../auth/LogoutButton';
 import logo from '../../assets/images/goldenbaylogo.svg'; 
-import { getUserRole, canManageMarketing, canManageMenu } from '../../utils/auth';
+import { getUserRole } from '../../utils/auth';
 
 const AdminLayout = () => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // Get current user role: 'Admin', 'Owner', 'Supervisor', 'Receptionist', 'Cashier'
   const role = getUserRole(); 
-  const isMarketingAdmin = canManageMarketing();
-  const isMenuAdmin = canManageMenu();
 
   // Close mobile menu when navigating
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
-  // Handle immediate redirects for restricted roles trying to access the base /staff URL
-  if (role === 'Owner' && location.pathname === '/staff') {
-      return <Navigate to="/staff/reports" replace />;
-  }
-  if (role === 'Cashier' && location.pathname === '/staff') {
-      return <Navigate to="/staff/customers" replace />;
-  }
-
-  // --- 2. PROTECT THE REPORTS PAGE FROM UNAUTHORIZED ROLES ---
-  if (location.pathname === '/staff/reports' && role !== 'Admin' && role !== 'Owner') {
-      // Bounce them back to their allowed default page
-      if (role === 'Cashier') return <Navigate to="/staff/customers" replace />;
-      return <Navigate to="/staff" replace />;
+  // ------------------------------------------------------------------
+  // 1. REDIRECT LOGIC FOR THE BASE "/staff" URL
+  // ------------------------------------------------------------------
+  if (location.pathname === '/staff') {
+    if (role === 'Owner') return <Navigate to="/staff/reports" replace />;
+    if (role === 'Supervisor') return <Navigate to="/staff/bookings" replace />;
+    if (role === 'Receptionist') return <Navigate to="/staff/bookings" replace />;
+    if (role === 'Cashier') return <Navigate to="/staff/customers" replace />;
   }
 
-  // Filter Sidebar Items based on Role
+  // ------------------------------------------------------------------
+  // 2. STRICT ROUTE PROTECTION (Bouncer Logic)
+  // Prevents users from manually typing a URL they don't have access to
+  // ------------------------------------------------------------------
+  if (role === 'Owner' && !location.pathname.startsWith('/staff/reports')) {
+    return <Navigate to="/staff/reports" replace />;
+  }
+
+  if (role === 'Receptionist' && !location.pathname.startsWith('/staff/bookings')) {
+    return <Navigate to="/staff/bookings" replace />;
+  }
+
+  if (role === 'Supervisor') {
+    const allowed = ['/staff/bookings', '/staff/menu', '/staff/rewards'];
+    const isAllowed = allowed.some(path => location.pathname.startsWith(path));
+    if (!isAllowed) {
+      return <Navigate to="/staff/bookings" replace />;
+    }
+  }
+
+  if (role === 'Cashier' && !location.pathname.startsWith('/staff/customers')) {
+    return <Navigate to="/staff/customers" replace />;
+  }
+
+  // ------------------------------------------------------------------
+  // 3. SIDEBAR NAVIGATION FILTERING
+  // ------------------------------------------------------------------
   const navItems = [
-    { path: '/staff', label: 'Overview', icon: LayoutDashboard, show: role !== 'Owner' && role !== 'Cashier' },
-    { path: '/staff/reports', label: 'Analytics', icon: BarChart3, show: role === 'Admin' || role === 'Owner' },
-    { path: '/staff/bookings', label: 'Reservations', icon: CalendarDays, show: role !== 'Owner' && role !== 'Cashier' },
-    { path: '/staff/customers', label: role === 'Cashier' ? 'Points Terminal' : 'Phone Book', icon: Users, show: role !== 'Owner' },
-    { path: '/staff/rewards', label: 'Fulfillment', icon: Gift, show: role !== 'Owner' && role !== 'Cashier' },
-    { path: '/staff/menu', label: 'Menu Manager', icon: Utensils, show: isMenuAdmin },
-    { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: isMarketingAdmin },
+    { path: '/staff', label: 'Overview', icon: LayoutDashboard, show: role === 'Admin' },
+    { path: '/staff/reports', label: 'Analytics', icon: BarChart3, show: ['Admin', 'Owner'].includes(role) },
+    { path: '/staff/bookings', label: 'Reservations', icon: CalendarDays, show: ['Admin', 'Supervisor', 'Receptionist'].includes(role) },
+    { path: '/staff/menu', label: 'Menu Manager', icon: Utensils, show: ['Admin', 'Supervisor'].includes(role) },
+    { path: '/staff/rewards', label: 'Fulfillment', icon: Gift, show: ['Admin', 'Supervisor'].includes(role) },
+    { path: '/staff/customers', label: role === 'Cashier' ? 'Points Terminal' : 'Phone Book', icon: Users, show: ['Admin', 'Cashier'].includes(role) },
+    { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: role === 'Admin' },
   ].filter(item => item.show);
 
   return (
@@ -81,7 +102,7 @@ const AdminLayout = () => {
           <p className="px-4 text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Management</p>
           
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
             const Icon = item.icon;
             
             return (
@@ -89,7 +110,7 @@ const AdminLayout = () => {
                 key={item.path} 
                 to={item.path}
                 className={`flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-md transition-all duration-200 group
-                  ${isActive 
+                  ${isActive && location.pathname !== '/staff' || (isActive && item.path === '/staff')
                     ? 'bg-gold-50 text-gold-700 shadow-sm border border-gold-200/50' 
                     : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
                   }`}
@@ -114,7 +135,7 @@ const AdminLayout = () => {
         <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4 z-10 flex justify-between items-center shadow-sm shrink-0">
            {/* Mobile menu trigger */}
            <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-md">
-             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinelinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
            </button>
            <div className="hidden md:block"></div> {/* Spacer for desktop */}
            
