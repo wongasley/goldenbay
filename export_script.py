@@ -130,6 +130,7 @@ FILES_TO_READ = [
     'frontend/src/pages/admin/dashboard/OwnerDashboardPage.jsx',
     'backend/core/utils.py',
     'frontend/src/pages/public/reservations/ManageBookingPage.jsx',
+    'frontend/.env',
 ]
 
 # 2. Set the name for the final output text file.

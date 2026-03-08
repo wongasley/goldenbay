@@ -11612,4 +11612,8 @@ const ManageBookingPage = () => {
   );
 };
 
-export default ManageBookingPage; 
+export default ManageBookingPage;
+
+VITE_API_URL=https://goldenbay.com.ph
+VITE_RECAPTCHA_SITE_KEY=6LcI2YMsAAAAAIqBnlzZvR5x3kp_YCWINoNlgaZg
+RECAPTCHA_SECRET_KEY=6LcI2YMsAAAAAI-aqOi9DkeX9l6bYVmaZNWPmCqA
