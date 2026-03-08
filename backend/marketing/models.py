@@ -4,6 +4,7 @@ from io import BytesIO
 from django.core.files.base import ContentFile
 from deep_translator import GoogleTranslator
 from bs4 import BeautifulSoup
+import os
 
 def auto_translate_html(html_content, dest_lang):
     if not html_content: return ""
@@ -62,12 +63,15 @@ class Post(models.Model):
         if not self.content_ja: self.content_ja = auto_translate_html(self.content, 'ja')
         if not self.content_ko: self.content_ko = auto_translate_html(self.content, 'ko')
 
-        # 3. IMAGE COMPRESSION
-        try:
-            this = Post.objects.get(id=self.id)
-            image_changed = (this.image != self.image)
-        except:
-            image_changed = True
+        # 3. IMAGE COMPRESSION (FIXED LOGIC)
+        image_changed = True
+        if self.pk:
+            try:
+                old_post = Post.objects.get(pk=self.pk)
+                if old_post.image == self.image:
+                    image_changed = False
+            except Post.DoesNotExist:
+                pass
 
         if self.image and image_changed:
             img = Image.open(self.image)
@@ -75,6 +79,9 @@ class Post(models.Model):
             img.thumbnail((1200, 1200))
             buffer = BytesIO()
             img.save(buffer, format='WEBP', quality=75)
-            self.image = ContentFile(buffer.getvalue(), name=self.image.name.rsplit('.', 1)[0] + '.webp')
+            
+            # Ensure proper string handling for the filename
+            file_name = os.path.splitext(os.path.basename(self.image.name))[0] + '.webp'
+            self.image = ContentFile(buffer.getvalue(), name=file_name)
 
         super().save(*args, **kwargs)

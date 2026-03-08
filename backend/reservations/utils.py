@@ -4,6 +4,7 @@ from core.models import SystemSetting
 
 def send_sms(to_number, body):
     # --- CHECK THE GLOBAL SWITCH FIRST ---
+    
     settings = SystemSetting.load()
     if not settings.enable_sms_notifications:
         print(f"🛑 SMS DISABLED BY ADMIN: Would have sent to {to_number} -> {body}")

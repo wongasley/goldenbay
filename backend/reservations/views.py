@@ -474,7 +474,10 @@ class RedeemRewardView(APIView):
         try:
             with transaction.atomic():
                 # 1. Lock the customer row immediately to prevent race conditions
-                customer = Customer.objects.select_for_update().get(phone=customer_phone)
+                try:
+                    customer = Customer.objects.select_for_update().get(phone=customer_phone)
+                except Customer.DoesNotExist:
+                    return Response({"error": "Customer profile not found."}, status=status.HTTP_404_NOT_FOUND)
                 
                 # 2. Identify the reward
                 try:
@@ -515,6 +518,7 @@ class RedeemRewardView(APIView):
 
         except Exception as e:
             # Catching generic DB errors or connection issues
+            print(f"Redemption Error: {e}")
             return Response({"error": "An internal error occurred. Please try again."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
 class StaffRedemptionListView(generics.ListAPIView):
@@ -554,3 +558,58 @@ class StaffRedemptionUpdateView(generics.UpdateAPIView):
                     reward_item=instance.reward_item,
                     encoded_by=self.request.user,
                 )
+
+class OwnerReportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if not (user.is_superuser or user.groups.filter(name__in=['Owner', 'Admin']).exists()):
+            raise PermissionDenied("Only Owners and Admins can view financial reports.")
+        today = date.today()
+        
+        # 1. Today's Metrics
+        today_active_res = Reservation.objects.filter(date=today).exclude(status__in=['CANCELLED', 'NO_SHOW'])
+        today_bookings = today_active_res.count()
+        today_pax = today_active_res.aggregate(Sum('pax'))['pax__sum'] or 0
+        today_vip_rooms = today_active_res.filter(dining_area__area_type='VIP').count()
+        expected_revenue = today_pax * 1500  # Estimate: 1500 PHP per head
+
+        # 2. All-Time Metrics
+        total_customers = Customer.objects.count()
+        total_vip_customers = Customer.objects.filter(is_vip=True).count()
+        total_bookings = Reservation.objects.exclude(status__in=['CANCELLED', 'NO_SHOW']).count()
+        total_points_in_circulation = Customer.objects.aggregate(Sum('points_balance'))['points_balance__sum'] or 0
+
+        # 3. 30-Day Trend Chart
+        chart_data = []
+        for i in range(29, -1, -1):
+            target_date = today - timedelta(days=i)
+            day_res = Reservation.objects.filter(date=target_date).exclude(status__in=['CANCELLED', 'NO_SHOW'])
+            
+            # Count bookings and pax for that specific day
+            b_count = day_res.count()
+            p_count = day_res.aggregate(Sum('pax'))['pax__sum'] or 0
+            
+            chart_data.append({
+                "date": target_date.strftime("%b %d"),
+                "bookings": b_count,
+                "pax": p_count,
+                "revenue": p_count * 1500
+            })
+
+        return Response({
+            "today": {
+                "bookings": today_bookings,
+                "pax": today_pax,
+                "vip_rooms_occupied": today_vip_rooms,
+                "estimated_revenue": f"₱{expected_revenue:,}"
+            },
+            "all_time": {
+                "total_customers": total_customers,
+                "total_vip_customers": total_vip_customers,
+                "total_bookings": total_bookings,
+                "points_liability": total_points_in_circulation
+            },
+            "chart_data": chart_data
+        })

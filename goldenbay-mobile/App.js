@@ -1,3 +1,5 @@
+//goldenbay-mobile/App.js
+
 import React, { useState, useEffect, useMemo, createContext, useContext, useCallback } from 'react';
 import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -45,7 +47,7 @@ const translations = {
       home: { title: "GOLDEN BAY", sub: "FRESH SEAFOOD RESTAURANT", book: "Book a Table", bookDesc: "Reserve VIP or Hall", menu: "Our Menu", menuDesc: "Explore live seafood", rewards: "Rewards", rewardsDesc: "View & redeem points", contact: "Contact", contactDesc: "Location & Hours" },
       menu: { title: "OUR MENU", all: "All", seasonal: "Seasonal", standard: "Standard", market: "Market Price" },
       book: { step: "STEP", of: "OF", selectDate: "Select Date", selectSession: "Select Session", lunch: "LUNCH", dinner: "DINNER", pref: "Dining Preference", vip: "VIP ROOMS", hall: "MAIN HALL", check: "CHECK AVAILABILITY", seats: "Seats Left", guests: "Guests", consumable: "Consumable", booked: "BOOKED", next: "NEXT: FINAL DETAILS", details: "Contact Details", name: "Full Name", phone: "Mobile Number", pax: "Guests", time: "Arrival Time", notes: "Special Requests", submit: "SUBMIT RESERVATION" },
-      auth: { login: "MEMBER LOGIN", rewards: "Golden Rewards", phone: "Mobile Number", send: "SEND CODE", code: "Enter 6-Digit Code", verify: "VERIFY", back: "Wrong number? Go back" },
+      auth: { login: "MEMBER LOGIN", rewards: "Golden Bay Rewards", phone: "Mobile Number", send: "SEND CODE", code: "Enter 6-Digit Code", verify: "VERIFY", back: "Wrong number? Go back" },
       rewards: { title: "REWARDS", vip: "VIP MEMBER", active: "Active Member", balance: "Available Balance", pts: "PTS", redeem: "Redeem Rewards", locked: "LOCKED", action: "REDEEM", policy: "Fulfillment Policy", policyDesc: "To claim your reward, please present the digital receipt to your waiter upon ordering. Valid for dine-in visits only." },
       contact: { title: "CONTACT US" },
       settings: { title: "SETTINGS", theme: "Appearance", light: "Light Mode", dark: "Dark Mode", language: "Language", save: "SAVE SETTINGS" }

@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Phone, Mail, Trash2, ArrowUpDown, X, User, StickyNote, Download, Calendar as CalendarIcon, Gift } from 'lucide-react';
+import { Search, Plus, Phone, Mail, Trash2, ArrowUpDown, X, User, StickyNote, Download, Gift } from 'lucide-react';
 import { FaWeixin, FaViber, FaWhatsapp, FaTelegram } from 'react-icons/fa';
 import axiosInstance from '../../../utils/axiosInstance';
 import toast from 'react-hot-toast';
-import { getUserRole } from '../../../utils/auth'; // <-- ADDED
-
-const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
+import { getUserRole } from '../../../utils/auth';
 
 const PhoneBookPage = () => {
   const [customers, setCustomers] = useState([]);
@@ -18,13 +16,15 @@ const PhoneBookPage = () => {
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [pointsCustomer, setPointsCustomer] = useState(null);
-  const [pointsAmount, setPointsAmount] = useState('');
+  // Advanced Points Form state
+  const [showPointsModal, setShowPointsModal] = useState(false);
   const [isAwarding, setIsAwarding] = useState(false);
+  const [pointsForm, setPointsForm] = useState({ phone: '', amount: '', name: '' });
 
-  const isAdmin = getUserRole() === 'Admin'; // <-- Determine if Admin
+  const role = getUserRole();
+  const isAdmin = role === 'Admin';
+  const isCashier = role === 'Cashier';
 
-  // Added care_of to state
   const [formData, setFormData] = useState({
     name: '', phone: '', care_of: '', email: '', wechat: '', viber: '', whatsapp: '', telegram: '', notes: '', date_of_birth: ''
   });
@@ -45,30 +45,21 @@ const PhoneBookPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // --- NEW: Strict Phone Validation & Formatting ---
-    // Removes spaces/dashes. If empty, defaults to an empty string safely.
     let cleanPhone = formData.phone ? formData.phone.replace(/[\s-]/g, '') : '';
     
-    // Only validate if they actually typed a number (if empty, nothing happens)
     if (cleanPhone) {
-        const phoneRegex = /^\+?\d+$/;
-        if (!phoneRegex.test(cleanPhone)) {
-            toast.error("Please enter a valid phone number (digits only). Use the 'Care Of' field for handlers like 'C/O Evelyn'.", {
-                duration: 5000,
-                style: { border: '1px solid #ef4444', padding: '16px', color: '#ef4444' }
-            });
-            return; // Stops the submission
+        if (!/^\+?\d+$/.test(cleanPhone)) {
+            toast.error("Please enter a valid phone number (digits only).", { style: { border: '1px solid #ef4444', color: '#ef4444' }});
+            return;
         }
     }
 
     setIsSubmitting(true);
-    
     const url = editingCustomer ? `/api/reservations/customers/${editingCustomer.id}/` : `/api/reservations/customers/`;
     const method = editingCustomer ? 'patch' : 'post';
 
     const payload = { ...formData };
-    payload.phone = cleanPhone || null; // <-- Saves clean string, or null if it was empty
+    payload.phone = cleanPhone || null;
     if (!payload.date_of_birth) payload.date_of_birth = null;
     if (!payload.email) payload.email = null;
     if (!payload.care_of) payload.care_of = null;
@@ -80,14 +71,22 @@ const PhoneBookPage = () => {
         toast.success(`Customer ${editingCustomer ? 'updated' : 'added'} successfully!`);
     } catch (err) {
         const errorData = err.response?.data;
-        if (errorData?.phone) {
-            toast.error("This phone number is already registered.");
-        } else {
-            toast.error("Failed to save customer.");
-        }
+        if (errorData?.phone) toast.error("This phone number is already registered.");
+        else toast.error("Failed to save customer.");
     } finally {
         setIsSubmitting(false);
     }
+  };
+
+  // Open Award Points with pre-filled data if clicked from list
+  const openAwardPoints = (customer = null, e = null) => {
+      if (e) e.stopPropagation();
+      if (customer) {
+          setPointsForm({ phone: customer.phone || '', name: customer.name, amount: '' });
+      } else {
+          setPointsForm({ phone: '', name: '', amount: '' });
+      }
+      setShowPointsModal(true);
   };
 
   const handleAwardPoints = async (e) => {
@@ -95,9 +94,9 @@ const PhoneBookPage = () => {
       setIsAwarding(true);
       try {
           const res = await axiosInstance.post('/api/reservations/award-points/', {
-              phone: pointsCustomer.phone || pointsCustomer.care_of || 'Walk-in',
-              name: pointsCustomer.name,
-              amount_spent: pointsAmount
+              phone: pointsForm.phone,
+              name: pointsForm.name,
+              amount_spent: pointsForm.amount
           });
           
           if (res.data.points_earned > 0) {
@@ -107,10 +106,9 @@ const PhoneBookPage = () => {
               toast('Amount too low to earn points.', { icon: 'ℹ️' });
           }
           
-          setPointsCustomer(null);
-          setPointsAmount('');
+          setShowPointsModal(false);
       } catch (err) {
-          toast.error("Failed to award points.");
+          toast.error(err.response?.data?.non_field_errors?.[0] || "Failed to award points.");
       } finally {
           setIsAwarding(false);
       }
@@ -129,17 +127,12 @@ const PhoneBookPage = () => {
   };
 
   const openEdit = (customer) => {
+      if (isCashier) return; // Cashier cannot edit profiles
       setEditingCustomer(customer);
       setFormData({
-          name: customer.name,
-          phone: customer.phone || '',
-          care_of: customer.care_of || '', // Load care_of
-          email: customer.email || '',
-          wechat: customer.wechat || '',
-          viber: customer.viber || '',
-          whatsapp: customer.whatsapp || '',
-          telegram: customer.telegram || '',
-          notes: customer.notes || '',
+          name: customer.name, phone: customer.phone || '', care_of: customer.care_of || '', 
+          email: customer.email || '', wechat: customer.wechat || '', viber: customer.viber || '', 
+          whatsapp: customer.whatsapp || '', telegram: customer.telegram || '', notes: customer.notes || '', 
           date_of_birth: customer.date_of_birth || ''
       });
       setShowModal(true);
@@ -169,18 +162,9 @@ const PhoneBookPage = () => {
   const exportToCSV = () => {
       const headers = ['Name', 'Phone', 'Care Of', 'Email', 'WeChat', 'Viber', 'WhatsApp', 'Telegram', 'Notes', 'DOB', 'Last Visit', 'Points Balance'];
       const csvData = filtered.map(c => [
-          `"${c.name}"`, 
-          `"${c.phone || ''}"`, 
-          `"${c.care_of || ''}"`, // Export care_of
-          `"${c.email || ''}"`, 
-          `"${c.wechat || ''}"`, 
-          `"${c.viber || ''}"`, 
-          `"${c.whatsapp || ''}"`, 
-          `"${c.telegram || ''}"`, 
-          `"${(c.notes || '').replace(/"/g, '""')}"`, 
-          `"${c.date_of_birth || ''}"`,
-          `"${c.last_visit || ''}"`,
-          `"${c.points_balance || 0}"`
+          `"${c.name}"`, `"${c.phone || ''}"`, `"${c.care_of || ''}"`, `"${c.email || ''}"`, 
+          `"${c.wechat || ''}"`, `"${c.viber || ''}"`, `"${c.whatsapp || ''}"`, `"${c.telegram || ''}"`, 
+          `"${(c.notes || '').replace(/"/g, '""')}"`, `"${c.date_of_birth || ''}"`, `"${c.last_visit || ''}"`, `"${c.points_balance || 0}"`
       ].join(','));
       
       const csvContent = [headers.join(','), ...csvData].join('\n');
@@ -195,7 +179,6 @@ const PhoneBookPage = () => {
 
   const inputClass = "w-full bg-white border border-gray-300 p-2 text-gray-900 text-sm focus:border-gold-500 focus:ring-1 focus:ring-gold-500 outline-none rounded-sm transition-all shadow-sm";
   const labelClass = "block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1";
-
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
   return (
@@ -205,16 +188,27 @@ const PhoneBookPage = () => {
       <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-gray-100 pb-3 mb-4">
             <div>
-                <h1 className="text-xl font-bold text-gray-900 font-serif">Phone Book CRM</h1>
-                <p className="text-gray-500 text-xs mt-0.5">Manage customer profiles, contact details, and birthdays.</p>
+                <h1 className="text-xl font-bold text-gray-900 font-serif">
+                    {isCashier ? 'Points Terminal' : 'Phone Book CRM'}
+                </h1>
+                <p className="text-gray-500 text-xs mt-0.5">
+                    {isCashier ? 'Search customers and award dining points.' : 'Manage customer profiles, contact details, and birthdays.'}
+                </p>
             </div>
             <div className="flex gap-2">
-                <button onClick={exportToCSV} className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded hover:bg-gray-50 transition-all flex items-center gap-1.5 shadow-sm">
-                    <Download size={14} /> Export
+                <button onClick={() => openAwardPoints()} className="bg-gray-900 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-black transition-all flex items-center gap-1.5">
+                    <Gift size={14} /> Award Points
                 </button>
-                <button onClick={openCreate} className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-all flex items-center gap-1.5">
-                    <Plus size={14} /> Add New
-                </button>
+                {!isCashier && (
+                    <>
+                        <button onClick={exportToCSV} className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded hover:bg-gray-50 transition-all flex items-center gap-1.5 shadow-sm">
+                            <Download size={14} /> Export
+                        </button>
+                        <button onClick={openCreate} className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-all flex items-center gap-1.5">
+                            <Plus size={14} /> Add New
+                        </button>
+                    </>
+                )}
             </div>
           </div>
 
@@ -229,8 +223,6 @@ const PhoneBookPage = () => {
                       onChange={(e) => setSearch(e.target.value)}
                   />
               </div>
-
-              {/* A-Z Quick Jump */}
               <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar flex-1 justify-end">
                  <button onClick={() => setActiveLetter('ALL')} className={`px-2 py-1 text-[10px] font-bold uppercase tracking-widest rounded transition-colors shrink-0 ${activeLetter === 'ALL' ? 'bg-gold-600 text-white' : 'text-gray-500 hover:bg-gray-100'}`}>All</button>
                  {alphabet.map(letter => (
@@ -267,7 +259,7 @@ const PhoneBookPage = () => {
                     </div>
 
                     {filtered.map(c => (
-                        <div key={c.id} onClick={() => openEdit(c)} className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 px-4 md:px-6 py-3 hover:bg-gold-50/30 transition-colors cursor-pointer items-center group">
+                        <div key={c.id} onClick={() => openEdit(c)} className={`grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 px-4 md:px-6 py-3 transition-colors items-center group ${isCashier ? 'cursor-default hover:bg-white' : 'cursor-pointer hover:bg-gold-50/30'}`}>
                             
                             <div className="col-span-1 md:col-span-4 flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-xs shrink-0">
@@ -277,7 +269,6 @@ const PhoneBookPage = () => {
                                     <div className="flex items-center gap-2">
                                         <h3 className="font-bold text-gray-900 text-sm truncate">{c.name}</h3>
                                         {c.is_vip && <span className="bg-gold-100 text-gold-700 text-[8px] font-bold px-1.5 py-0.5 rounded border border-gold-200 uppercase tracking-widest shrink-0">VIP</span>}
-                                        {c.has_claimed_vip_perk && <span className="bg-blue-50 text-blue-600 text-[8px] font-bold px-1.5 py-0.5 rounded border border-blue-200 uppercase tracking-widest shrink-0" title="Has claimed website welcome perk">Perk Claimed</span>}
                                     </div>
                                     <div className="md:hidden text-xs text-gray-500 font-mono mt-0.5">
                                         {c.phone ? c.phone : (c.care_of ? `C/O: ${c.care_of}` : 'No Contact')}
@@ -304,11 +295,10 @@ const PhoneBookPage = () => {
                                 {c.points_balance || 0} pts
                             </div>
 
-                            <div className="hidden md:flex col-span-1 justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={(e) => { e.stopPropagation(); setPointsCustomer(c); }} className="p-1.5 text-white bg-gold-600 hover:bg-black rounded shadow-sm transition-colors" title="Award Points">
+                            <div className="hidden md:flex col-span-1 justify-end gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={(e) => openAwardPoints(c, e)} className="p-1.5 text-white bg-gold-600 hover:bg-black rounded shadow-sm transition-colors" title="Award Points">
                                     <Gift size={14}/>
                                 </button>
-                                {/* --- ONLY SHOW TRASH BUTTON IF ADMIN --- */}
                                 {isAdmin && (
                                     <button onClick={(e) => handleDelete(c.id, e)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete">
                                         <Trash2 size={14}/>
@@ -322,18 +312,13 @@ const PhoneBookPage = () => {
           </div>
       )}
 
-      {/* --- ADD / EDIT MODAL --- */}
-      {showModal && (
+      {/* --- ADD / EDIT MODAL (Hidden for Cashier) --- */}
+      {showModal && !isCashier && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
             <div className="bg-white w-full max-w-2xl rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-                
                 <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
-                    <div>
-                        <h2 className="text-lg font-serif text-gray-900 font-bold">{editingCustomer ? 'Edit Profile' : 'New Client'}</h2>
-                    </div>
-                    <button onClick={closeModal} className="p-1.5 hover:bg-gray-200 rounded text-gray-500 transition-colors">
-                        <X size={18}/>
-                    </button>
+                    <h2 className="text-lg font-serif text-gray-900 font-bold">{editingCustomer ? 'Edit Profile' : 'New Client'}</h2>
+                    <button onClick={closeModal} className="p-1.5 hover:bg-gray-200 rounded text-gray-500 transition-colors"><X size={18}/></button>
                 </div>
                 
                 <div className="p-6 overflow-y-auto bg-white">
@@ -394,9 +379,7 @@ const PhoneBookPage = () => {
                 </div>
 
                 <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 shrink-0">
-                    <button onClick={closeModal} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors">
-                        Cancel
-                    </button>
+                    <button onClick={closeModal} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors">Cancel</button>
                     <button form="contactForm" type="submit" disabled={isSubmitting} className="bg-gold-600 text-white px-8 py-2.5 font-bold uppercase tracking-widest text-xs rounded shadow-md hover:bg-black transition-colors disabled:opacity-50">
                         {isSubmitting ? 'Saving...' : 'Save Profile'}
                     </button>
@@ -405,34 +388,37 @@ const PhoneBookPage = () => {
         </div>
       )}
 
-      {/* --- AWARD POINTS MODAL (Phone Book Target) --- */}
-      {pointsCustomer && (
+      {/* --- FLEXIBLE AWARD POINTS MODAL --- */}
+      {showPointsModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
             <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
                 <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                     <h2 className="text-lg font-serif text-gray-900 font-bold flex items-center gap-2"><Gift size={18} className="text-gold-600"/> Award Points</h2>
-                    <button onClick={() => setPointsCustomer(null)} className="p-1 hover:bg-gray-200 rounded text-gray-500"><X size={18}/></button>
+                    <button onClick={() => setShowPointsModal(false)} className="p-1 hover:bg-gray-200 rounded text-gray-500"><X size={18}/></button>
                 </div>
                 
                 <form onSubmit={handleAwardPoints} className="p-6 space-y-4">
                     <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Customer</label>
-                        <div className="w-full bg-gray-50 border border-gray-200 p-2.5 text-sm text-gray-900 rounded-sm">
-                            <span className="font-bold">{pointsCustomer.name}</span><br/>
-                            <span className="text-xs text-gray-500 font-mono">
-                                {pointsCustomer.phone ? pointsCustomer.phone : (pointsCustomer.care_of ? `C/O: ${pointsCustomer.care_of}` : 'Walk-in')}
-                            </span>
-                        </div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Customer Phone <span className="text-red-500">*</span></label>
+                        <input required type="tel" placeholder="e.g. 0917 123 4567" className="w-full bg-white border border-gray-300 p-2.5 text-sm focus:border-gold-500 outline-none rounded-sm transition-all"
+                            value={pointsForm.phone} onChange={e => setPointsForm({...pointsForm, phone: e.target.value})}
+                        />
                     </div>
                     <div>
                         <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Total Bill Amount (₱) <span className="text-red-500">*</span></label>
                         <input required type="number" min="0" step="0.01" placeholder="e.g. 15500.00" className="w-full bg-white border border-gray-300 p-2.5 text-sm focus:border-gold-500 outline-none rounded-sm transition-all"
-                            value={pointsAmount} onChange={e => setPointsAmount(e.target.value)} autoFocus
+                            value={pointsForm.amount} onChange={e => setPointsForm({...pointsForm, amount: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Customer Name <span className="text-gray-400 font-normal lowercase">(Optional for new numbers)</span></label>
+                        <input type="text" placeholder="Leave blank if already registered" className="w-full bg-white border border-gray-300 p-2.5 text-sm focus:border-gold-500 outline-none rounded-sm transition-all"
+                            value={pointsForm.name} onChange={e => setPointsForm({...pointsForm, name: e.target.value})}
                         />
                     </div>
 
-                    <button type="submit" disabled={isAwarding || !pointsAmount} className="w-full bg-gold-600 text-white font-bold uppercase tracking-widest py-3 text-xs hover:bg-black transition-colors disabled:opacity-50 rounded-sm shadow-md mt-4">
-                        {isAwarding ? 'Processing...' : 'Confirm Points'}
+                    <button type="submit" disabled={isAwarding || !pointsForm.phone || !pointsForm.amount} className="w-full bg-gold-600 text-white font-bold uppercase tracking-widest py-3 text-xs hover:bg-black transition-colors disabled:opacity-50 rounded-sm shadow-md mt-4">
+                        {isAwarding ? 'Processing...' : 'Award Points Now'}
                     </button>
                 </form>
             </div>

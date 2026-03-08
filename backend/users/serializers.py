@@ -10,14 +10,17 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['username'] = user.username
         
         # Determine the user's highest role. 
-        # Default to 'Receptionist' if no group is assigned.
         role = 'Receptionist'
         if user.is_superuser:
             role = 'Admin'
-        elif user.groups.filter(name='Supervisor').exists():
-            role = 'Supervisor'
+        elif user.groups.filter(name='Owner').exists():
+            role = 'Owner'
         elif user.groups.filter(name='Admin').exists():
             role = 'Admin'
+        elif user.groups.filter(name='Supervisor').exists():
+            role = 'Supervisor'
+        elif user.groups.filter(name='Cashier').exists():
+            role = 'Cashier'
             
         token['role'] = role
 

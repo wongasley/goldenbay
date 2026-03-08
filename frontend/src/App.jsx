@@ -37,6 +37,7 @@ const PhoneBookPage = lazy(() => import('./pages/admin/customers/PhoneBookPage')
 const CampaignBuilder = lazy(() => import('./pages/admin/marketing/CampaignBuilder'));
 const MenuManager = lazy(() => import('./pages/admin/menu/MenuManager'));
 const RewardsManager = lazy(() => import('./pages/admin/customers/RewardsManager'));
+const OwnerDashboardPage = lazy(() => import('./pages/admin/dashboard/OwnerDashboardPage'));
 
 // Premium Loading Fallback while splitting code
 const PageLoader = () => (
@@ -103,6 +104,7 @@ function App() {
                 <Route path="marketing/blast" element={<CampaignBuilder />} />
                 <Route path="menu" element={<MenuManager />} />
                 <Route path="rewards" element={<RewardsManager />} />
+                <Route path="reports" element={<OwnerDashboardPage />} />
               </Route>
               
             </Routes>

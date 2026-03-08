@@ -1092,7 +1092,7 @@ class RewardRedemptionSerializer(serializers.ModelSerializer):
         return obj.fulfilled_by.username if obj.fulfilled_by else None
 
 from django.urls import path
-from .views import AdminReservationDetailView, AdminReservationListView, AvailableRoomsView, AwardPointsView, ChatbotBookingWebhook, CustomerDetailView, CustomerListView, DashboardStatsView, LeadCaptureView, RedeemRewardView, ReservationCreateView, RewardItemListView, StaffRedemptionListView, StaffRedemptionUpdateView, VIPRoomListView
+from .views import AdminReservationDetailView, AdminReservationListView, AvailableRoomsView, AwardPointsView, ChatbotBookingWebhook, CustomerDetailView, CustomerListView, DashboardStatsView, LeadCaptureView, OwnerReportView, RedeemRewardView, ReservationCreateView, RewardItemListView, StaffRedemptionListView, StaffRedemptionUpdateView, VIPRoomListView
 
 urlpatterns = [
     path('check/', AvailableRoomsView.as_view(), name='check_availability'),
@@ -1110,6 +1110,7 @@ urlpatterns = [
     path('award-points/', AwardPointsView.as_view(), name='award_points'),
     path('manage/redemptions/', StaffRedemptionListView.as_view(), name='manage_redemptions'),
     path('manage/redemptions/<int:pk>/', StaffRedemptionUpdateView.as_view(), name='update_redemption'),
+    path('reports/', OwnerReportView.as_view(), name='owner_reports'),
 ]
 
 import os
@@ -1588,7 +1589,10 @@ class RedeemRewardView(APIView):
         try:
             with transaction.atomic():
                 # 1. Lock the customer row immediately to prevent race conditions
-                customer = Customer.objects.select_for_update().get(phone=customer_phone)
+                try:
+                    customer = Customer.objects.select_for_update().get(phone=customer_phone)
+                except Customer.DoesNotExist:
+                    return Response({"error": "Customer profile not found."}, status=status.HTTP_404_NOT_FOUND)
                 
                 # 2. Identify the reward
                 try:
@@ -1629,6 +1633,7 @@ class RedeemRewardView(APIView):
 
         except Exception as e:
             # Catching generic DB errors or connection issues
+            print(f"Redemption Error: {e}")
             return Response({"error": "An internal error occurred. Please try again."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
 class StaffRedemptionListView(generics.ListAPIView):
@@ -1669,12 +1674,68 @@ class StaffRedemptionUpdateView(generics.UpdateAPIView):
                     encoded_by=self.request.user,
                 )
 
+class OwnerReportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if not (user.is_superuser or user.groups.filter(name__in=['Owner', 'Admin']).exists()):
+            raise PermissionDenied("Only Owners and Admins can view financial reports.")
+        today = date.today()
+        
+        # 1. Today's Metrics
+        today_active_res = Reservation.objects.filter(date=today).exclude(status__in=['CANCELLED', 'NO_SHOW'])
+        today_bookings = today_active_res.count()
+        today_pax = today_active_res.aggregate(Sum('pax'))['pax__sum'] or 0
+        today_vip_rooms = today_active_res.filter(dining_area__area_type='VIP').count()
+        expected_revenue = today_pax * 1500  # Estimate: 1500 PHP per head
+
+        # 2. All-Time Metrics
+        total_customers = Customer.objects.count()
+        total_vip_customers = Customer.objects.filter(is_vip=True).count()
+        total_bookings = Reservation.objects.exclude(status__in=['CANCELLED', 'NO_SHOW']).count()
+        total_points_in_circulation = Customer.objects.aggregate(Sum('points_balance'))['points_balance__sum'] or 0
+
+        # 3. 30-Day Trend Chart
+        chart_data = []
+        for i in range(29, -1, -1):
+            target_date = today - timedelta(days=i)
+            day_res = Reservation.objects.filter(date=target_date).exclude(status__in=['CANCELLED', 'NO_SHOW'])
+            
+            # Count bookings and pax for that specific day
+            b_count = day_res.count()
+            p_count = day_res.aggregate(Sum('pax'))['pax__sum'] or 0
+            
+            chart_data.append({
+                "date": target_date.strftime("%b %d"),
+                "bookings": b_count,
+                "pax": p_count,
+                "revenue": p_count * 1500
+            })
+
+        return Response({
+            "today": {
+                "bookings": today_bookings,
+                "pax": today_pax,
+                "vip_rooms_occupied": today_vip_rooms,
+                "estimated_revenue": f"₱{expected_revenue:,}"
+            },
+            "all_time": {
+                "total_customers": total_customers,
+                "total_vip_customers": total_vip_customers,
+                "total_bookings": total_bookings,
+                "points_liability": total_points_in_circulation
+            },
+            "chart_data": chart_data
+        })
+
 import requests
 import os
 from core.models import SystemSetting
 
 def send_sms(to_number, body):
     # --- CHECK THE GLOBAL SWITCH FIRST ---
+    
     settings = SystemSetting.load()
     if not settings.enable_sms_notifications:
         print(f"🛑 SMS DISABLED BY ADMIN: Would have sent to {to_number} -> {body}")
@@ -2021,6 +2082,7 @@ from io import BytesIO
 from django.core.files.base import ContentFile
 from deep_translator import GoogleTranslator
 from bs4 import BeautifulSoup
+import os
 
 def auto_translate_html(html_content, dest_lang):
     if not html_content: return ""
@@ -2079,12 +2141,15 @@ class Post(models.Model):
         if not self.content_ja: self.content_ja = auto_translate_html(self.content, 'ja')
         if not self.content_ko: self.content_ko = auto_translate_html(self.content, 'ko')
 
-        # 3. IMAGE COMPRESSION
-        try:
-            this = Post.objects.get(id=self.id)
-            image_changed = (this.image != self.image)
-        except:
-            image_changed = True
+        # 3. IMAGE COMPRESSION (FIXED LOGIC)
+        image_changed = True
+        if self.pk:
+            try:
+                old_post = Post.objects.get(pk=self.pk)
+                if old_post.image == self.image:
+                    image_changed = False
+            except Post.DoesNotExist:
+                pass
 
         if self.image and image_changed:
             img = Image.open(self.image)
@@ -2092,7 +2157,10 @@ class Post(models.Model):
             img.thumbnail((1200, 1200))
             buffer = BytesIO()
             img.save(buffer, format='WEBP', quality=75)
-            self.image = ContentFile(buffer.getvalue(), name=self.image.name.rsplit('.', 1)[0] + '.webp')
+            
+            # Ensure proper string handling for the filename
+            file_name = os.path.splitext(os.path.basename(self.image.name))[0] + '.webp'
+            self.image = ContentFile(buffer.getvalue(), name=file_name)
 
         super().save(*args, **kwargs)
 
@@ -2247,14 +2315,17 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['username'] = user.username
         
         # Determine the user's highest role. 
-        # Default to 'Receptionist' if no group is assigned.
         role = 'Receptionist'
         if user.is_superuser:
             role = 'Admin'
-        elif user.groups.filter(name='Supervisor').exists():
-            role = 'Supervisor'
+        elif user.groups.filter(name='Owner').exists():
+            role = 'Owner'
         elif user.groups.filter(name='Admin').exists():
             role = 'Admin'
+        elif user.groups.filter(name='Supervisor').exists():
+            role = 'Supervisor'
+        elif user.groups.filter(name='Cashier').exists():
+            role = 'Cashier'
             
         token['role'] = role
 
@@ -2405,6 +2476,7 @@ const PhoneBookPage = lazy(() => import('./pages/admin/customers/PhoneBookPage')
 const CampaignBuilder = lazy(() => import('./pages/admin/marketing/CampaignBuilder'));
 const MenuManager = lazy(() => import('./pages/admin/menu/MenuManager'));
 const RewardsManager = lazy(() => import('./pages/admin/customers/RewardsManager'));
+const OwnerDashboardPage = lazy(() => import('./pages/admin/dashboard/OwnerDashboardPage'));
 
 // Premium Loading Fallback while splitting code
 const PageLoader = () => (
@@ -2471,6 +2543,7 @@ function App() {
                 <Route path="marketing/blast" element={<CampaignBuilder />} />
                 <Route path="menu" element={<MenuManager />} />
                 <Route path="rewards" element={<RewardsManager />} />
+                <Route path="reports" element={<OwnerDashboardPage />} />
               </Route>
               
             </Routes>
@@ -7549,13 +7622,11 @@ const Footer = () => {
 export default Footer;
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Phone, Mail, Trash2, ArrowUpDown, X, User, StickyNote, Download, Calendar as CalendarIcon, Gift } from 'lucide-react';
+import { Search, Plus, Phone, Mail, Trash2, ArrowUpDown, X, User, StickyNote, Download, Gift } from 'lucide-react';
 import { FaWeixin, FaViber, FaWhatsapp, FaTelegram } from 'react-icons/fa';
 import axiosInstance from '../../../utils/axiosInstance';
 import toast from 'react-hot-toast';
-import { getUserRole } from '../../../utils/auth'; // <-- ADDED
-
-const BACKEND_URL = import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000";
+import { getUserRole } from '../../../utils/auth';
 
 const PhoneBookPage = () => {
   const [customers, setCustomers] = useState([]);
@@ -7568,13 +7639,15 @@ const PhoneBookPage = () => {
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [pointsCustomer, setPointsCustomer] = useState(null);
-  const [pointsAmount, setPointsAmount] = useState('');
+  // Advanced Points Form state
+  const [showPointsModal, setShowPointsModal] = useState(false);
   const [isAwarding, setIsAwarding] = useState(false);
+  const [pointsForm, setPointsForm] = useState({ phone: '', amount: '', name: '' });
 
-  const isAdmin = getUserRole() === 'Admin'; // <-- Determine if Admin
+  const role = getUserRole();
+  const isAdmin = role === 'Admin';
+  const isCashier = role === 'Cashier';
 
-  // Added care_of to state
   const [formData, setFormData] = useState({
     name: '', phone: '', care_of: '', email: '', wechat: '', viber: '', whatsapp: '', telegram: '', notes: '', date_of_birth: ''
   });
@@ -7595,30 +7668,21 @@ const PhoneBookPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // --- NEW: Strict Phone Validation & Formatting ---
-    // Removes spaces/dashes. If empty, defaults to an empty string safely.
     let cleanPhone = formData.phone ? formData.phone.replace(/[\s-]/g, '') : '';
     
-    // Only validate if they actually typed a number (if empty, nothing happens)
     if (cleanPhone) {
-        const phoneRegex = /^\+?\d+$/;
-        if (!phoneRegex.test(cleanPhone)) {
-            toast.error("Please enter a valid phone number (digits only). Use the 'Care Of' field for handlers like 'C/O Evelyn'.", {
-                duration: 5000,
-                style: { border: '1px solid #ef4444', padding: '16px', color: '#ef4444' }
-            });
-            return; // Stops the submission
+        if (!/^\+?\d+$/.test(cleanPhone)) {
+            toast.error("Please enter a valid phone number (digits only).", { style: { border: '1px solid #ef4444', color: '#ef4444' }});
+            return;
         }
     }
 
     setIsSubmitting(true);
-    
     const url = editingCustomer ? `/api/reservations/customers/${editingCustomer.id}/` : `/api/reservations/customers/`;
     const method = editingCustomer ? 'patch' : 'post';
 
     const payload = { ...formData };
-    payload.phone = cleanPhone || null; // <-- Saves clean string, or null if it was empty
+    payload.phone = cleanPhone || null;
     if (!payload.date_of_birth) payload.date_of_birth = null;
     if (!payload.email) payload.email = null;
     if (!payload.care_of) payload.care_of = null;
@@ -7630,14 +7694,22 @@ const PhoneBookPage = () => {
         toast.success(`Customer ${editingCustomer ? 'updated' : 'added'} successfully!`);
     } catch (err) {
         const errorData = err.response?.data;
-        if (errorData?.phone) {
-            toast.error("This phone number is already registered.");
-        } else {
-            toast.error("Failed to save customer.");
-        }
+        if (errorData?.phone) toast.error("This phone number is already registered.");
+        else toast.error("Failed to save customer.");
     } finally {
         setIsSubmitting(false);
     }
+  };
+
+  // Open Award Points with pre-filled data if clicked from list
+  const openAwardPoints = (customer = null, e = null) => {
+      if (e) e.stopPropagation();
+      if (customer) {
+          setPointsForm({ phone: customer.phone || '', name: customer.name, amount: '' });
+      } else {
+          setPointsForm({ phone: '', name: '', amount: '' });
+      }
+      setShowPointsModal(true);
   };
 
   const handleAwardPoints = async (e) => {
@@ -7645,9 +7717,9 @@ const PhoneBookPage = () => {
       setIsAwarding(true);
       try {
           const res = await axiosInstance.post('/api/reservations/award-points/', {
-              phone: pointsCustomer.phone || pointsCustomer.care_of || 'Walk-in',
-              name: pointsCustomer.name,
-              amount_spent: pointsAmount
+              phone: pointsForm.phone,
+              name: pointsForm.name,
+              amount_spent: pointsForm.amount
           });
           
           if (res.data.points_earned > 0) {
@@ -7657,10 +7729,9 @@ const PhoneBookPage = () => {
               toast('Amount too low to earn points.', { icon: 'ℹ️' });
           }
           
-          setPointsCustomer(null);
-          setPointsAmount('');
+          setShowPointsModal(false);
       } catch (err) {
-          toast.error("Failed to award points.");
+          toast.error(err.response?.data?.non_field_errors?.[0] || "Failed to award points.");
       } finally {
           setIsAwarding(false);
       }
@@ -7679,17 +7750,12 @@ const PhoneBookPage = () => {
   };
 
   const openEdit = (customer) => {
+      if (isCashier) return; // Cashier cannot edit profiles
       setEditingCustomer(customer);
       setFormData({
-          name: customer.name,
-          phone: customer.phone || '',
-          care_of: customer.care_of || '', // Load care_of
-          email: customer.email || '',
-          wechat: customer.wechat || '',
-          viber: customer.viber || '',
-          whatsapp: customer.whatsapp || '',
-          telegram: customer.telegram || '',
-          notes: customer.notes || '',
+          name: customer.name, phone: customer.phone || '', care_of: customer.care_of || '', 
+          email: customer.email || '', wechat: customer.wechat || '', viber: customer.viber || '', 
+          whatsapp: customer.whatsapp || '', telegram: customer.telegram || '', notes: customer.notes || '', 
           date_of_birth: customer.date_of_birth || ''
       });
       setShowModal(true);
@@ -7719,18 +7785,9 @@ const PhoneBookPage = () => {
   const exportToCSV = () => {
       const headers = ['Name', 'Phone', 'Care Of', 'Email', 'WeChat', 'Viber', 'WhatsApp', 'Telegram', 'Notes', 'DOB', 'Last Visit', 'Points Balance'];
       const csvData = filtered.map(c => [
-          `"${c.name}"`, 
-          `"${c.phone || ''}"`, 
-          `"${c.care_of || ''}"`, // Export care_of
-          `"${c.email || ''}"`, 
-          `"${c.wechat || ''}"`, 
-          `"${c.viber || ''}"`, 
-          `"${c.whatsapp || ''}"`, 
-          `"${c.telegram || ''}"`, 
-          `"${(c.notes || '').replace(/"/g, '""')}"`, 
-          `"${c.date_of_birth || ''}"`,
-          `"${c.last_visit || ''}"`,
-          `"${c.points_balance || 0}"`
+          `"${c.name}"`, `"${c.phone || ''}"`, `"${c.care_of || ''}"`, `"${c.email || ''}"`, 
+          `"${c.wechat || ''}"`, `"${c.viber || ''}"`, `"${c.whatsapp || ''}"`, `"${c.telegram || ''}"`, 
+          `"${(c.notes || '').replace(/"/g, '""')}"`, `"${c.date_of_birth || ''}"`, `"${c.last_visit || ''}"`, `"${c.points_balance || 0}"`
       ].join(','));
       
       const csvContent = [headers.join(','), ...csvData].join('\n');
@@ -7745,7 +7802,6 @@ const PhoneBookPage = () => {
 
   const inputClass = "w-full bg-white border border-gray-300 p-2 text-gray-900 text-sm focus:border-gold-500 focus:ring-1 focus:ring-gold-500 outline-none rounded-sm transition-all shadow-sm";
   const labelClass = "block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1";
-
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
   return (
@@ -7755,16 +7811,27 @@ const PhoneBookPage = () => {
       <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-gray-100 pb-3 mb-4">
             <div>
-                <h1 className="text-xl font-bold text-gray-900 font-serif">Phone Book CRM</h1>
-                <p className="text-gray-500 text-xs mt-0.5">Manage customer profiles, contact details, and birthdays.</p>
+                <h1 className="text-xl font-bold text-gray-900 font-serif">
+                    {isCashier ? 'Points Terminal' : 'Phone Book CRM'}
+                </h1>
+                <p className="text-gray-500 text-xs mt-0.5">
+                    {isCashier ? 'Search customers and award dining points.' : 'Manage customer profiles, contact details, and birthdays.'}
+                </p>
             </div>
             <div className="flex gap-2">
-                <button onClick={exportToCSV} className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded hover:bg-gray-50 transition-all flex items-center gap-1.5 shadow-sm">
-                    <Download size={14} /> Export
+                <button onClick={() => openAwardPoints()} className="bg-gray-900 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-black transition-all flex items-center gap-1.5">
+                    <Gift size={14} /> Award Points
                 </button>
-                <button onClick={openCreate} className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-all flex items-center gap-1.5">
-                    <Plus size={14} /> Add New
-                </button>
+                {!isCashier && (
+                    <>
+                        <button onClick={exportToCSV} className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded hover:bg-gray-50 transition-all flex items-center gap-1.5 shadow-sm">
+                            <Download size={14} /> Export
+                        </button>
+                        <button onClick={openCreate} className="bg-gold-600 text-white px-4 py-1.5 font-bold uppercase tracking-widest text-[10px] rounded shadow-sm hover:bg-gold-700 transition-all flex items-center gap-1.5">
+                            <Plus size={14} /> Add New
+                        </button>
+                    </>
+                )}
             </div>
           </div>
 
@@ -7779,8 +7846,6 @@ const PhoneBookPage = () => {
                       onChange={(e) => setSearch(e.target.value)}
                   />
               </div>
-
-              {/* A-Z Quick Jump */}
               <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar flex-1 justify-end">
                  <button onClick={() => setActiveLetter('ALL')} className={`px-2 py-1 text-[10px] font-bold uppercase tracking-widest rounded transition-colors shrink-0 ${activeLetter === 'ALL' ? 'bg-gold-600 text-white' : 'text-gray-500 hover:bg-gray-100'}`}>All</button>
                  {alphabet.map(letter => (
@@ -7817,7 +7882,7 @@ const PhoneBookPage = () => {
                     </div>
 
                     {filtered.map(c => (
-                        <div key={c.id} onClick={() => openEdit(c)} className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 px-4 md:px-6 py-3 hover:bg-gold-50/30 transition-colors cursor-pointer items-center group">
+                        <div key={c.id} onClick={() => openEdit(c)} className={`grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 px-4 md:px-6 py-3 transition-colors items-center group ${isCashier ? 'cursor-default hover:bg-white' : 'cursor-pointer hover:bg-gold-50/30'}`}>
                             
                             <div className="col-span-1 md:col-span-4 flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-xs shrink-0">
@@ -7827,7 +7892,6 @@ const PhoneBookPage = () => {
                                     <div className="flex items-center gap-2">
                                         <h3 className="font-bold text-gray-900 text-sm truncate">{c.name}</h3>
                                         {c.is_vip && <span className="bg-gold-100 text-gold-700 text-[8px] font-bold px-1.5 py-0.5 rounded border border-gold-200 uppercase tracking-widest shrink-0">VIP</span>}
-                                        {c.has_claimed_vip_perk && <span className="bg-blue-50 text-blue-600 text-[8px] font-bold px-1.5 py-0.5 rounded border border-blue-200 uppercase tracking-widest shrink-0" title="Has claimed website welcome perk">Perk Claimed</span>}
                                     </div>
                                     <div className="md:hidden text-xs text-gray-500 font-mono mt-0.5">
                                         {c.phone ? c.phone : (c.care_of ? `C/O: ${c.care_of}` : 'No Contact')}
@@ -7854,11 +7918,10 @@ const PhoneBookPage = () => {
                                 {c.points_balance || 0} pts
                             </div>
 
-                            <div className="hidden md:flex col-span-1 justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={(e) => { e.stopPropagation(); setPointsCustomer(c); }} className="p-1.5 text-white bg-gold-600 hover:bg-black rounded shadow-sm transition-colors" title="Award Points">
+                            <div className="hidden md:flex col-span-1 justify-end gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={(e) => openAwardPoints(c, e)} className="p-1.5 text-white bg-gold-600 hover:bg-black rounded shadow-sm transition-colors" title="Award Points">
                                     <Gift size={14}/>
                                 </button>
-                                {/* --- ONLY SHOW TRASH BUTTON IF ADMIN --- */}
                                 {isAdmin && (
                                     <button onClick={(e) => handleDelete(c.id, e)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete">
                                         <Trash2 size={14}/>
@@ -7872,18 +7935,13 @@ const PhoneBookPage = () => {
           </div>
       )}
 
-      {/* --- ADD / EDIT MODAL --- */}
-      {showModal && (
+      {/* --- ADD / EDIT MODAL (Hidden for Cashier) --- */}
+      {showModal && !isCashier && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
             <div className="bg-white w-full max-w-2xl rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-                
                 <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
-                    <div>
-                        <h2 className="text-lg font-serif text-gray-900 font-bold">{editingCustomer ? 'Edit Profile' : 'New Client'}</h2>
-                    </div>
-                    <button onClick={closeModal} className="p-1.5 hover:bg-gray-200 rounded text-gray-500 transition-colors">
-                        <X size={18}/>
-                    </button>
+                    <h2 className="text-lg font-serif text-gray-900 font-bold">{editingCustomer ? 'Edit Profile' : 'New Client'}</h2>
+                    <button onClick={closeModal} className="p-1.5 hover:bg-gray-200 rounded text-gray-500 transition-colors"><X size={18}/></button>
                 </div>
                 
                 <div className="p-6 overflow-y-auto bg-white">
@@ -7944,9 +8002,7 @@ const PhoneBookPage = () => {
                 </div>
 
                 <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 shrink-0">
-                    <button onClick={closeModal} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors">
-                        Cancel
-                    </button>
+                    <button onClick={closeModal} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors">Cancel</button>
                     <button form="contactForm" type="submit" disabled={isSubmitting} className="bg-gold-600 text-white px-8 py-2.5 font-bold uppercase tracking-widest text-xs rounded shadow-md hover:bg-black transition-colors disabled:opacity-50">
                         {isSubmitting ? 'Saving...' : 'Save Profile'}
                     </button>
@@ -7955,34 +8011,37 @@ const PhoneBookPage = () => {
         </div>
       )}
 
-      {/* --- AWARD POINTS MODAL (Phone Book Target) --- */}
-      {pointsCustomer && (
+      {/* --- FLEXIBLE AWARD POINTS MODAL --- */}
+      {showPointsModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
             <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
                 <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                     <h2 className="text-lg font-serif text-gray-900 font-bold flex items-center gap-2"><Gift size={18} className="text-gold-600"/> Award Points</h2>
-                    <button onClick={() => setPointsCustomer(null)} className="p-1 hover:bg-gray-200 rounded text-gray-500"><X size={18}/></button>
+                    <button onClick={() => setShowPointsModal(false)} className="p-1 hover:bg-gray-200 rounded text-gray-500"><X size={18}/></button>
                 </div>
                 
                 <form onSubmit={handleAwardPoints} className="p-6 space-y-4">
                     <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Customer</label>
-                        <div className="w-full bg-gray-50 border border-gray-200 p-2.5 text-sm text-gray-900 rounded-sm">
-                            <span className="font-bold">{pointsCustomer.name}</span><br/>
-                            <span className="text-xs text-gray-500 font-mono">
-                                {pointsCustomer.phone ? pointsCustomer.phone : (pointsCustomer.care_of ? `C/O: ${pointsCustomer.care_of}` : 'Walk-in')}
-                            </span>
-                        </div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Customer Phone <span className="text-red-500">*</span></label>
+                        <input required type="tel" placeholder="e.g. 0917 123 4567" className="w-full bg-white border border-gray-300 p-2.5 text-sm focus:border-gold-500 outline-none rounded-sm transition-all"
+                            value={pointsForm.phone} onChange={e => setPointsForm({...pointsForm, phone: e.target.value})}
+                        />
                     </div>
                     <div>
                         <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Total Bill Amount (₱) <span className="text-red-500">*</span></label>
                         <input required type="number" min="0" step="0.01" placeholder="e.g. 15500.00" className="w-full bg-white border border-gray-300 p-2.5 text-sm focus:border-gold-500 outline-none rounded-sm transition-all"
-                            value={pointsAmount} onChange={e => setPointsAmount(e.target.value)} autoFocus
+                            value={pointsForm.amount} onChange={e => setPointsForm({...pointsForm, amount: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Customer Name <span className="text-gray-400 font-normal lowercase">(Optional for new numbers)</span></label>
+                        <input type="text" placeholder="Leave blank if already registered" className="w-full bg-white border border-gray-300 p-2.5 text-sm focus:border-gold-500 outline-none rounded-sm transition-all"
+                            value={pointsForm.name} onChange={e => setPointsForm({...pointsForm, name: e.target.value})}
                         />
                     </div>
 
-                    <button type="submit" disabled={isAwarding || !pointsAmount} className="w-full bg-gold-600 text-white font-bold uppercase tracking-widest py-3 text-xs hover:bg-black transition-colors disabled:opacity-50 rounded-sm shadow-md mt-4">
-                        {isAwarding ? 'Processing...' : 'Confirm Points'}
+                    <button type="submit" disabled={isAwarding || !pointsForm.phone || !pointsForm.amount} className="w-full bg-gold-600 text-white font-bold uppercase tracking-widest py-3 text-xs hover:bg-black transition-colors disabled:opacity-50 rounded-sm shadow-md mt-4">
+                        {isAwarding ? 'Processing...' : 'Award Points Now'}
                     </button>
                 </form>
             </div>
@@ -7996,7 +8055,7 @@ const PhoneBookPage = () => {
 export default PhoneBookPage;
 
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation, Outlet } from 'react-router-dom';
+import { Link, useLocation, Outlet, Navigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   CalendarDays, 
@@ -8005,6 +8064,7 @@ import {
   Utensils,
   X,
   Gift,
+  BarChart3
 } from 'lucide-react';
 import LogoutButton from '../auth/LogoutButton';
 import logo from '../../assets/images/goldenbaylogo.svg'; 
@@ -8013,7 +8073,7 @@ import { getUserRole, canManageMarketing, canManageMenu } from '../../utils/auth
 const AdminLayout = () => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const role = getUserRole(); // Get user role
+  const role = getUserRole(); 
   const isMarketingAdmin = canManageMarketing();
   const isMenuAdmin = canManageMenu();
 
@@ -8022,11 +8082,28 @@ const AdminLayout = () => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
+  // Handle immediate redirects for restricted roles trying to access the base /staff URL
+  if (role === 'Owner' && location.pathname === '/staff') {
+      return <Navigate to="/staff/reports" replace />;
+  }
+  if (role === 'Cashier' && location.pathname === '/staff') {
+      return <Navigate to="/staff/customers" replace />;
+  }
+
+  // --- 2. PROTECT THE REPORTS PAGE FROM UNAUTHORIZED ROLES ---
+  if (location.pathname === '/staff/reports' && role !== 'Admin' && role !== 'Owner') {
+      // Bounce them back to their allowed default page
+      if (role === 'Cashier') return <Navigate to="/staff/customers" replace />;
+      return <Navigate to="/staff" replace />;
+  }
+
+  // Filter Sidebar Items based on Role
   const navItems = [
-    { path: '/staff', label: 'Overview', icon: LayoutDashboard, show: true },
-    { path: '/staff/bookings', label: 'Reservations', icon: CalendarDays, show: true },
-    { path: '/staff/customers', label: 'Phone Book', icon: Users, show: true },
-    { path: '/staff/rewards', label: 'Fulfillment', icon: Gift, show: true }, // <--- ADD THIS
+    { path: '/staff', label: 'Overview', icon: LayoutDashboard, show: role !== 'Owner' && role !== 'Cashier' },
+    { path: '/staff/reports', label: 'Analytics', icon: BarChart3, show: role === 'Admin' || role === 'Owner' },
+    { path: '/staff/bookings', label: 'Reservations', icon: CalendarDays, show: role !== 'Owner' && role !== 'Cashier' },
+    { path: '/staff/customers', label: role === 'Cashier' ? 'Points Terminal' : 'Phone Book', icon: Users, show: role !== 'Owner' },
+    { path: '/staff/rewards', label: 'Fulfillment', icon: Gift, show: role !== 'Owner' && role !== 'Cashier' },
     { path: '/staff/menu', label: 'Menu Manager', icon: Utensils, show: isMenuAdmin },
     { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: isMarketingAdmin },
   ].filter(item => item.show);
@@ -8091,7 +8168,12 @@ const AdminLayout = () => {
         
         {/* Top Header */}
         <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4 z-10 flex justify-between items-center shadow-sm shrink-0">
-           {/* ... */}
+           {/* Mobile menu trigger */}
+           <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-md">
+             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinelinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+           </button>
+           <div className="hidden md:block"></div> {/* Spacer for desktop */}
+           
            <div className="flex items-center gap-3 md:gap-4">
               {/* Display the actual role */}
               <span className="text-[10px] md:text-xs font-medium text-gray-500 uppercase tracking-widest">{role}</span>
@@ -9638,7 +9720,6 @@ export const getUserRole = () => {
 
 export const canCancelBooking = () => {
     const role = getUserRole();
-    // Allow ALL staff roles to cancel bookings
     return role === 'Supervisor' || role === 'Admin';
 };
 
@@ -10986,7 +11067,7 @@ const axiosInstance = axios.create({
 
 // Attach Token to every request
 axiosInstance.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem('gb_access_token');
+  const token = await AsyncStorage.getItem('gb_customer_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -10994,6 +11075,8 @@ axiosInstance.interceptors.request.use(async (config) => {
 }, (error) => Promise.reject(error));
 
 export default axiosInstance;
+
+//goldenbay-mobile/App.js
 
 import React, { useState, useEffect, useMemo, createContext, useContext, useCallback } from 'react';
 import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
@@ -11042,7 +11125,7 @@ const translations = {
       home: { title: "GOLDEN BAY", sub: "FRESH SEAFOOD RESTAURANT", book: "Book a Table", bookDesc: "Reserve VIP or Hall", menu: "Our Menu", menuDesc: "Explore live seafood", rewards: "Rewards", rewardsDesc: "View & redeem points", contact: "Contact", contactDesc: "Location & Hours" },
       menu: { title: "OUR MENU", all: "All", seasonal: "Seasonal", standard: "Standard", market: "Market Price" },
       book: { step: "STEP", of: "OF", selectDate: "Select Date", selectSession: "Select Session", lunch: "LUNCH", dinner: "DINNER", pref: "Dining Preference", vip: "VIP ROOMS", hall: "MAIN HALL", check: "CHECK AVAILABILITY", seats: "Seats Left", guests: "Guests", consumable: "Consumable", booked: "BOOKED", next: "NEXT: FINAL DETAILS", details: "Contact Details", name: "Full Name", phone: "Mobile Number", pax: "Guests", time: "Arrival Time", notes: "Special Requests", submit: "SUBMIT RESERVATION" },
-      auth: { login: "MEMBER LOGIN", rewards: "Golden Rewards", phone: "Mobile Number", send: "SEND CODE", code: "Enter 6-Digit Code", verify: "VERIFY", back: "Wrong number? Go back" },
+      auth: { login: "MEMBER LOGIN", rewards: "Golden Bay Rewards", phone: "Mobile Number", send: "SEND CODE", code: "Enter 6-Digit Code", verify: "VERIFY", back: "Wrong number? Go back" },
       rewards: { title: "REWARDS", vip: "VIP MEMBER", active: "Active Member", balance: "Available Balance", pts: "PTS", redeem: "Redeem Rewards", locked: "LOCKED", action: "REDEEM", policy: "Fulfillment Policy", policyDesc: "To claim your reward, please present the digital receipt to your waiter upon ordering. Valid for dine-in visits only." },
       contact: { title: "CONTACT US" },
       settings: { title: "SETTINGS", theme: "Appearance", light: "Light Mode", dark: "Dark Mode", language: "Language", save: "SAVE SETTINGS" }
@@ -12174,3 +12257,131 @@ ios/
 # Local logs/OS files
 *.log
 .DS_Store
+
+// frontend/src/pages/admin/dashboard/OwnerDashboardPage.jsx
+import React, { useEffect, useState } from 'react';
+import { Users, Crown, CalendarCheck, DoorOpen, BarChart3, TrendingUp, DollarSign, Gift } from 'lucide-react';
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import toast from 'react-hot-toast';
+import axiosInstance from '../../../utils/axiosInstance';
+
+const StatCard = ({ title, value, icon: Icon, colorClass, subtitle }) => (
+  <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between relative overflow-hidden h-full">
+    <div className={`absolute top-0 right-0 w-20 h-20 bg-${colorClass}-50 rounded-bl-full -mr-4 -mt-4`}></div>
+    <div className="relative z-10 flex justify-between items-start mb-4">
+      <div className={`p-3 rounded-lg bg-${colorClass}-50 text-${colorClass}-600`}>
+        <Icon size={22} />
+      </div>
+    </div>
+    <div className="relative z-10">
+      <h3 className="text-3xl font-bold text-gray-900 font-sans tracking-tight mb-1">{value}</h3>
+      <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">{title}</p>
+      {subtitle && <p className="text-[10px] text-gray-400 mt-2">{subtitle}</p>}
+    </div>
+  </div>
+);
+
+const OwnerDashboardPage = () => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        const res = await axiosInstance.get('/api/reservations/reports/');
+        setData(res.data);
+      } catch (err) {
+        toast.error("Failed to load owner reports.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchReports();
+  }, []);
+
+  if (loading) {
+    return <div className="p-12 text-center text-gray-400 animate-pulse font-serif text-lg">Compiling Executive Reports...</div>;
+  }
+
+  return (
+    <div className="space-y-6 pb-20">
+      {/* Header (No Action Buttons) */}
+      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <h1 className="text-2xl font-bold text-gray-900 font-serif flex items-center gap-3">
+          <div className="p-2 bg-gold-50 rounded-lg border border-gold-100">
+            <BarChart3 size={24} className="text-gold-600"/> 
+          </div>
+          Executive Analytics
+        </h1>
+        <p className="text-gray-500 text-xs mt-1 uppercase tracking-widest font-medium">Read-Only Performance Overview</p>
+      </div>
+
+      {/* TODAY'S METRICS */}
+      <h2 className="text-sm font-bold text-gray-900 uppercase tracking-widest mt-8 border-b border-gray-200 pb-2">Today's Operations</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <StatCard title="Est. Revenue" value={data.today.estimated_revenue} icon={DollarSign} colorClass="green" subtitle="Based on ₱1,500/head avg" />
+        <StatCard title="Total Pax" value={data.today.pax} icon={Users} colorClass="blue" subtitle="Guests expected today" />
+        <StatCard title="VIP Rooms Active" value={data.today.vip_rooms_occupied} icon={DoorOpen} colorClass="purple" subtitle="Occupied VIP Suites" />
+        <StatCard title="Bookings Today" value={data.today.bookings} icon={CalendarCheck} colorClass="orange" subtitle="Active reservations" />
+      </div>
+
+      {/* ALL-TIME CRM METRICS */}
+      <h2 className="text-sm font-bold text-gray-900 uppercase tracking-widest mt-8 border-b border-gray-200 pb-2">CRM & Lifetime Value</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <StatCard title="Total Customers" value={data.all_time.total_customers.toLocaleString()} icon={Users} colorClass="gray" subtitle="Registered in Phone Book" />
+        <StatCard title="Elite VIPs" value={data.all_time.total_vip_customers.toLocaleString()} icon={Crown} colorClass="gold" subtitle="High-value returning guests" />
+        <StatCard title="Points Liability" value={data.all_time.points_liability.toLocaleString()} icon={Gift} colorClass="rose" subtitle="Total unredeemed points in economy" />
+      </div>
+
+      {/* 30-DAY TREND CHARTS */}
+      <h2 className="text-sm font-bold text-gray-900 uppercase tracking-widest mt-8 border-b border-gray-200 pb-2">30-Day Trajectory</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* Revenue/Pax Chart */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+            <h3 className="font-bold text-gray-900 text-xs uppercase tracking-widest mb-6 flex items-center gap-2">
+                <TrendingUp size={16} className="text-gold-600"/> Guest Footfall (Last 30 Days)
+            </h3>
+            <div className="h-72 w-full text-xs font-mono">
+                <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={data.chart_data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <defs>
+                            <linearGradient id="colorPax" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.8}/>
+                                <stop offset="95%" stopColor="#D4AF37" stopOpacity={0}/>
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                        <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#9ca3af'}} minTickGap={20} />
+                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af'}} />
+                        <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
+                        <Area type="monotone" name="Total Pax" dataKey="pax" stroke="#D4AF37" strokeWidth={3} fillOpacity={1} fill="url(#colorPax)" />
+                    </AreaChart>
+                </ResponsiveContainer>
+            </div>
+        </div>
+
+        {/* Bookings Bar Chart */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+            <h3 className="font-bold text-gray-900 text-xs uppercase tracking-widest mb-6 flex items-center gap-2">
+                <CalendarCheck size={16} className="text-blue-500"/> Reservation Volume (Last 30 Days)
+            </h3>
+            <div className="h-72 w-full text-xs font-mono">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data.chart_data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                        <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#9ca3af'}} minTickGap={20} />
+                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af'}} />
+                        <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} cursor={{fill: '#f3f4f6'}} />
+                        <Bar name="Reservations" dataKey="bookings" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+export default OwnerDashboardPage;
