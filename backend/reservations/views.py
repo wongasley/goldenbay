@@ -66,9 +66,9 @@ class ReservationCreateView(generics.CreateAPIView):
     # --- NEW: Intercept the request before saving to check CAPTCHA ---
     def create(self, request, *args, **kwargs):
         # We only mandate CAPTCHA for website users. Admins skip this.
-        if not request.user.is_authenticated:
-            captcha_token = request.data.get('captcha_token')
-            verify_recaptcha(captcha_token)
+        # if not request.user.is_authenticated:
+        #     captcha_token = request.data.get('captcha_token')
+        #     verify_recaptcha(captcha_token)
             
         return super().create(request, *args, **kwargs)
     # -----------------------------------------------------------------

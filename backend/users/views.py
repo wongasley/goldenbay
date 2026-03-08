@@ -25,7 +25,7 @@ class RequestOTPView(APIView):
             return Response({"error": "Phone number is required."}, status=status.HTTP_400_BAD_REQUEST)
             
         # Verify Bot Status before sending SMS
-        verify_recaptcha(captcha_token)
+        # verify_recaptcha(captcha_token)
 
         # Standardize phone format
         clean_phone = ''.join(filter(str.isdigit, str(phone)))
