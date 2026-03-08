@@ -68,7 +68,7 @@ const AdminLayout = () => {
     { path: '/staff/reports', label: 'Analytics', icon: BarChart3, show: ['Admin', 'Owner'].includes(role) },
     { path: '/staff/bookings', label: 'Reservations', icon: CalendarDays, show: ['Admin', 'Supervisor', 'Receptionist'].includes(role) },
     { path: '/staff/menu', label: 'Menu Manager', icon: Utensils, show: ['Admin', 'Supervisor'].includes(role) },
-    { path: '/staff/rewards', label: 'Fulfillment', icon: Gift, show: ['Admin', 'Supervisor'].includes(role) },
+    { path: '/staff/rewards', label: 'Fulfillment', icon: Gift, show: ['Admin', 'Supervisor', 'Receptionist'].includes(role) },
     { path: '/staff/customers', label: role === 'Cashier' ? 'Points Terminal' : 'Phone Book', icon: Users, show: ['Admin', 'Cashier'].includes(role) },
     { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: role === 'Admin' },
   ].filter(item => item.show);
