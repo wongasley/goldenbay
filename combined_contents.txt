@@ -2747,6 +2747,7 @@ h2 {
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
       gtag('config', 'G-C5GW1EHVWT');
+      gtag('config', 'AW-18001067811');
     </script>
 
     <script>

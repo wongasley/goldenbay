@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Users, Crown, CalendarCheck, DoorOpen, BarChart3, TrendingUp, DollarSign, Gift, MapPin, Clock } from 'lucide-react';
+import { Users, Crown, CalendarCheck, DoorOpen, BarChart3, TrendingUp, DollarSign, Gift, MapPin, Clock, CheckCircle2, XCircle, Flag } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import toast from 'react-hot-toast';
 import axiosInstance from '../../../utils/axiosInstance';
@@ -23,6 +23,15 @@ const StatCard = ({ title, value, icon: Icon, colorClass, subtitle }) => (
 const OwnerDashboardPage = () => {
   const [data, setData] = useState(null);
   const [todayBookings, setTodayBookings] = useState([]);
+  
+  // New state for all-time booking status totals
+  const [bookingStats, setBookingStats] = useState({
+    confirmed: 0,
+    completed: 0,
+    noShow: 0,
+    cancelled: 0,
+  });
+  
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -36,12 +45,21 @@ const OwnerDashboardPage = () => {
         
         setData(reportsRes.data);
 
+        // Calculate all-time status totals directly from the bookings array
+        const allBookings = bookingsRes.data;
+        setBookingStats({
+          confirmed: allBookings.filter(b => b.status === 'CONFIRMED').length,
+          completed: allBookings.filter(b => b.status === 'COMPLETED').length,
+          noShow: allBookings.filter(b => b.status === 'NO_SHOW').length,
+          cancelled: allBookings.filter(b => b.status === 'CANCELLED').length,
+        });
+
         // Get today's date in YYYY-MM-DD format based on local timezone
         const d = new Date();
         const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
         // Filter bookings to only show today's active reservations, sorted by time
-        const activeToday = bookingsRes.data
+        const activeToday = allBookings
           .filter(b => b.date === todayStr && !['CANCELLED', 'NO_SHOW'].includes(b.status))
           .sort((a, b) => a.time.localeCompare(b.time));
 
@@ -77,6 +95,10 @@ const OwnerDashboardPage = () => {
             <div className="h-6 w-48 bg-gray-200 animate-pulse rounded mt-8 mb-2"></div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {[1,2,3].map(i => <div key={i} className="bg-white h-32 rounded-xl border border-gray-200 shadow-sm animate-pulse"></div>)}
+            </div>
+            <div className="h-6 w-48 bg-gray-200 animate-pulse rounded mt-8 mb-2"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                {[1,2,3,4].map(i => <div key={i} className="bg-white h-32 rounded-xl border border-gray-200 shadow-sm animate-pulse"></div>)}
             </div>
             <div className="h-6 w-48 bg-gray-200 animate-pulse rounded mt-8 mb-2"></div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -170,6 +192,15 @@ const OwnerDashboardPage = () => {
         <StatCard title="Total Customers" value={data.all_time.total_customers.toLocaleString()} icon={Users} colorClass="gray" subtitle="Registered in Phone Book" />
         <StatCard title="Elite VIPs" value={data.all_time.total_vip_customers.toLocaleString()} icon={Crown} colorClass="gold" subtitle="High-value returning guests" />
         <StatCard title="Points Liability" value={data.all_time.points_liability.toLocaleString()} icon={Gift} colorClass="rose" subtitle="Total unredeemed points in economy" />
+      </div>
+
+      {/* ALL-TIME BOOKING ANALYSIS */}
+      <h2 className="text-sm font-bold text-gray-900 uppercase tracking-widest mt-8 border-b border-gray-200 pb-2">All-Time Booking Analysis</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <StatCard title="Total Confirmed" value={bookingStats.confirmed.toLocaleString()} icon={CalendarCheck} colorClass="blue" subtitle="Awaiting Arrival" />
+        <StatCard title="Total Completed" value={bookingStats.completed.toLocaleString()} icon={CheckCircle2} colorClass="green" subtitle="Successfully Served" />
+        <StatCard title="Total No-Show" value={bookingStats.noShow.toLocaleString()} icon={Flag} colorClass="orange" subtitle="Missed Reservations" />
+        <StatCard title="Total Cancelled" value={bookingStats.cancelled.toLocaleString()} icon={XCircle} colorClass="rose" subtitle="Cancelled by Guest/Staff" />
       </div>
 
       {/* 30-DAY TREND CHARTS */}
