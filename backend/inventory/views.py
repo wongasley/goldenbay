@@ -98,3 +98,15 @@ class DocumentApproveView(APIView):
             
         except Exception as e:
             return Response({"error": str(e)}, status=400)
+
+class ProductCreateView(generics.CreateAPIView):
+    """ Allows Inventory Managers to add new products to the catalog """
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if not (user.is_superuser or user.groups.filter(name__in=['Inventory Manager', 'Admin']).exists()):
+            raise PermissionDenied("Only Inventory Managers can add new products.")
+        serializer.save()
