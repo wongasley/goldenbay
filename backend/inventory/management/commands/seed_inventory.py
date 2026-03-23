@@ -73,4 +73,3 @@ class Command(BaseCommand):
                 )
 
         self.stdout.write(self.style.SUCCESS('Inventory Seeded Successfully!'))
-        self.stdout.write("Run: python manage.py seed_inventory")

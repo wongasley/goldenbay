@@ -39,6 +39,9 @@ const CampaignBuilder = lazy(() => import('./pages/admin/marketing/CampaignBuild
 const MenuManager = lazy(() => import('./pages/admin/menu/MenuManager'));
 const RewardsManager = lazy(() => import('./pages/admin/customers/RewardsManager'));
 const OwnerDashboardPage = lazy(() => import('./pages/admin/dashboard/OwnerDashboardPage'));
+const InventoryDashboard = lazy(() => import('./pages/admin/inventory/InventoryDashboard'));
+const DocumentForm = lazy(() => import('./pages/admin/inventory/DocumentForm'));
+const InventoryManager = lazy(() => import('./pages/admin/inventory/InventoryManager')); // In case you link to the catalog later
 
 const PageLoader = () => (
   <div className="min-h-screen bg-cream-50 flex items-center justify-center text-gold-600 font-serif tracking-widest uppercase animate-pulse">
@@ -105,19 +108,10 @@ function App() {
                     <Route path="menu" element={<MenuManager />} />
                     <Route path="rewards" element={<RewardsManager />} />
                     <Route path="reports" element={<OwnerDashboardPage />} />
-                    <Route path="/staff/inventory" element={<InventoryDashboard />} />
-                    <Route path="/staff/inventory" element={<InventoryDashboard />} />
-                    <Route path="/staff/inventory/deliveries" element={<DocumentForm docType="DELIVERY" />} />
-                    <Route path="/staff/inventory/requisitions" element={<DocumentForm docType="REQUISITION" />} />
+                    <Route path="inventory" element={<InventoryDashboard />} />
+                    <Route path="inventory/deliveries" element={<DocumentForm docType="DELIVERY" />} />
                     <Route path="inventory/transfers" element={<DocumentForm docType="TRANSFER" />} />
-                    <Route 
-                      path="/staff/inventory/catalog" 
-                      element={
-                        <RoleGuard allowedRoles={['Admin', 'Inventory Manager']}>
-                          <ProductCatalogManager />
-                        </RoleGuard>
-                      } 
-                    />
+                    <Route path="inventory/requisitions" element={<DocumentForm docType="REQUISITION" />} />
                   </Route>
                   
                 </Routes>

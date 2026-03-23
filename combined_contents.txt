@@ -2831,6 +2831,7 @@ function App() {
                     <Route path="/staff/inventory" element={<InventoryDashboard />} />
                     <Route path="/staff/inventory/deliveries" element={<DocumentForm docType="DELIVERY" />} />
                     <Route path="/staff/inventory/requisitions" element={<DocumentForm docType="REQUISITION" />} />
+                    <Route path="inventory/transfers" element={<DocumentForm docType="TRANSFER" />} />
                     <Route 
                       path="/staff/inventory/catalog" 
                       element={
@@ -8448,6 +8449,7 @@ import {
   Package,
   ArrowDownToLine,
   ArrowUpFromLine,
+  ArrowRightLeft,
 } from 'lucide-react';
 import LogoutButton from '../auth/LogoutButton';
 import logo from '../../assets/images/goldenbaylogo.svg'; 
@@ -8512,6 +8514,7 @@ const AdminLayout = () => {
     { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: role === 'Admin' },
     { path: '/staff/inventory', label: 'Current Stock', icon: Package, show: ['Admin', 'Inventory Manager', 'Inventory Officer', 'Owner'].includes(role) },
     { path: '/staff/inventory/deliveries', label: 'Receive Delivery', icon: ArrowDownToLine, show: ['Admin', 'Inventory Manager', 'Inventory Officer'].includes(role) },
+    { path: '/staff/inventory/transfers', label: 'Storage Transfers', icon: ArrowRightLeft, show: ['Admin', 'Inventory Manager', 'Inventory Officer'].includes(role) },
     { path: '/staff/inventory/requisitions', label: 'Dept Requisitions', icon: ArrowUpFromLine, show: ['Admin', 'Inventory Manager', 'Inventory Officer'].includes(role) },
   ].filter(item => item.show);
 
@@ -12139,7 +12142,7 @@ import toast from 'react-hot-toast';
 import { Barcode, Trash2, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const DocumentForm = ({ docType }) => { // pass 'DELIVERY' or 'REQUISITION' as a prop
+const DocumentForm = ({ docType }) => { // 'DELIVERY', 'REQUISITION', 'TRANSFER'
   const navigate = useNavigate();
   const [locations, setLocations] = useState([]);
   const [source, setSource] = useState('');
@@ -12156,10 +12159,20 @@ const DocumentForm = ({ docType }) => { // pass 'DELIVERY' or 'REQUISITION' as a
       setLocations(res.data);
     };
     fetchLocs();
-  }, []);
+    
+    // Reset state if docType changes (e.g. clicking sidebar links)
+    setSource('');
+    setDest('');
+    setLineItems([]);
+  }, [docType]);
 
   const storages = locations.filter(l => l.is_storage);
   const departments = locations.filter(l => l.is_department);
+
+  // Dynamic dropdown logic
+  const destOptions = docType === 'DELIVERY' ? storages : 
+                      docType === 'REQUISITION' ? departments : 
+                      storages; // TRANSFER dest is another storage
 
   const handleScan = async (e) => {
     e.preventDefault();
@@ -12202,6 +12215,8 @@ const DocumentForm = ({ docType }) => { // pass 'DELIVERY' or 'REQUISITION' as a
     if (lineItems.length === 0) return toast.error("Scan at least one item.");
     if (docType === 'DELIVERY' && !dest) return toast.error("Select a destination storage.");
     if (docType === 'REQUISITION' && (!source || !dest)) return toast.error("Select both source and department.");
+    if (docType === 'TRANSFER' && (!source || !dest)) return toast.error("Select source and destination.");
+    if (docType === 'TRANSFER' && source === dest) return toast.error("Source and Destination cannot be the same.");
 
     try {
       await axiosInstance.post('/api/inventory/documents/create/', {
@@ -12212,10 +12227,16 @@ const DocumentForm = ({ docType }) => { // pass 'DELIVERY' or 'REQUISITION' as a
         items: lineItems
       });
       toast.success("Document Submitted for Approval!");
-      navigate('/staff/inventory'); // Redirect back to overview
+      navigate('/staff/inventory'); 
     } catch (err) {
       toast.error("Failed to submit document.");
     }
+  };
+
+  const getTitle = () => {
+      if (docType === 'DELIVERY') return 'Supplier Delivery (Inbound)';
+      if (docType === 'REQUISITION') return 'Department Requisition (Outbound)';
+      return 'Internal Stock Transfer';
   };
 
   return (
@@ -12223,48 +12244,45 @@ const DocumentForm = ({ docType }) => { // pass 'DELIVERY' or 'REQUISITION' as a
       
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-6">
         <div>
-            <h1 className="text-2xl font-bold font-serif text-gray-900">
-                New {docType === 'DELIVERY' ? 'Supplier Delivery' : 'Department Requisition'}
-            </h1>
+            <h1 className="text-2xl font-bold font-serif text-gray-900">{getTitle()}</h1>
             <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Ensure scanner is plugged in and focused</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-            {docType === 'REQUISITION' && (
+            {/* SOURCE (Hidden for deliveries) */}
+            {docType !== 'DELIVERY' && (
                 <div>
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Take From (Source)</label>
-                    <select className="w-full p-2 border rounded" value={source} onChange={e => setSource(e.target.value)}>
+                    <select className="w-full p-2 border border-gray-300 rounded text-sm outline-none focus:border-gold-500" value={source} onChange={e => setSource(e.target.value)}>
                         <option value="">-- Select Storage --</option>
                         {storages.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                     </select>
                 </div>
             )}
             
-            <div>
+            {/* DESTINATION */}
+            <div className={docType === 'DELIVERY' ? "md:col-span-2" : ""}>
                 <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">
-                    {docType === 'DELIVERY' ? 'Store In (Destination)' : 'Deliver To (Department)'}
+                    {docType === 'DELIVERY' ? 'Store In (Destination)' : docType === 'TRANSFER' ? 'Transfer To (Destination)' : 'Deliver To (Department)'}
                 </label>
-                <select className="w-full p-2 border rounded" value={dest} onChange={e => setDest(e.target.value)}>
+                <select className="w-full p-2 border border-gray-300 rounded text-sm outline-none focus:border-gold-500" value={dest} onChange={e => setDest(e.target.value)}>
                     <option value="">-- Select Location --</option>
-                    {(docType === 'DELIVERY' ? storages : departments).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    {destOptions.map(l => <option key={l.id} value={l.id} disabled={docType === 'TRANSFER' && l.id.toString() === source}>{l.name}</option>)}
                 </select>
             </div>
             
             <div className="md:col-span-2">
                 <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Notes / Invoice #</label>
-                <input type="text" className="w-full p-2 border rounded" placeholder="Optional notes..." value={notes} onChange={e => setNotes(e.target.value)} />
+                <input type="text" className="w-full p-2 border border-gray-300 rounded text-sm outline-none focus:border-gold-500" placeholder="Optional notes..." value={notes} onChange={e => setNotes(e.target.value)} />
             </div>
         </div>
 
         {/* INVISIBLE SCANNER INPUT */}
-        <form onSubmit={handleScan} className="relative mt-4">
+        <form onSubmit={handleScan} className="relative mt-2">
           <input 
             ref={scannerRef}
             autoFocus
-            onBlur={() => {
-              // Keeps the cursor locked so the user can just scan continuously
-              setTimeout(() => scannerRef.current?.focus(), 10);
-            }}
+            onBlur={() => setTimeout(() => scannerRef.current?.focus(), 10)}
             className="absolute opacity-0 w-0 h-0" 
             value={barcodeInput} 
             onChange={e => setBarcodeInput(e.target.value)} 
@@ -12283,7 +12301,7 @@ const DocumentForm = ({ docType }) => { // pass 'DELIVERY' or 'REQUISITION' as a
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="p-4 text-xs text-gray-500 uppercase tracking-widest">Scanned Product</th>
-              <th className="p-4 text-xs text-gray-500 uppercase tracking-widest text-center">Quantity</th>
+              <th className="p-4 text-xs text-gray-500 uppercase tracking-widest text-center">Total Quantity</th>
               <th className="p-4 text-xs text-gray-500 uppercase tracking-widest text-right">Action</th>
             </tr>
           </thead>
@@ -12303,7 +12321,7 @@ const DocumentForm = ({ docType }) => { // pass 'DELIVERY' or 'REQUISITION' as a
                             const val = parseInt(e.target.value) || 1;
                             setLineItems(prev => prev.map(item => item.product_id === line.product_id ? { ...item, quantity: val } : item));
                         }}
-                        className="border border-gray-300 p-1.5 w-20 rounded text-center font-mono font-bold"
+                        className="border border-gray-300 p-1.5 w-24 rounded text-center font-mono font-bold outline-none focus:border-gold-500"
                       />
                       <span className="text-xs text-gray-500 uppercase">{line.unit}s</span>
                   </div>
@@ -12430,3 +12448,80 @@ const InventoryDashboard = () => {
 };
 
 export default InventoryDashboard;
+
+from django.core.management.base import BaseCommand
+from django.db import transaction
+from inventory.models import Location, Product, StockLevel
+
+class Command(BaseCommand):
+    help = 'Seeds the database with Inventory Locations, Products, and Initial Stock'
+
+    def handle(self, *args, **options):
+        self.stdout.write("Seeding Inventory System...")
+
+        with transaction.atomic():
+            # 1. Create Locations (Storages vs Departments)
+            storages = [
+                "Main Commissary (Ground Floor)",
+                "4th Floor Dry Storage",
+                "Walk-in Freezer 1",
+            ]
+            departments = [
+                "Main Kitchen",
+                "Dimsum Kitchen",
+                "Bar & Beverage",
+            ]
+
+            storage_locs = []
+            for name in storages:
+                loc, _ = Location.objects.get_or_create(name=name, defaults={'is_storage': True, 'is_department': False})
+                storage_locs.append(loc)
+
+            dept_locs = []
+            for name in departments:
+                loc, _ = Location.objects.get_or_create(name=name, defaults={'is_storage': False, 'is_department': True})
+                dept_locs.append(loc)
+
+            # 2. Create Products
+            products_data = [
+                {
+                    "name": "Premium Light Soy Sauce", "brand": "Lee Kum Kee", 
+                    "base_unit": "Bottle", "units_per_box": 12, 
+                    "barcode": "SOY-123-BOT", "box_barcode": "SOY-123-BOX", "cost_price": 150.00
+                },
+                {
+                    "name": "Jasmine Tea Leaves", "brand": "Ten Fu", 
+                    "base_unit": "Pack", "units_per_box": 50, 
+                    "barcode": "TEA-456-PCK", "box_barcode": "TEA-456-BOX", "cost_price": 45.00
+                },
+                {
+                    "name": "Heineken Beer (330ml)", "brand": "Heineken", 
+                    "base_unit": "Can", "units_per_box": 24, 
+                    "barcode": "BEER-789-CAN", "box_barcode": "BEER-789-BOX", "cost_price": 80.00
+                },
+                {
+                    "name": "Black Truffle Paste", "brand": "Urbani", 
+                    "base_unit": "Jar", "units_per_box": 6, 
+                    "barcode": "TRUF-001-JAR", "box_barcode": "TRUF-001-BOX", "cost_price": 1200.00
+                },
+            ]
+
+            created_products = []
+            for p_data in products_data:
+                prod, _ = Product.objects.get_or_create(
+                    barcode=p_data['barcode'],
+                    defaults=p_data
+                )
+                created_products.append(prod)
+
+            # 3. Add Initial Stock to the Main Commissary so you have something to transfer
+            main_storage = storage_locs[0]
+            for prod in created_products:
+                StockLevel.objects.get_or_create(
+                    product=prod,
+                    location=main_storage,
+                    defaults={'quantity': prod.units_per_box * 10} # 10 boxes of everything
+                )
+
+        self.stdout.write(self.style.SUCCESS('Inventory Seeded Successfully!'))
+        self.stdout.write("Run: python manage.py seed_inventory")
