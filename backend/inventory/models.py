@@ -13,6 +13,17 @@ class Location(models.Model):
     def __str__(self):
         return self.name
 
+class Rack(models.Model):
+    location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='racks')
+    name = models.CharField(max_length=50, help_text="e.g., Rack 1, Shelf A, Bin 12")
+
+    class Meta:
+        unique_together = ('location', 'name') # Prevents having two "Rack 1"s in the same room
+        ordering = ['location__name', 'name']
+
+    def __str__(self):
+        return f"{self.location.name} - {self.name}"
+    
 class Product(models.Model):
     name = models.CharField(max_length=200)
     brand = models.CharField(max_length=100, blank=True, null=True)
@@ -31,6 +42,9 @@ class Product(models.Model):
 class StockLevel(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='stock_levels')
     location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='inventory')
+
+    rack = models.ForeignKey(Rack, on_delete=models.SET_NULL, null=True, blank=True, related_name='stock_levels')
+    
     quantity = models.IntegerField(default=0, help_text="Tracked in base units")
 
     class Meta:
