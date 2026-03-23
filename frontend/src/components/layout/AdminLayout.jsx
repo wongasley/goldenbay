@@ -8,7 +8,11 @@ import {
   Utensils,
   X,
   Gift,
-  BarChart3
+  BarChart3,
+  Package,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  ArrowRightLeft,
 } from 'lucide-react';
 import LogoutButton from '../auth/LogoutButton';
 import logo from '../../assets/images/goldenbaylogo.svg'; 
@@ -71,6 +75,10 @@ const AdminLayout = () => {
     { path: '/staff/rewards', label: 'Fulfillment', icon: Gift, show: ['Admin', 'Supervisor'].includes(role) },
     { path: '/staff/customers', label: role === 'Cashier' ? 'Points Terminal' : 'Phone Book', icon: Users, show: ['Admin', 'Cashier'].includes(role) },
     { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: role === 'Admin' },
+    { path: '/staff/inventory', label: 'Current Stock', icon: Package, show: ['Admin', 'Inventory Manager', 'Inventory Officer', 'Owner'].includes(role) },
+    { path: '/staff/inventory/deliveries', label: 'Receive Delivery', icon: ArrowDownToLine, show: ['Admin', 'Inventory Manager', 'Inventory Officer'].includes(role) },
+    { path: '/staff/inventory/transfers', label: 'Storage Transfers', icon: ArrowRightLeft, show: ['Admin', 'Inventory Manager', 'Inventory Officer'].includes(role) },
+    { path: '/staff/inventory/requisitions', label: 'Dept Requisitions', icon: ArrowUpFromLine, show: ['Admin', 'Inventory Manager', 'Inventory Officer'].includes(role) },
   ].filter(item => item.show);
 
   return (

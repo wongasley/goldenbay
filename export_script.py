@@ -60,6 +60,16 @@ FILES_TO_READ = [
     'backend/users/tasks.py',
     'backend/users/services.py',
 
+    'backend/inventory/admin.py',
+    'backend/inventory/apps.py',
+    'backend/inventory/models.py',
+    'backend/inventory/serializers.py',
+    'backend/inventory/urls.py',
+    'backend/inventory/views.py',
+    'backend/inventory/reporting.py',
+    'backend/inventory/tasks.py',
+    'backend/inventory/services.py',
+
     'frontend/src/App.jsx',
     # 'frontend/src/App.css',
     'frontend/src/index.css',
@@ -131,6 +141,10 @@ FILES_TO_READ = [
     'backend/core/utils.py',
     'frontend/src/pages/public/reservations/ManageBookingPage.jsx',
     'frontend/.env',
+    'frontend/src/pages/admin/inventory/InventoryManager.jsx',
+    'frontend/src/pages/admin/inventory/DocumentForm.jsx',
+    'frontend/src/pages/admin/inventory/InventoryDashboard.jsx',
+    'backend/inventory/management/commands/seed_inventory.py',
 ]
 
 # 2. Set the name for the final output text file.

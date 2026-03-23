@@ -17,10 +17,15 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             role = 'Owner'
         elif user.groups.filter(name='Admin').exists():
             role = 'Admin'
+        elif user.groups.filter(name='Inventory Manager').exists():
+            role = 'Inventory Manager'
+        elif user.groups.filter(name='Inventory Officer').exists():
+            role = 'Inventory Officer'
         elif user.groups.filter(name='Supervisor').exists():
             role = 'Supervisor'
         elif user.groups.filter(name='Cashier').exists():
             role = 'Cashier'
+        
             
         token['role'] = role
 

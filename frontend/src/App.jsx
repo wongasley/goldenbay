@@ -105,6 +105,19 @@ function App() {
                     <Route path="menu" element={<MenuManager />} />
                     <Route path="rewards" element={<RewardsManager />} />
                     <Route path="reports" element={<OwnerDashboardPage />} />
+                    <Route path="/staff/inventory" element={<InventoryDashboard />} />
+                    <Route path="/staff/inventory" element={<InventoryDashboard />} />
+                    <Route path="/staff/inventory/deliveries" element={<DocumentForm docType="DELIVERY" />} />
+                    <Route path="/staff/inventory/requisitions" element={<DocumentForm docType="REQUISITION" />} />
+                    <Route path="inventory/transfers" element={<DocumentForm docType="TRANSFER" />} />
+                    <Route 
+                      path="/staff/inventory/catalog" 
+                      element={
+                        <RoleGuard allowedRoles={['Admin', 'Inventory Manager']}>
+                          <ProductCatalogManager />
+                        </RoleGuard>
+                      } 
+                    />
                   </Route>
                   
                 </Routes>

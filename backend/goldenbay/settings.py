@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'events',
     'blog',
     'marketing',
+    'inventory',
     'rest_framework_simplejwt',
     'ckeditor',
     'simple_history',
