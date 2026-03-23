@@ -12,9 +12,9 @@ const InventoryDashboard = () => {
     const fetchData = async () => {
       try {
         const locRes = await axiosInstance.get('/api/inventory/locations/');
-        const storageLocs = locRes.data.filter(l => l.is_storage);
-        setLocations(storageLocs);
-        if (storageLocs.length > 0) setSelectedLoc(storageLocs[0].id);
+        // FIX: Removed the .filter(l => l.is_storage) since all rooms are now valid storages!
+        setLocations(locRes.data);
+        if (locRes.data.length > 0) setSelectedLoc(locRes.data[0].id);
       } catch (err) {
         console.error(err);
       }
@@ -72,19 +72,20 @@ const InventoryDashboard = () => {
               <tr>
                 <th className="px-6 py-4">Product Name</th>
                 <th className="px-6 py-4">Barcode</th>
+                <th className="px-6 py-4">Rack / Shelf</th>
                 <th className="px-6 py-4 text-right">Current Quantity</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
               {stock.length === 0 ? (
-                <tr><td colSpan="3" className="px-6 py-8 text-center text-gray-400">No items stored here.</td></tr>
+                <tr><td colSpan="4" className="px-6 py-8 text-center text-gray-400">No items stored here.</td></tr>
               ) : stock.map(s => (
                 <tr key={s.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 font-bold text-gray-900">{s.product_name}</td>
                   <td className="px-6 py-4 text-gray-500 font-mono text-xs">{s.product_barcode}</td>
 
                   <td className="px-6 py-4 text-gray-600 font-medium">
-                      <span className="bg-gray-100 px-2 py-1 rounded text-xs">{s.rack_name || 'Unassigned'}</span>
+                      <span className="bg-gray-100 px-2 py-1 rounded text-xs border border-gray-200">{s.rack_name || 'Unassigned'}</span>
                   </td>
                   
                   <td className="px-6 py-4 text-right font-bold">
