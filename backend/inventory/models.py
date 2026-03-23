@@ -7,23 +7,22 @@ from rest_framework.exceptions import ValidationError
 
 class Location(models.Model):
     name = models.CharField(max_length=100, unique=True)
-    is_storage = models.BooleanField(default=True, help_text="Can hold inventory (e.g., 4th Floor Stock Room, 1st Floor Freezer)")
-    is_department = models.BooleanField(default=False, help_text="Consumes inventory (e.g., Kitchen, Dining, Dimsum)")
+    # REMOVED is_storage and is_department. Everything is a storage location now!
 
     def __str__(self):
         return self.name
 
 class Rack(models.Model):
     location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='racks')
-    name = models.CharField(max_length=50, help_text="e.g., Rack 1, Shelf A, Bin 12")
+    name = models.CharField(max_length=50, help_text="e.g., Rack 1, Shelf A, Bar Cabinet")
 
     class Meta:
-        unique_together = ('location', 'name') # Prevents having two "Rack 1"s in the same room
+        unique_together = ('location', 'name')
         ordering = ['location__name', 'name']
 
     def __str__(self):
         return f"{self.location.name} - {self.name}"
-    
+
 class Product(models.Model):
     name = models.CharField(max_length=200)
     brand = models.CharField(max_length=100, blank=True, null=True)
@@ -42,9 +41,7 @@ class Product(models.Model):
 class StockLevel(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='stock_levels')
     location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='inventory')
-
     rack = models.ForeignKey(Rack, on_delete=models.SET_NULL, null=True, blank=True, related_name='stock_levels')
-
     quantity = models.IntegerField(default=0, help_text="Tracked in base units")
 
     class Meta:
@@ -56,9 +53,9 @@ class StockLevel(models.Model):
 
 class InventoryDocument(models.Model):
     DOC_TYPES = [
-        ('DELIVERY', 'Delivery (Inbound)'),
-        ('REQUISITION', 'Requisition (Outbound to Dept)'),
-        ('TRANSFER', 'Transfer (Storage to Storage)'),
+        ('INBOUND', 'Inbound Delivery (From Supplier)'),
+        ('TRANSFER', 'Internal Transfer (Loc to Loc)'),
+        ('OUTBOUND', 'Outbound (Consumed / Wasted)'),
     ]
     STATUS_CHOICES = [
         ('DRAFT', 'Draft'),
@@ -71,7 +68,10 @@ class InventoryDocument(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='DRAFT')
     
     source_location = models.ForeignKey(Location, related_name='outgoing_docs', on_delete=models.SET_NULL, null=True, blank=True)
+    source_rack = models.ForeignKey(Rack, related_name='outgoing_rack_docs', on_delete=models.SET_NULL, null=True, blank=True)
+    
     destination_location = models.ForeignKey(Location, related_name='incoming_docs', on_delete=models.SET_NULL, null=True, blank=True)
+    destination_rack = models.ForeignKey(Rack, related_name='incoming_rack_docs', on_delete=models.SET_NULL, null=True, blank=True)
     
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_docs')
     approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_docs')
@@ -87,28 +87,28 @@ class DocumentLineItem(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     quantity = models.IntegerField(help_text="Total base units")
 
-# --- CORE LOGIC: Automated Stock Movement ---
+# --- UPDATED LOGIC: Accurate Rack-to-Rack Stock Movement ---
 @receiver(post_save, sender=InventoryDocument)
 def process_inventory_movement(sender, instance, **kwargs):
-    """ Executes stock movement ONLY when a manager marks the document as APPROVED """
     if instance.status == 'APPROVED':
         with transaction.atomic():
             for line in instance.items.all():
-                # 1. Deduct from Source (For Requisitions & Transfers)
-                if instance.source_location:
+                
+                # Deduct from Source (Transfers & Outbound Consumption)
+                if instance.doc_type in ['TRANSFER', 'OUTBOUND'] and instance.source_location:
                     source_stock, _ = StockLevel.objects.get_or_create(
-                        product=line.product, location=instance.source_location
+                        product=line.product, location=instance.source_location, rack=instance.source_rack
                     )
                     if source_stock.quantity < line.quantity:
-                        raise ValidationError(f"Insufficient stock for {line.product.name} in {instance.source_location.name}")
+                        raise ValidationError(f"Insufficient stock for {line.product.name} in {instance.source_location.name} ({instance.source_rack.name if instance.source_rack else 'No Rack'})")
                     
                     source_stock.quantity -= line.quantity
                     source_stock.save()
 
-                # 2. Add to Destination (For Deliveries & Transfers. Requisitions are 'consumed' so they don't add to a storage location)
-                if instance.destination_location and instance.destination_location.is_storage:
+                # Add to Destination (Inbound Deliveries & Transfers)
+                if instance.doc_type in ['INBOUND', 'TRANSFER'] and instance.destination_location:
                     dest_stock, _ = StockLevel.objects.get_or_create(
-                        product=line.product, location=instance.destination_location
+                        product=line.product, location=instance.destination_location, rack=instance.destination_rack
                     )
                     dest_stock.quantity += line.quantity
                     dest_stock.save()

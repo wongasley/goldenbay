@@ -1,10 +1,17 @@
 from rest_framework import serializers
-from .models import Location, Product, StockLevel, InventoryDocument, DocumentLineItem
+from .models import Location, Rack, Product, StockLevel, InventoryDocument, DocumentLineItem
+
+class RackSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Rack
+        fields = '__all__'
 
 class LocationSerializer(serializers.ModelSerializer):
+    racks = RackSerializer(many=True, read_only=True) # Exposes racks to React
+
     class Meta:
         model = Location
-        fields = '__all__'
+        fields = ['id', 'name', 'racks']
 
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:

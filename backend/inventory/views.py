@@ -110,3 +110,15 @@ class ProductCreateView(generics.CreateAPIView):
         if not (user.is_superuser or user.groups.filter(name__in=['Inventory Manager', 'Admin']).exists()):
             raise PermissionDenied("Only Inventory Managers can add new products.")
         serializer.save()
+
+class ProductUpdateView(generics.UpdateAPIView):
+    """ Allows Inventory Managers to edit existing product details """
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        if not (user.is_superuser or user.groups.filter(name__in=['Inventory Manager', 'Admin']).exists()):
+            raise PermissionDenied("Only Inventory Managers can edit products.")
+        serializer.save()

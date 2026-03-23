@@ -2556,14 +2556,15 @@ class StockLevel(models.Model):
     location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='inventory')
 
     rack = models.ForeignKey(Rack, on_delete=models.SET_NULL, null=True, blank=True, related_name='stock_levels')
-    
+
     quantity = models.IntegerField(default=0, help_text="Tracked in base units")
 
     class Meta:
-        unique_together = ('product', 'location')
+        unique_together = ('product', 'location', 'rack')
         
     def __str__(self):
-        return f"{self.product.name} @ {self.location.name}: {self.quantity}"
+        rack_info = f" ({self.rack.name})" if self.rack else ""
+        return f"{self.product.name} @ {self.location.name}{rack_info}: {self.quantity}"
 
 class InventoryDocument(models.Model):
     DOC_TYPES = [
@@ -2642,6 +2643,7 @@ class StockLevelSerializer(serializers.ModelSerializer):
     product_barcode = serializers.CharField(source='product.barcode', read_only=True)
     location_name = serializers.CharField(source='location.name', read_only=True)
     base_unit = serializers.CharField(source='product.base_unit', read_only=True)
+    rack_name = serializers.CharField(source='rack.name', read_only=True, default='Unassigned')
 
     class Meta:
         model = StockLevel
@@ -12579,6 +12581,11 @@ const InventoryDashboard = () => {
                 <tr key={s.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 font-bold text-gray-900">{s.product_name}</td>
                   <td className="px-6 py-4 text-gray-500 font-mono text-xs">{s.product_barcode}</td>
+
+                  <td className="px-6 py-4 text-gray-600 font-medium">
+                      <span className="bg-gray-100 px-2 py-1 rounded text-xs">{s.rack_name || 'Unassigned'}</span>
+                  </td>
+                  
                   <td className="px-6 py-4 text-right font-bold">
                     <span className={s.quantity < 10 ? 'text-red-500' : 'text-green-600'}>
                         {s.quantity} {s.base_unit}s
@@ -12598,76 +12605,77 @@ export default InventoryDashboard;
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from inventory.models import Location, Product, StockLevel
+from inventory.models import Location, Rack, Product, StockLevel
 
 class Command(BaseCommand):
-    help = 'Seeds the database with Inventory Locations, Products, and Initial Stock'
+    help = 'Seeds the database with Inventory Locations, Racks, Products, and Initial Stock'
 
     def handle(self, *args, **options):
         self.stdout.write("Seeding Inventory System...")
 
         with transaction.atomic():
-            # 1. Create Locations (Storages vs Departments)
-            storages = [
-                "Main Commissary (Ground Floor)",
-                "4th Floor Dry Storage",
-                "Walk-in Freezer 1",
-            ]
-            departments = [
-                "Main Kitchen",
-                "Dimsum Kitchen",
-                "Bar & Beverage",
-            ]
+            # 1. Create Locations
+            storages = ["Main Commissary (Ground Floor)", "4th Floor Dry Storage", "Walk-in Freezer 1"]
+            departments = ["Main Kitchen", "Dimsum Kitchen", "Bar & Beverage"]
 
-            storage_locs = []
+            storage_locs = {}
             for name in storages:
                 loc, _ = Location.objects.get_or_create(name=name, defaults={'is_storage': True, 'is_department': False})
-                storage_locs.append(loc)
+                storage_locs[name] = loc
 
-            dept_locs = []
             for name in departments:
-                loc, _ = Location.objects.get_or_create(name=name, defaults={'is_storage': False, 'is_department': True})
-                dept_locs.append(loc)
+                Location.objects.get_or_create(name=name, defaults={'is_storage': False, 'is_department': True})
 
-            # 2. Create Products
+            # 2. Create Multiple Racks for Storages
+            rack_configs = {
+                "Main Commissary (Ground Floor)": ["Rack 1", "Rack 2", "Rack 3", "Receiving Pallet"],
+                "4th Floor Dry Storage": ["Aisle A", "Aisle B", "Aisle C"],
+                "Walk-in Freezer 1": ["Shelf 1", "Shelf 2", "Shelf 3"]
+            }
+
+            all_racks = {}
+            for loc_name, racks in rack_configs.items():
+                loc = storage_locs[loc_name]
+                for rack_name in racks:
+                    rack, _ = Rack.objects.get_or_create(location=loc, name=rack_name)
+                    # Save a reference to the rack so we can easily put stock on it later
+                    all_racks[f"{loc_name}-{rack_name}"] = rack
+
+            # 3. Create Products
             products_data = [
-                {
-                    "name": "Premium Light Soy Sauce", "brand": "Lee Kum Kee", 
-                    "base_unit": "Bottle", "units_per_box": 12, 
-                    "barcode": "SOY-123-BOT", "box_barcode": "SOY-123-BOX", "cost_price": 150.00
-                },
-                {
-                    "name": "Jasmine Tea Leaves", "brand": "Ten Fu", 
-                    "base_unit": "Pack", "units_per_box": 50, 
-                    "barcode": "TEA-456-PCK", "box_barcode": "TEA-456-BOX", "cost_price": 45.00
-                },
-                {
-                    "name": "Heineken Beer (330ml)", "brand": "Heineken", 
-                    "base_unit": "Can", "units_per_box": 24, 
-                    "barcode": "BEER-789-CAN", "box_barcode": "BEER-789-BOX", "cost_price": 80.00
-                },
-                {
-                    "name": "Black Truffle Paste", "brand": "Urbani", 
-                    "base_unit": "Jar", "units_per_box": 6, 
-                    "barcode": "TRUF-001-JAR", "box_barcode": "TRUF-001-BOX", "cost_price": 1200.00
-                },
+                {"name": "Premium Light Soy Sauce", "brand": "Lee Kum Kee", "base_unit": "Bottle", "units_per_box": 12, "barcode": "SOY-123-BOT", "box_barcode": "SOY-123-BOX", "cost_price": 150.00},
+                {"name": "Jasmine Tea Leaves", "brand": "Ten Fu", "base_unit": "Pack", "units_per_box": 50, "barcode": "TEA-456-PCK", "box_barcode": "TEA-456-BOX", "cost_price": 45.00},
+                {"name": "Heineken Beer (330ml)", "brand": "Heineken", "base_unit": "Can", "units_per_box": 24, "barcode": "BEER-789-CAN", "box_barcode": "BEER-789-BOX", "cost_price": 80.00},
+                {"name": "Black Truffle Paste", "brand": "Urbani", "base_unit": "Jar", "units_per_box": 6, "barcode": "TRUF-001-JAR", "box_barcode": "TRUF-001-BOX", "cost_price": 1200.00},
             ]
 
-            created_products = []
+            created_products = {}
             for p_data in products_data:
-                prod, _ = Product.objects.get_or_create(
-                    barcode=p_data['barcode'],
-                    defaults=p_data
-                )
-                created_products.append(prod)
+                prod, _ = Product.objects.get_or_create(barcode=p_data['barcode'], defaults=p_data)
+                created_products[prod.barcode] = prod
 
-            # 3. Add Initial Stock to the Main Commissary so you have something to transfer
-            main_storage = storage_locs[0]
-            for prod in created_products:
-                StockLevel.objects.get_or_create(
+            # 4. Distribute Initial Stock Across Different Racks
+            stock_distribution = [
+                # Soy Sauce -> Main Commissary, Rack 1
+                (created_products["SOY-123-BOT"], storage_locs["Main Commissary (Ground Floor)"], all_racks["Main Commissary (Ground Floor)-Rack 1"], 120),
+                
+                # Tea Leaves -> 4th Floor, Aisle A
+                (created_products["TEA-456-PCK"], storage_locs["4th Floor Dry Storage"], all_racks["4th Floor Dry Storage-Aisle A"], 500),
+                
+                # Beer -> Main Commissary, Rack 2
+                (created_products["BEER-789-CAN"], storage_locs["Main Commissary (Ground Floor)"], all_racks["Main Commissary (Ground Floor)-Rack 2"], 240),
+                
+                # Truffle Paste -> Freezer, Shelf 1
+                (created_products["TRUF-001-JAR"], storage_locs["Walk-in Freezer 1"], all_racks["Walk-in Freezer 1-Shelf 1"], 60),
+            ]
+
+            for prod, loc, rack, qty in stock_distribution:
+                # Using update_or_create so if you run this twice, it resets the quantities safely
+                StockLevel.objects.update_or_create(
                     product=prod,
-                    location=main_storage,
-                    defaults={'quantity': prod.units_per_box * 10} # 10 boxes of everything
+                    location=loc,
+                    rack=rack,
+                    defaults={'quantity': qty} 
                 )
 
-        self.stdout.write(self.style.SUCCESS('Inventory Seeded Successfully!'))
+        self.stdout.write(self.style.SUCCESS('Inventory Seeded Successfully with Racks!'))
