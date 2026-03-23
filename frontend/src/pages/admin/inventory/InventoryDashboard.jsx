@@ -82,6 +82,11 @@ const InventoryDashboard = () => {
                 <tr key={s.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 font-bold text-gray-900">{s.product_name}</td>
                   <td className="px-6 py-4 text-gray-500 font-mono text-xs">{s.product_barcode}</td>
+
+                  <td className="px-6 py-4 text-gray-600 font-medium">
+                      <span className="bg-gray-100 px-2 py-1 rounded text-xs">{s.rack_name || 'Unassigned'}</span>
+                  </td>
+                  
                   <td className="px-6 py-4 text-right font-bold">
                     <span className={s.quantity < 10 ? 'text-red-500' : 'text-green-600'}>
                         {s.quantity} {s.base_unit}s

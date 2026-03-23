@@ -242,6 +242,7 @@ urlpatterns = [
     path('api/reservations/', include('reservations.urls')), 
     path('api/marketing/', include('marketing.urls')),
     path('api/users/', include('users.urls')),
+    path('api/inventory/', include('inventory.urls')),
     path('sitemap.xml', dynamic_sitemap, name='dynamic_sitemap'),
     path('api/token/', ThrottledTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
@@ -2456,13 +2457,25 @@ class VerifyOTPView(APIView):
         }, status=status.HTTP_200_OK)
 
 from django.contrib import admin
-from .models import Location, Product, StockLevel, InventoryDocument, DocumentLineItem
+from .models import Location, Rack, Product, StockLevel, InventoryDocument, DocumentLineItem
+
+# --- 1. ADD RACK INLINE ---
+class RackInline(admin.TabularInline):
+    model = Rack
+    extra = 1 # Shows one blank row by default to quickly add a new rack
 
 @admin.register(Location)
 class LocationAdmin(admin.ModelAdmin):
     list_display = ('name', 'is_storage', 'is_department')
     list_filter = ('is_storage', 'is_department')
     search_fields = ('name',)
+    inlines = [RackInline] # --- 2. ATTACH TO LOCATION ADMIN ---
+
+@admin.register(Rack)
+class RackAdmin(admin.ModelAdmin):
+    list_display = ('name', 'location')
+    list_filter = ('location',)
+    search_fields = ('name', 'location__name')
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
@@ -2472,10 +2485,10 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(StockLevel)
 class StockLevelAdmin(admin.ModelAdmin):
-    list_display = ('product', 'location', 'quantity')
-    list_filter = ('location',)
+    list_display = ('product', 'location', 'rack', 'quantity') # Added rack to display
+    list_filter = ('location', 'rack')
     search_fields = ('product__name', 'product__barcode')
-    autocomplete_fields = ['product'] # Makes searching for products much faster
+    autocomplete_fields = ['product', 'rack'] # Makes searching faster
 
 class DocumentLineItemInline(admin.TabularInline):
     model = DocumentLineItem
@@ -2512,6 +2525,17 @@ class Location(models.Model):
     def __str__(self):
         return self.name
 
+class Rack(models.Model):
+    location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='racks')
+    name = models.CharField(max_length=50, help_text="e.g., Rack 1, Shelf A, Bin 12")
+
+    class Meta:
+        unique_together = ('location', 'name') # Prevents having two "Rack 1"s in the same room
+        ordering = ['location__name', 'name']
+
+    def __str__(self):
+        return f"{self.location.name} - {self.name}"
+    
 class Product(models.Model):
     name = models.CharField(max_length=200)
     brand = models.CharField(max_length=100, blank=True, null=True)
@@ -2530,6 +2554,9 @@ class Product(models.Model):
 class StockLevel(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='stock_levels')
     location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='inventory')
+
+    rack = models.ForeignKey(Rack, on_delete=models.SET_NULL, null=True, blank=True, related_name='stock_levels')
+    
     quantity = models.IntegerField(default=0, help_text="Tracked in base units")
 
     class Meta:

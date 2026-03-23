@@ -16,6 +16,7 @@ class StockLevelSerializer(serializers.ModelSerializer):
     product_barcode = serializers.CharField(source='product.barcode', read_only=True)
     location_name = serializers.CharField(source='location.name', read_only=True)
     base_unit = serializers.CharField(source='product.base_unit', read_only=True)
+    rack_name = serializers.CharField(source='rack.name', read_only=True, default='Unassigned')
 
     class Meta:
         model = StockLevel

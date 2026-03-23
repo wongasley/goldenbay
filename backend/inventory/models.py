@@ -44,14 +44,15 @@ class StockLevel(models.Model):
     location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='inventory')
 
     rack = models.ForeignKey(Rack, on_delete=models.SET_NULL, null=True, blank=True, related_name='stock_levels')
-    
+
     quantity = models.IntegerField(default=0, help_text="Tracked in base units")
 
     class Meta:
-        unique_together = ('product', 'location')
+        unique_together = ('product', 'location', 'rack')
         
     def __str__(self):
-        return f"{self.product.name} @ {self.location.name}: {self.quantity}"
+        rack_info = f" ({self.rack.name})" if self.rack else ""
+        return f"{self.product.name} @ {self.location.name}{rack_info}: {self.quantity}"
 
 class InventoryDocument(models.Model):
     DOC_TYPES = [
