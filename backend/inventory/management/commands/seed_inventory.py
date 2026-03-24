@@ -19,6 +19,11 @@ class Command(BaseCommand):
                 "VIP Room 15", "BANQUET HALL", "4TH FLOOR STOCK ROOM", "2ND FLOOR STOCK ROOM"
             ]
 
+            uoms = ["Bottle", "Pack", "Can", "Kilogram", "Liter", "Box", "Piece", "Gram"]
+            from inventory.models import UnitOfMeasure # Add this import if needed
+            for uom in uoms:
+                UnitOfMeasure.objects.get_or_create(name=uom)
+
             loc_objects = {}
             for name in all_locations:
                 loc, _ = Location.objects.get_or_create(name=name)

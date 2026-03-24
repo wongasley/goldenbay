@@ -36,7 +36,7 @@ const DocumentForm = ({ docType }) => {
     const fetchData = async () => {
       const locRes = await axiosInstance.get('/api/inventory/locations/');
       setLocations(locRes.data);
-      const prodRes = await axiosInstance.get('/api/inventory/'); // Fetch all products for manual dropdown
+      const prodRes = await axiosInstance.get('/api/inventory/products/');
       setAllProducts(prodRes.data);
     };
     fetchData();

@@ -4,14 +4,55 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from django.db import transaction
-from .models import Location, Product, StockLevel, InventoryDocument, DocumentLineItem
-from .serializers import LocationSerializer, ProductSerializer, StockLevelSerializer, InventoryDocumentSerializer
+from django.db.models import Q
+from .models import Location, Product, StockLevel, InventoryDocument, DocumentLineItem, Rack, UnitOfMeasure
+from .serializers import LocationSerializer, ProductSerializer, StockLevelSerializer, InventoryDocumentSerializer, RackSerializer, UnitOfMeasureSerializer
 
-class LocationListView(generics.ListAPIView):
+# --- SETTINGS VIEWS ---
+class LocationListCreateView(generics.ListCreateAPIView):
     queryset = Location.objects.all().order_by('name')
     serializer_class = LocationSerializer
     permission_classes = [IsAuthenticated]
 
+class LocationDetailView(generics.DestroyAPIView):
+    queryset = Location.objects.all()
+    serializer_class = LocationSerializer
+    permission_classes = [IsAuthenticated]
+
+class RackListCreateView(generics.ListCreateAPIView):
+    queryset = Rack.objects.all().order_by('location__name', 'name')
+    serializer_class = RackSerializer
+    permission_classes = [IsAuthenticated]
+
+class RackDetailView(generics.DestroyAPIView):
+    queryset = Rack.objects.all()
+    serializer_class = RackSerializer
+    permission_classes = [IsAuthenticated]
+
+class UOMListCreateView(generics.ListCreateAPIView):
+    queryset = UnitOfMeasure.objects.all().order_by('name')
+    serializer_class = UnitOfMeasureSerializer
+    permission_classes = [IsAuthenticated]
+
+class UOMDetailView(generics.DestroyAPIView):
+    queryset = UnitOfMeasure.objects.all()
+    serializer_class = UnitOfMeasureSerializer
+    permission_classes = [IsAuthenticated]
+
+# --- PRODUCT DATABASE VIEW (THE FIX) ---
+class ProductListView(generics.ListAPIView):
+    """ Lists and searches all products for the Inventory Manager catalog """
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        qs = Product.objects.all().order_by('name')
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(Q(name__icontains=search) | Q(barcode__icontains=search) | Q(brand__icontains=search))
+        return qs
+
+# --- EXISTING VIEWS ---
 class StockLevelListView(generics.ListAPIView):
     serializer_class = StockLevelSerializer
     permission_classes = [IsAuthenticated]

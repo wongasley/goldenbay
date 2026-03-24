@@ -5,6 +5,13 @@ from django.dispatch import receiver
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
+class UnitOfMeasure(models.Model):
+    name = models.CharField(max_length=50, unique=True, help_text="e.g., Kilogram, Liter, Box, Piece")
+    abbreviation = models.CharField(max_length=10, blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+    
 class Location(models.Model):
     name = models.CharField(max_length=100, unique=True)
     # REMOVED is_storage and is_department. Everything is a storage location now!

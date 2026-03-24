@@ -1,6 +1,11 @@
 from rest_framework import serializers
-from .models import Location, Rack, Product, StockLevel, InventoryDocument, DocumentLineItem
+from .models import Location, Rack, Product, StockLevel, InventoryDocument, DocumentLineItem, UnitOfMeasure
 
+class UnitOfMeasureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UnitOfMeasure
+        fields = '__all__'
+    
 class RackSerializer(serializers.ModelSerializer):
     class Meta:
         model = Rack

@@ -16,11 +16,16 @@ const InventoryManager = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [itemForm, setItemForm] = useState({ id: null, name: '', brand: '', description: '', barcode: '', box_barcode: '', base_unit: 'Bottle', units_per_box: 1, cost_price: '' });
+  const [uoms, setUoms] = useState([]);
 
   const fetchInventory = async () => {
     try {
-      const res = await axiosInstance.get(`/api/inventory/?search=${search}`);
+      // FIX: Changed /api/inventory/ to /api/inventory/products/
+      const res = await axiosInstance.get(`/api/inventory/products/?search=${search}`);
       setItems(res.data);
+      
+      const uomRes = await axiosInstance.get('/api/inventory/uom/'); // <--- ADD THIS
+      setUoms(uomRes.data); // <--- ADD THIS
     } catch (err) {
       toast.error("Failed to load inventory.");
     } finally { setLoading(false); }
@@ -135,7 +140,12 @@ const InventoryManager = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label className={labelClass}>Base Unit</label>
-                            <input required type="text" placeholder="e.g. Bottle" className={inputClass} value={itemForm.base_unit} onChange={e => setItemForm({...itemForm, base_unit: e.target.value})} />
+                            <select required className={inputClass} value={itemForm.base_unit} onChange={e => setItemForm({...itemForm, base_unit: e.target.value})}>
+                                <option value="" disabled>-- Select Unit --</option>
+                                {uoms.map(uom => (
+                                    <option key={uom.id} value={uom.name}>{uom.name}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
                             <label className={labelClass}>Units per Box</label>

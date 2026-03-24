@@ -2516,6 +2516,13 @@ from django.dispatch import receiver
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
+class UnitOfMeasure(models.Model):
+    name = models.CharField(max_length=50, unique=True, help_text="e.g., Kilogram, Liter, Box, Piece")
+    abbreviation = models.CharField(max_length=10, blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+    
 class Location(models.Model):
     name = models.CharField(max_length=100, unique=True)
     # REMOVED is_storage and is_department. Everything is a storage location now!
@@ -2625,8 +2632,13 @@ def process_inventory_movement(sender, instance, **kwargs):
                     dest_stock.save()
 
 from rest_framework import serializers
-from .models import Location, Rack, Product, StockLevel, InventoryDocument, DocumentLineItem
+from .models import Location, Rack, Product, StockLevel, InventoryDocument, DocumentLineItem, UnitOfMeasure
 
+class UnitOfMeasureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UnitOfMeasure
+        fields = '__all__'
+    
 class RackSerializer(serializers.ModelSerializer):
     class Meta:
         model = Rack
@@ -2674,14 +2686,29 @@ class InventoryDocumentSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 from django.urls import path
-from .views import LocationListView, ProductCreateView, ProductUpdateView, StockLevelListView, ProductLookupView, DocumentCreateView, DocumentApproveView
+from .views import (LocationListCreateView, LocationDetailView, RackListCreateView, 
+                    RackDetailView, UOMListCreateView, UOMDetailView, ProductListView, 
+                    ProductCreateView, ProductUpdateView, StockLevelListView, 
+                    ProductLookupView, DocumentCreateView, DocumentApproveView)
 
 urlpatterns = [
-    path('locations/', LocationListView.as_view()),
-    path('stock/', StockLevelListView.as_view()),
+    # Settings Endpoints
+    path('locations/', LocationListCreateView.as_view()),
+    path('locations/<int:pk>/', LocationDetailView.as_view()),
+    path('racks/', RackListCreateView.as_view()),
+    path('racks/<int:pk>/', RackDetailView.as_view()),
+    path('uom/', UOMListCreateView.as_view()),
+    path('uom/<int:pk>/', UOMDetailView.as_view()),
+    
+    # Inventory & Catalog Endpoints
+    path('products/', ProductListView.as_view()), # <--- THIS FIXES THE FRONTEND CRASH
     path('products/lookup/', ProductLookupView.as_view()),
     path('products/create/', ProductCreateView.as_view()), 
-    path('products/<int:pk>/update/', ProductUpdateView.as_view()), # <--- EDIT ROUTE
+    path('products/<int:pk>/update/', ProductUpdateView.as_view()),
+    
+    path('stock/', StockLevelListView.as_view()),
+    
+    # Document Endpoints
     path('documents/create/', DocumentCreateView.as_view()),
     path('documents/<int:pk>/approve/', DocumentApproveView.as_view()),
 ]
@@ -2692,14 +2719,55 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from django.db import transaction
-from .models import Location, Product, StockLevel, InventoryDocument, DocumentLineItem
-from .serializers import LocationSerializer, ProductSerializer, StockLevelSerializer, InventoryDocumentSerializer
+from django.db.models import Q
+from .models import Location, Product, StockLevel, InventoryDocument, DocumentLineItem, Rack, UnitOfMeasure
+from .serializers import LocationSerializer, ProductSerializer, StockLevelSerializer, InventoryDocumentSerializer, RackSerializer, UnitOfMeasureSerializer
 
-class LocationListView(generics.ListAPIView):
+# --- SETTINGS VIEWS ---
+class LocationListCreateView(generics.ListCreateAPIView):
     queryset = Location.objects.all().order_by('name')
     serializer_class = LocationSerializer
     permission_classes = [IsAuthenticated]
 
+class LocationDetailView(generics.DestroyAPIView):
+    queryset = Location.objects.all()
+    serializer_class = LocationSerializer
+    permission_classes = [IsAuthenticated]
+
+class RackListCreateView(generics.ListCreateAPIView):
+    queryset = Rack.objects.all().order_by('location__name', 'name')
+    serializer_class = RackSerializer
+    permission_classes = [IsAuthenticated]
+
+class RackDetailView(generics.DestroyAPIView):
+    queryset = Rack.objects.all()
+    serializer_class = RackSerializer
+    permission_classes = [IsAuthenticated]
+
+class UOMListCreateView(generics.ListCreateAPIView):
+    queryset = UnitOfMeasure.objects.all().order_by('name')
+    serializer_class = UnitOfMeasureSerializer
+    permission_classes = [IsAuthenticated]
+
+class UOMDetailView(generics.DestroyAPIView):
+    queryset = UnitOfMeasure.objects.all()
+    serializer_class = UnitOfMeasureSerializer
+    permission_classes = [IsAuthenticated]
+
+# --- PRODUCT DATABASE VIEW (THE FIX) ---
+class ProductListView(generics.ListAPIView):
+    """ Lists and searches all products for the Inventory Manager catalog """
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        qs = Product.objects.all().order_by('name')
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(Q(name__icontains=search) | Q(barcode__icontains=search) | Q(brand__icontains=search))
+        return qs
+
+# --- EXISTING VIEWS ---
 class StockLevelListView(generics.ListAPIView):
     serializer_class = StockLevelSerializer
     permission_classes = [IsAuthenticated]
@@ -2811,6 +2879,17 @@ class ProductUpdateView(generics.UpdateAPIView):
             raise PermissionDenied("Only Inventory Managers can edit products.")
         serializer.save()
 
+# backend/inventory/permissions.py
+from rest_framework.permissions import BasePermission
+
+class IsInventoryManager(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and (request.user.is_superuser or request.user.groups.filter(name='Inventory Manager').exists()))
+
+class IsInventoryOfficer(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and (request.user.is_superuser or request.user.groups.filter(name__in=['Inventory Manager', 'Inventory Officer']).exists()))
+
 import React, { Suspense, lazy } from 'react';
 import { HelmetProvider } from 'react-helmet-async';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
@@ -2855,6 +2934,7 @@ const OwnerDashboardPage = lazy(() => import('./pages/admin/dashboard/OwnerDashb
 const InventoryDashboard = lazy(() => import('./pages/admin/inventory/InventoryDashboard'));
 const DocumentForm = lazy(() => import('./pages/admin/inventory/DocumentForm'));
 const InventoryManager = lazy(() => import('./pages/admin/inventory/InventoryManager')); // In case you link to the catalog later
+const InventorySettings = lazy(() => import('./pages/admin/inventory/InventorySettings'));
 
 const PageLoader = () => (
   <div className="min-h-screen bg-cream-50 flex items-center justify-center text-gold-600 font-serif tracking-widest uppercase animate-pulse">
@@ -2922,9 +3002,11 @@ function App() {
                     <Route path="rewards" element={<RewardsManager />} />
                     <Route path="reports" element={<OwnerDashboardPage />} />
                     <Route path="inventory" element={<InventoryDashboard />} />
+                    <Route path="inventory/catalog" element={<InventoryManager />} />
                     <Route path="inventory/deliveries" element={<DocumentForm docType="DELIVERY" />} />
                     <Route path="inventory/transfers" element={<DocumentForm docType="TRANSFER" />} />
                     <Route path="inventory/requisitions" element={<DocumentForm docType="REQUISITION" />} />
+                    <Route path="inventory/settings" element={<InventorySettings />} />
                   </Route>
                   
                 </Routes>
@@ -8523,18 +8605,7 @@ export default PhoneBookPage;
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet, Navigate } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
-  CalendarDays, 
-  Users, 
-  Megaphone, 
-  Utensils,
-  X,
-  Gift,
-  BarChart3,
-  Package,
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  ArrowRightLeft,
+  LayoutDashboard, CalendarDays, Users, Megaphone, Utensils, X, Gift, BarChart3, Package, ArrowDownToLine, ArrowUpFromLine, ArrowRightLeft, Database, Settings // <--- ADD Database & Settings
 } from 'lucide-react';
 import LogoutButton from '../auth/LogoutButton';
 import logo from '../../assets/images/goldenbaylogo.svg'; 
@@ -8598,9 +8669,12 @@ const AdminLayout = () => {
     { path: '/staff/customers', label: role === 'Cashier' ? 'Points Terminal' : 'Phone Book', icon: Users, show: ['Admin', 'Cashier'].includes(role) },
     { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: role === 'Admin' },
     { path: '/staff/inventory', label: 'Current Stock', icon: Package, show: ['Admin', 'Inventory Manager', 'Inventory Officer', 'Owner'].includes(role) },
+    // --- NEW LINKS ---
+    { path: '/staff/inventory/catalog', label: 'Product Database', icon: Database, show: ['Admin', 'Inventory Manager', 'Owner'].includes(role) },
     { path: '/staff/inventory/deliveries', label: 'Receive Delivery', icon: ArrowDownToLine, show: ['Admin', 'Inventory Manager', 'Inventory Officer'].includes(role) },
     { path: '/staff/inventory/transfers', label: 'Storage Transfers', icon: ArrowRightLeft, show: ['Admin', 'Inventory Manager', 'Inventory Officer'].includes(role) },
     { path: '/staff/inventory/requisitions', label: 'Dept Requisitions', icon: ArrowUpFromLine, show: ['Admin', 'Inventory Manager', 'Inventory Officer'].includes(role) },
+    { path: '/staff/inventory/settings', label: 'Inv. Settings', icon: Settings, show: ['Admin', 'Inventory Manager'].includes(role) },
   ].filter(item => item.show);
 
   return (
@@ -12053,11 +12127,16 @@ const InventoryManager = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [itemForm, setItemForm] = useState({ id: null, name: '', brand: '', description: '', barcode: '', box_barcode: '', base_unit: 'Bottle', units_per_box: 1, cost_price: '' });
+  const [uoms, setUoms] = useState([]);
 
   const fetchInventory = async () => {
     try {
-      const res = await axiosInstance.get(`/api/inventory/?search=${search}`);
+      // FIX: Changed /api/inventory/ to /api/inventory/products/
+      const res = await axiosInstance.get(`/api/inventory/products/?search=${search}`);
       setItems(res.data);
+      
+      const uomRes = await axiosInstance.get('/api/inventory/uom/'); // <--- ADD THIS
+      setUoms(uomRes.data); // <--- ADD THIS
     } catch (err) {
       toast.error("Failed to load inventory.");
     } finally { setLoading(false); }
@@ -12172,7 +12251,12 @@ const InventoryManager = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label className={labelClass}>Base Unit</label>
-                            <input required type="text" placeholder="e.g. Bottle" className={inputClass} value={itemForm.base_unit} onChange={e => setItemForm({...itemForm, base_unit: e.target.value})} />
+                            <select required className={inputClass} value={itemForm.base_unit} onChange={e => setItemForm({...itemForm, base_unit: e.target.value})}>
+                                <option value="" disabled>-- Select Unit --</option>
+                                {uoms.map(uom => (
+                                    <option key={uom.id} value={uom.name}>{uom.name}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
                             <label className={labelClass}>Units per Box</label>
@@ -12247,12 +12331,22 @@ export default InventoryManager;
 import React, { useState, useEffect, useRef } from 'react';
 import axiosInstance from '../../../utils/axiosInstance';
 import toast from 'react-hot-toast';
-import { Barcode, Trash2, Send } from 'lucide-react';
+import { Barcode, Trash2, Send, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const DocumentForm = ({ docType }) => { // 'INBOUND', 'TRANSFER', 'OUTBOUND'
+const DocumentForm = ({ docType }) => { 
   const navigate = useNavigate();
+  
+  // FIX: Map App.jsx routes to Database Choices safely
+  const getActualDocType = () => {
+      if (docType === 'DELIVERY') return 'INBOUND';
+      if (docType === 'REQUISITION') return 'OUTBOUND';
+      return 'TRANSFER'; // TRANSFER matches perfectly
+  };
+  const actualDocType = getActualDocType();
+
   const [locations, setLocations] = useState([]);
+  const [allProducts, setAllProducts] = useState([]); // For manual entry
   
   const [source, setSource] = useState('');
   const [sourceRack, setSourceRack] = useState('');
@@ -12263,20 +12357,26 @@ const DocumentForm = ({ docType }) => { // 'INBOUND', 'TRANSFER', 'OUTBOUND'
   const [notes, setNotes] = useState('');
   const [lineItems, setLineItems] = useState([]);
   const [barcodeInput, setBarcodeInput] = useState('');
+  
+  const [selectedManualProduct, setSelectedManualProduct] = useState('');
+
   const scannerRef = useRef(null);
 
   useEffect(() => {
-    const fetchLocs = async () => {
-      const res = await axiosInstance.get('/api/inventory/locations/');
-      setLocations(res.data);
+    const fetchData = async () => {
+      const locRes = await axiosInstance.get('/api/inventory/locations/');
+      setLocations(locRes.data);
+      const prodRes = await axiosInstance.get('/api/inventory/products/');
+      setAllProducts(prodRes.data);
     };
-    fetchLocs();
+    fetchData();
     
     setSource(''); setSourceRack('');
     setDest(''); setDestRack('');
     setLineItems([]);
   }, [docType]);
 
+  // Handle Barcode Scanner
   const handleScan = async (e) => {
     e.preventDefault();
     const code = barcodeInput.trim();
@@ -12288,13 +12388,7 @@ const DocumentForm = ({ docType }) => { // 'INBOUND', 'TRANSFER', 'OUTBOUND'
       const isBox = res.data.is_box;
       const qtyToAdd = isBox ? product.units_per_box : 1;
 
-      setLineItems(prev => {
-        const existing = prev.find(item => item.product_id === product.id);
-        if (existing) {
-          return prev.map(item => item.product_id === product.id ? { ...item, quantity: item.quantity + qtyToAdd } : item);
-        }
-        return [...prev, { product_id: product.id, name: product.name, unit: product.base_unit, quantity: qtyToAdd }];
-      });
+      addItemToTable(product, qtyToAdd);
       new Audio('/audio/success.mp3').play().catch(()=>{});
     } catch (err) {
       toast.error("Barcode not recognized.");
@@ -12303,21 +12397,47 @@ const DocumentForm = ({ docType }) => { // 'INBOUND', 'TRANSFER', 'OUTBOUND'
     }
   };
 
+  // Handle Manual Dropdown Selection
+  const handleManualAdd = () => {
+      if (!selectedManualProduct) return;
+      const product = allProducts.find(p => p.product.toString() === selectedManualProduct || p.id.toString() === selectedManualProduct);
+      if (product) {
+          // Normalize the product object to match scanner lookup format
+          const formattedProduct = {
+              id: product.product || product.id,
+              name: product.product_name || product.name,
+              base_unit: product.base_unit
+          };
+          addItemToTable(formattedProduct, 1);
+          setSelectedManualProduct(''); // Reset dropdown
+      }
+  };
+
+  const addItemToTable = (product, qtyToAdd) => {
+    setLineItems(prev => {
+        const existing = prev.find(item => item.product_id === product.id);
+        if (existing) {
+          return prev.map(item => item.product_id === product.id ? { ...item, quantity: item.quantity + qtyToAdd } : item);
+        }
+        return [...prev, { product_id: product.id, name: product.name || product.product_name, unit: product.base_unit, quantity: qtyToAdd }];
+      });
+  };
+
   const removeRow = (productId) => setLineItems(prev => prev.filter(item => item.product_id !== productId));
 
   const handleSubmit = async () => {
-    if (lineItems.length === 0) return toast.error("Scan at least one item.");
-    if (docType === 'INBOUND' && (!dest || !destRack)) return toast.error("Select destination location and rack.");
-    if (docType === 'OUTBOUND' && (!source || !sourceRack)) return toast.error("Select source location and rack.");
-    if (docType === 'TRANSFER' && (!source || !sourceRack || !dest || !destRack)) return toast.error("Select source and destination locations and racks.");
+    if (lineItems.length === 0) return toast.error("Scan or add at least one item.");
+    if (actualDocType === 'INBOUND' && (!dest || !destRack)) return toast.error("Select destination location and rack.");
+    if (actualDocType === 'OUTBOUND' && (!source || !sourceRack)) return toast.error("Select source location and rack.");
+    if (actualDocType === 'TRANSFER' && (!source || !sourceRack || !dest || !destRack)) return toast.error("Select source and destination locations and racks.");
 
     try {
       await axiosInstance.post('/api/inventory/documents/create/', {
-        doc_type: docType,
-        source_location: docType === 'INBOUND' ? null : source,
-        source_rack: docType === 'INBOUND' ? null : sourceRack,
-        destination_location: docType === 'OUTBOUND' ? null : dest,
-        destination_rack: docType === 'OUTBOUND' ? null : destRack,
+        doc_type: actualDocType,
+        source_location: actualDocType === 'INBOUND' ? null : source,
+        source_rack: actualDocType === 'INBOUND' ? null : sourceRack,
+        destination_location: actualDocType === 'OUTBOUND' ? null : dest,
+        destination_rack: actualDocType === 'OUTBOUND' ? null : destRack,
         notes: notes,
         items: lineItems
       });
@@ -12336,16 +12456,17 @@ const DocumentForm = ({ docType }) => { // 'INBOUND', 'TRANSFER', 'OUTBOUND'
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-6">
         <div>
             <h1 className="text-2xl font-bold font-serif text-gray-900">
-                {docType === 'INBOUND' ? 'Inbound Delivery' : docType === 'OUTBOUND' ? 'Outbound Consumption' : 'Internal Transfer'}
+                {actualDocType === 'INBOUND' ? 'Inbound Delivery' : actualDocType === 'OUTBOUND' ? 'Outbound Consumption' : 'Internal Transfer'}
             </h1>
-            <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Ensure scanner is plugged in and focused</p>
+            <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Select movement locations below</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+            
             {/* SOURCE (Hidden for Inbound) */}
-            {docType !== 'INBOUND' && (
-                <div className="space-y-3 p-3 bg-white rounded border border-gray-200">
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gold-600">Take From</label>
+            {actualDocType !== 'INBOUND' && (
+                <div className="space-y-3 p-3 bg-white rounded border border-gray-200 shadow-sm">
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gold-600">Take From (Source)</label>
                     <select className="w-full p-2 border border-gray-300 rounded text-sm outline-none focus:border-gold-500" value={source} onChange={e => {setSource(e.target.value); setSourceRack('');}}>
                         <option value="">-- Select Room --</option>
                         {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -12358,12 +12479,12 @@ const DocumentForm = ({ docType }) => { // 'INBOUND', 'TRANSFER', 'OUTBOUND'
             )}
             
             {/* DESTINATION (Hidden for Outbound) */}
-            {docType !== 'OUTBOUND' && (
-                <div className="space-y-3 p-3 bg-white rounded border border-gray-200">
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-blue-600">Store In</label>
+            {actualDocType !== 'OUTBOUND' && (
+                <div className="space-y-3 p-3 bg-white rounded border border-gray-200 shadow-sm">
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-blue-600">Store In (Destination)</label>
                     <select className="w-full p-2 border border-gray-300 rounded text-sm outline-none focus:border-gold-500" value={dest} onChange={e => {setDest(e.target.value); setDestRack('');}}>
                         <option value="">-- Select Room --</option>
-                        {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                        {locations.map(l => <option key={l.id} value={l.id} disabled={actualDocType === 'TRANSFER' && l.id.toString() === source}>{l.name}</option>)}
                     </select>
                     <select className="w-full p-2 border border-gray-300 rounded text-sm outline-none focus:border-gold-500" value={destRack} onChange={e => setDestRack(e.target.value)} disabled={!dest}>
                         <option value="">-- Select Rack/Shelf --</option>
@@ -12374,33 +12495,51 @@ const DocumentForm = ({ docType }) => { // 'INBOUND', 'TRANSFER', 'OUTBOUND'
             
             <div className="md:col-span-2 mt-2">
                 <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Notes / Invoice #</label>
-                <input type="text" className="w-full p-2 border border-gray-300 rounded text-sm outline-none focus:border-gold-500" placeholder="Optional notes..." value={notes} onChange={e => setNotes(e.target.value)} />
+                <input type="text" className="w-full p-2 border border-gray-300 rounded text-sm outline-none focus:border-gold-500 shadow-sm" placeholder="Optional notes..." value={notes} onChange={e => setNotes(e.target.value)} />
             </div>
         </div>
 
-        {/* INVISIBLE SCANNER INPUT */}
-        <form onSubmit={handleScan} className="relative mt-2">
-          <input ref={scannerRef} autoFocus onBlur={() => setTimeout(() => scannerRef.current?.focus(), 10)} className="absolute opacity-0 w-0 h-0" value={barcodeInput} onChange={e => setBarcodeInput(e.target.value)} />
-          <div className="w-full bg-blue-50/50 text-blue-700 py-8 rounded-lg text-center border-2 border-blue-200 border-dashed cursor-pointer" onClick={() => scannerRef.current?.focus()}>
-            <Barcode size={32} className="mx-auto mb-2 text-blue-400" />
-            <p className="font-bold text-sm">Scanner Ready</p>
-            <p className="text-xs opacity-70">Click here if scanner loses focus</p>
-          </div>
-        </form>
+        {/* ADD ITEMS CONTROLS */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            {/* INVISIBLE SCANNER INPUT */}
+            <form onSubmit={handleScan} className="relative">
+              <input ref={scannerRef} autoFocus onBlur={() => setTimeout(() => scannerRef.current?.focus(), 10)} className="absolute opacity-0 w-0 h-0" value={barcodeInput} onChange={e => setBarcodeInput(e.target.value)} />
+              <div className="w-full h-full bg-blue-50/50 text-blue-700 py-6 rounded-lg text-center border-2 border-blue-200 border-dashed cursor-pointer" onClick={() => scannerRef.current?.focus()}>
+                <Barcode size={32} className="mx-auto mb-2 text-blue-400" />
+                <p className="font-bold text-sm">Scanner Ready</p>
+                <p className="text-xs opacity-70">Click here if scanner loses focus</p>
+              </div>
+            </form>
+
+            {/* MANUAL SELECTOR (For testing without barcode) */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 flex flex-col justify-center">
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">No Scanner? Select Manually</label>
+                <div className="flex gap-2">
+                    <select className="flex-1 p-2 border border-gray-300 rounded text-sm outline-none focus:border-gold-500" value={selectedManualProduct} onChange={e => setSelectedManualProduct(e.target.value)}>
+                        <option value="">-- Choose Product --</option>
+                        {allProducts.map(p => (
+                            <option key={p.id || p.product} value={p.product || p.id}>{p.product_name || p.name}</option>
+                        ))}
+                    </select>
+                    <button onClick={handleManualAdd} className="bg-gold-600 text-white px-4 rounded hover:bg-black transition-colors"><Plus size={18}/></button>
+                </div>
+            </div>
+        </div>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         <table className="w-full text-left text-sm border-collapse">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="p-4 text-xs text-gray-500 uppercase tracking-widest">Scanned Product</th>
+              <th className="p-4 text-xs text-gray-500 uppercase tracking-widest">Selected Product</th>
               <th className="p-4 text-xs text-gray-500 uppercase tracking-widest text-center">Total Quantity</th>
               <th className="p-4 text-xs text-gray-500 uppercase tracking-widest text-right">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {lineItems.length === 0 ? (
-                <tr><td colSpan="3" className="p-8 text-center text-gray-400 italic">No items scanned yet.</td></tr>
+                <tr><td colSpan="3" className="p-8 text-center text-gray-400 italic">No items added yet.</td></tr>
             ) : lineItems.map((line) => (
               <tr key={line.product_id} className="hover:bg-gray-50">
                 <td className="p-4 font-bold">{line.name}</td>
@@ -12440,9 +12579,9 @@ const InventoryDashboard = () => {
     const fetchData = async () => {
       try {
         const locRes = await axiosInstance.get('/api/inventory/locations/');
-        const storageLocs = locRes.data.filter(l => l.is_storage);
-        setLocations(storageLocs);
-        if (storageLocs.length > 0) setSelectedLoc(storageLocs[0].id);
+        // FIX: Removed the .filter(l => l.is_storage) since all rooms are now valid storages!
+        setLocations(locRes.data);
+        if (locRes.data.length > 0) setSelectedLoc(locRes.data[0].id);
       } catch (err) {
         console.error(err);
       }
@@ -12500,19 +12639,20 @@ const InventoryDashboard = () => {
               <tr>
                 <th className="px-6 py-4">Product Name</th>
                 <th className="px-6 py-4">Barcode</th>
+                <th className="px-6 py-4">Rack / Shelf</th>
                 <th className="px-6 py-4 text-right">Current Quantity</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
               {stock.length === 0 ? (
-                <tr><td colSpan="3" className="px-6 py-8 text-center text-gray-400">No items stored here.</td></tr>
+                <tr><td colSpan="4" className="px-6 py-8 text-center text-gray-400">No items stored here.</td></tr>
               ) : stock.map(s => (
                 <tr key={s.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 font-bold text-gray-900">{s.product_name}</td>
                   <td className="px-6 py-4 text-gray-500 font-mono text-xs">{s.product_barcode}</td>
 
                   <td className="px-6 py-4 text-gray-600 font-medium">
-                      <span className="bg-gray-100 px-2 py-1 rounded text-xs">{s.rack_name || 'Unassigned'}</span>
+                      <span className="bg-gray-100 px-2 py-1 rounded text-xs border border-gray-200">{s.rack_name || 'Unassigned'}</span>
                   </td>
                   
                   <td className="px-6 py-4 text-right font-bold">
@@ -12553,6 +12693,11 @@ class Command(BaseCommand):
                 "VIP Room 15", "BANQUET HALL", "4TH FLOOR STOCK ROOM", "2ND FLOOR STOCK ROOM"
             ]
 
+            uoms = ["Bottle", "Pack", "Can", "Kilogram", "Liter", "Box", "Piece", "Gram"]
+            from inventory.models import UnitOfMeasure # Add this import if needed
+            for uom in uoms:
+                UnitOfMeasure.objects.get_or_create(name=uom)
+
             loc_objects = {}
             for name in all_locations:
                 loc, _ = Location.objects.get_or_create(name=name)
@@ -12589,3 +12734,186 @@ class Command(BaseCommand):
                 Product.objects.get_or_create(barcode=p_data['barcode'], defaults=p_data)
 
         self.stdout.write(self.style.SUCCESS('Locations & Racks Seeded Successfully!'))
+
+import React, { useState, useEffect } from 'react';
+import { Settings, Plus, Trash2, MapPin, Layers, Scale } from 'lucide-react';
+import toast from 'react-hot-toast';
+import axiosInstance from '../../../utils/axiosInstance';
+
+const InventorySettings = () => {
+  const [activeTab, setActiveTab] = useState('LOCATIONS');
+  const [locations, setLocations] = useState([]);
+  const [racks, setRacks] = useState([]);
+  const [uoms, setUoms] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Form States
+  const [newLoc, setNewLoc] = useState('');
+  const [newRack, setNewRack] = useState('');
+  const [selectedLocForRack, setSelectedLocForRack] = useState('');
+  const [newUom, setNewUom] = useState('');
+
+  const fetchData = async () => {
+    try {
+      const [locRes, rackRes, uomRes] = await Promise.all([
+        axiosInstance.get('/api/inventory/locations/'),
+        axiosInstance.get('/api/inventory/racks/'),
+        axiosInstance.get('/api/inventory/uom/')
+      ]);
+      setLocations(locRes.data);
+      setRacks(rackRes.data);
+      setUoms(uomRes.data);
+    } catch (err) {
+      toast.error("Failed to load settings.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  const handleAddLocation = async (e) => {
+    e.preventDefault();
+    if (!newLoc.trim()) return;
+    try {
+      await axiosInstance.post('/api/inventory/locations/', { name: newLoc });
+      toast.success("Location added");
+      setNewLoc(''); fetchData();
+    } catch (err) { toast.error("Failed to add location."); }
+  };
+
+  const handleAddRack = async (e) => {
+    e.preventDefault();
+    if (!newRack.trim() || !selectedLocForRack) return toast.error("Select a location and enter a rack name.");
+    try {
+      await axiosInstance.post('/api/inventory/racks/', { name: newRack, location: selectedLocForRack });
+      toast.success("Rack added");
+      setNewRack(''); fetchData();
+    } catch (err) { toast.error("Failed to add rack."); }
+  };
+
+  const handleAddUom = async (e) => {
+    e.preventDefault();
+    if (!newUom.trim()) return;
+    try {
+      await axiosInstance.post('/api/inventory/uom/', { name: newUom });
+      toast.success("Unit of Measure added");
+      setNewUom(''); fetchData();
+    } catch (err) { toast.error("Failed to add UOM."); }
+  };
+
+  const handleDelete = async (endpoint, id) => {
+    if(!window.confirm("Are you sure you want to delete this?")) return;
+    try {
+      await axiosInstance.delete(`/api/inventory/${endpoint}/${id}/`);
+      toast.success("Deleted successfully.");
+      fetchData();
+    } catch (err) { toast.error("Cannot delete. It may be in use."); }
+  };
+
+  const tabClass = (tab) => `flex items-center gap-2 px-6 py-3 text-sm font-bold uppercase tracking-widest border-b-2 transition-all ${activeTab === tab ? 'border-gold-600 text-gold-600' : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`;
+
+  if (loading) return <div className="p-10 text-center animate-pulse text-gray-400">Loading Settings...</div>;
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6 pb-20">
+      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <h1 className="text-2xl font-bold text-gray-900 font-serif flex items-center gap-3">
+          <div className="p-2 bg-gray-100 rounded-lg border border-gray-200"><Settings size={24} className="text-gray-600"/></div>
+          Inventory Settings
+        </h1>
+        <p className="text-gray-500 text-xs mt-1 uppercase tracking-widest">Manage your warehouse infrastructure</p>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="flex border-b border-gray-200 overflow-x-auto">
+          <button onClick={() => setActiveTab('LOCATIONS')} className={tabClass('LOCATIONS')}><MapPin size={16}/> Locations</button>
+          <button onClick={() => setActiveTab('RACKS')} className={tabClass('RACKS')}><Layers size={16}/> Racks & Shelves</button>
+          <button onClick={() => setActiveTab('UOM')} className={tabClass('UOM')}><Scale size={16}/> Units of Measure</button>
+        </div>
+
+        <div className="p-6">
+          {activeTab === 'LOCATIONS' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">Current Locations</h3>
+                <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg">
+                  {locations.map(loc => (
+                    <li key={loc.id} className="p-3 flex justify-between items-center hover:bg-gray-50">
+                      <span className="font-bold text-sm text-gray-900">{loc.name}</span>
+                      <button onClick={() => handleDelete('locations', loc.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">Add New Location</h3>
+                <form onSubmit={handleAddLocation} className="flex gap-2">
+                  <input type="text" placeholder="e.g. Ground Floor Freezer" className="flex-1 p-2 border border-gray-300 rounded outline-none focus:border-gold-500 text-sm" value={newLoc} onChange={e => setNewLoc(e.target.value)} />
+                  <button type="submit" className="bg-gold-600 text-white px-4 rounded hover:bg-black transition-colors"><Plus size={18}/></button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'RACKS' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">Current Racks</h3>
+                <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg">
+                  {racks.map(rack => (
+                    <li key={rack.id} className="p-3 flex justify-between items-center hover:bg-gray-50">
+                      <div>
+                        <span className="font-bold text-sm text-gray-900 block">{rack.name}</span>
+                        <span className="text-[10px] text-gray-500 uppercase">In: {locations.find(l => l.id === rack.location)?.name}</span>
+                      </div>
+                      <button onClick={() => handleDelete('racks', rack.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">Add New Rack</h3>
+                <form onSubmit={handleAddRack} className="space-y-3">
+                  <select className="w-full p-2 border border-gray-300 rounded outline-none focus:border-gold-500 text-sm" value={selectedLocForRack} onChange={e => setSelectedLocForRack(e.target.value)}>
+                    <option value="">-- Select Parent Location --</option>
+                    {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+                  </select>
+                  <div className="flex gap-2">
+                    <input type="text" placeholder="e.g. Shelf A2" className="flex-1 p-2 border border-gray-300 rounded outline-none focus:border-gold-500 text-sm" value={newRack} onChange={e => setNewRack(e.target.value)} />
+                    <button type="submit" className="bg-gold-600 text-white px-4 rounded hover:bg-black transition-colors"><Plus size={18}/></button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'UOM' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">Units of Measure</h3>
+                <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg">
+                  {uoms.map(uom => (
+                    <li key={uom.id} className="p-3 flex justify-between items-center hover:bg-gray-50">
+                      <span className="font-bold text-sm text-gray-900">{uom.name}</span>
+                      <button onClick={() => handleDelete('uom', uom.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">Add Unit of Measure</h3>
+                <form onSubmit={handleAddUom} className="flex gap-2">
+                  <input type="text" placeholder="e.g. Kilogram, Liter, Case" className="flex-1 p-2 border border-gray-300 rounded outline-none focus:border-gold-500 text-sm" value={newUom} onChange={e => setNewUom(e.target.value)} />
+                  <button type="submit" className="bg-gold-600 text-white px-4 rounded hover:bg-black transition-colors"><Plus size={18}/></button>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default InventorySettings;

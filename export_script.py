@@ -69,6 +69,7 @@ FILES_TO_READ = [
     'backend/inventory/reporting.py',
     'backend/inventory/tasks.py',
     'backend/inventory/services.py',
+    'backend/inventory/permissions.py',
 
     'frontend/src/App.jsx',
     # 'frontend/src/App.css',
@@ -145,6 +146,8 @@ FILES_TO_READ = [
     'frontend/src/pages/admin/inventory/DocumentForm.jsx',
     'frontend/src/pages/admin/inventory/InventoryDashboard.jsx',
     'backend/inventory/management/commands/seed_inventory.py',
+    'frontend/src/pages/admin/inventory/InventorySettings.jsx',
+    
 ]
 
 # 2. Set the name for the final output text file.

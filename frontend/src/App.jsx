@@ -42,6 +42,7 @@ const OwnerDashboardPage = lazy(() => import('./pages/admin/dashboard/OwnerDashb
 const InventoryDashboard = lazy(() => import('./pages/admin/inventory/InventoryDashboard'));
 const DocumentForm = lazy(() => import('./pages/admin/inventory/DocumentForm'));
 const InventoryManager = lazy(() => import('./pages/admin/inventory/InventoryManager')); // In case you link to the catalog later
+const InventorySettings = lazy(() => import('./pages/admin/inventory/InventorySettings'));
 
 const PageLoader = () => (
   <div className="min-h-screen bg-cream-50 flex items-center justify-center text-gold-600 font-serif tracking-widest uppercase animate-pulse">
@@ -109,9 +110,11 @@ function App() {
                     <Route path="rewards" element={<RewardsManager />} />
                     <Route path="reports" element={<OwnerDashboardPage />} />
                     <Route path="inventory" element={<InventoryDashboard />} />
+                    <Route path="inventory/catalog" element={<InventoryManager />} />
                     <Route path="inventory/deliveries" element={<DocumentForm docType="DELIVERY" />} />
                     <Route path="inventory/transfers" element={<DocumentForm docType="TRANSFER" />} />
                     <Route path="inventory/requisitions" element={<DocumentForm docType="REQUISITION" />} />
+                    <Route path="inventory/settings" element={<InventorySettings />} />
                   </Route>
                   
                 </Routes>

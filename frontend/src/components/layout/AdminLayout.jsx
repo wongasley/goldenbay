@@ -1,18 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet, Navigate } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
-  CalendarDays, 
-  Users, 
-  Megaphone, 
-  Utensils,
-  X,
-  Gift,
-  BarChart3,
-  Package,
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  ArrowRightLeft,
+  LayoutDashboard, CalendarDays, Users, Megaphone, Utensils, X, Gift, BarChart3, Package, ArrowDownToLine, ArrowUpFromLine, ArrowRightLeft, Database, Settings // <--- ADD Database & Settings
 } from 'lucide-react';
 import LogoutButton from '../auth/LogoutButton';
 import logo from '../../assets/images/goldenbaylogo.svg'; 
@@ -76,9 +65,12 @@ const AdminLayout = () => {
     { path: '/staff/customers', label: role === 'Cashier' ? 'Points Terminal' : 'Phone Book', icon: Users, show: ['Admin', 'Cashier'].includes(role) },
     { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: role === 'Admin' },
     { path: '/staff/inventory', label: 'Current Stock', icon: Package, show: ['Admin', 'Inventory Manager', 'Inventory Officer', 'Owner'].includes(role) },
+    // --- NEW LINKS ---
+    { path: '/staff/inventory/catalog', label: 'Product Database', icon: Database, show: ['Admin', 'Inventory Manager', 'Owner'].includes(role) },
     { path: '/staff/inventory/deliveries', label: 'Receive Delivery', icon: ArrowDownToLine, show: ['Admin', 'Inventory Manager', 'Inventory Officer'].includes(role) },
     { path: '/staff/inventory/transfers', label: 'Storage Transfers', icon: ArrowRightLeft, show: ['Admin', 'Inventory Manager', 'Inventory Officer'].includes(role) },
     { path: '/staff/inventory/requisitions', label: 'Dept Requisitions', icon: ArrowUpFromLine, show: ['Admin', 'Inventory Manager', 'Inventory Officer'].includes(role) },
+    { path: '/staff/inventory/settings', label: 'Inv. Settings', icon: Settings, show: ['Admin', 'Inventory Manager'].includes(role) },
   ].filter(item => item.show);
 
   return (
