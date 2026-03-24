@@ -39,9 +39,8 @@ class UOMDetailView(generics.DestroyAPIView):
     serializer_class = UnitOfMeasureSerializer
     permission_classes = [IsAuthenticated]
 
-# --- PRODUCT DATABASE VIEW (THE FIX) ---
+# --- PRODUCT DATABASE VIEW ---
 class ProductListView(generics.ListAPIView):
-    """ Lists and searches all products for the Inventory Manager catalog """
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticated]
     
@@ -52,7 +51,51 @@ class ProductListView(generics.ListAPIView):
             qs = qs.filter(Q(name__icontains=search) | Q(barcode__icontains=search) | Q(brand__icontains=search))
         return qs
 
-# --- EXISTING VIEWS ---
+class ProductLookupView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        barcode = request.query_params.get('barcode')
+        if not barcode:
+            return Response({"error": "Barcode required"}, status=400)
+
+        product = Product.objects.filter(barcode=barcode).first()
+        is_box = False
+
+        if not product:
+            product = Product.objects.filter(box_barcode=barcode).first()
+            is_box = True
+
+        if not product:
+            return Response({"error": "Product not found"}, status=404)
+
+        serializer = ProductSerializer(product)
+        return Response({"product": serializer.data, "is_box": is_box})
+
+class ProductCreateView(generics.CreateAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if not (user.is_superuser or user.groups.filter(name__in=['Inventory Manager', 'Admin']).exists()):
+            raise PermissionDenied("Only Inventory Managers can add new products.")
+        serializer.save()
+
+class ProductUpdateView(generics.UpdateAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        if not (user.is_superuser or user.groups.filter(name__in=['Inventory Manager', 'Admin']).exists()):
+            raise PermissionDenied("Only Inventory Managers can edit products.")
+        serializer.save()
+
+
+# --- STOCK AND DOCUMENTS VIEWS ---
 class StockLevelListView(generics.ListAPIView):
     serializer_class = StockLevelSerializer
     permission_classes = [IsAuthenticated]
@@ -64,32 +107,15 @@ class StockLevelListView(generics.ListAPIView):
             qs = qs.filter(location_id=loc)
         return qs
 
-class ProductLookupView(APIView):
-    """ Used by the USB scanner on the frontend to identify a product """
+# --- ADDED: Document List View for the Dashboard ---
+class DocumentListView(generics.ListAPIView):
+    serializer_class = InventoryDocumentSerializer
     permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        barcode = request.query_params.get('barcode')
-        if not barcode:
-            return Response({"error": "Barcode required"}, status=400)
-
-        # Check loose items first
-        product = Product.objects.filter(barcode=barcode).first()
-        is_box = False
-
-        # If not found, check if it's a mother box
-        if not product:
-            product = Product.objects.filter(box_barcode=barcode).first()
-            is_box = True
-
-        if not product:
-            return Response({"error": "Product not found"}, status=404)
-
-        serializer = ProductSerializer(product)
-        return Response({"product": serializer.data, "is_box": is_box})
+    
+    def get_queryset(self):
+        return InventoryDocument.objects.all().order_by('-created_at')
 
 class DocumentCreateView(APIView):
-    """ Handles the submission of a new Requisition/Delivery/Transfer from the scanner form """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -97,7 +123,6 @@ class DocumentCreateView(APIView):
         items_data = data.pop('items', [])
         
         with transaction.atomic():
-            # Create Document
             doc = InventoryDocument.objects.create(
                 doc_type=data.get('doc_type'),
                 status=data.get('status', 'PENDING'),
@@ -107,7 +132,6 @@ class DocumentCreateView(APIView):
                 created_by=request.user
             )
             
-            # Create Line Items
             for item in items_data:
                 DocumentLineItem.objects.create(
                     document=doc,
@@ -118,7 +142,6 @@ class DocumentCreateView(APIView):
         return Response({"message": "Document created successfully!", "id": doc.id}, status=201)
 
 class DocumentApproveView(APIView):
-    """ Only Inventory Managers can approve documents, triggering the stock movement """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
@@ -133,33 +156,9 @@ class DocumentApproveView(APIView):
                 
             doc.status = 'APPROVED'
             doc.approved_by = user
-            doc.save() # This triggers the post_save signal we wrote in models.py
+            doc.save() 
             
             return Response({"message": f"{doc.doc_type} Approved and Stock Updated!"})
             
         except Exception as e:
             return Response({"error": str(e)}, status=400)
-
-class ProductCreateView(generics.CreateAPIView):
-    """ Allows Inventory Managers to add new products to the catalog """
-    queryset = Product.objects.all()
-    serializer_class = ProductSerializer
-    permission_classes = [IsAuthenticated]
-
-    def perform_create(self, serializer):
-        user = self.request.user
-        if not (user.is_superuser or user.groups.filter(name__in=['Inventory Manager', 'Admin']).exists()):
-            raise PermissionDenied("Only Inventory Managers can add new products.")
-        serializer.save()
-
-class ProductUpdateView(generics.UpdateAPIView):
-    """ Allows Inventory Managers to edit existing product details """
-    queryset = Product.objects.all()
-    serializer_class = ProductSerializer
-    permission_classes = [IsAuthenticated]
-
-    def perform_update(self, serializer):
-        user = self.request.user
-        if not (user.is_superuser or user.groups.filter(name__in=['Inventory Manager', 'Admin']).exists()):
-            raise PermissionDenied("Only Inventory Managers can edit products.")
-        serializer.save()

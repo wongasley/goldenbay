@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (LocationListCreateView, LocationDetailView, RackListCreateView, 
                     RackDetailView, UOMListCreateView, UOMDetailView, ProductListView, 
                     ProductCreateView, ProductUpdateView, StockLevelListView, 
-                    ProductLookupView, DocumentCreateView, DocumentApproveView)
+                    ProductLookupView, DocumentCreateView, DocumentApproveView, DocumentListView)
 
 urlpatterns = [
     # Settings Endpoints
@@ -14,7 +14,7 @@ urlpatterns = [
     path('uom/<int:pk>/', UOMDetailView.as_view()),
     
     # Inventory & Catalog Endpoints
-    path('products/', ProductListView.as_view()), # <--- THIS FIXES THE FRONTEND CRASH
+    path('products/', ProductListView.as_view()), 
     path('products/lookup/', ProductLookupView.as_view()),
     path('products/create/', ProductCreateView.as_view()), 
     path('products/<int:pk>/update/', ProductUpdateView.as_view()),
@@ -22,6 +22,7 @@ urlpatterns = [
     path('stock/', StockLevelListView.as_view()),
     
     # Document Endpoints
+    path('documents/', DocumentListView.as_view()), # <--- ADDED THIS LINE
     path('documents/create/', DocumentCreateView.as_view()),
     path('documents/<int:pk>/approve/', DocumentApproveView.as_view()),
 ]
