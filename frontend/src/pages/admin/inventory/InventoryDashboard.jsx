@@ -213,4 +213,68 @@ const InventoryDashboard = () => {
                                         ) : (
                                             <div className="flex flex-col text-xs font-bold text-gray-600">
                                                 <span>From: {doc.source_name}</span>
-                                                <span className="text-gold-600">To: {doc.dest_
+                                                <span className="text-gold-600">To: {doc.dest_name}</span>
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 text-xs">
+                                        <p className="text-gray-900 font-bold">{new Date(doc.created_at).toLocaleDateString()}</p>
+                                        <p className="text-gray-500">by {doc.created_by_name}</p>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                        <span className={`px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-widest border shadow-sm ${getDocBadge(doc.status)}`}>
+                                            {doc.status}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-right flex items-center justify-end gap-3 h-full">
+                                        {doc.status === 'PENDING' && canApprove && (
+                                            <button 
+                                                onClick={(e) => handleApprove(doc.id, e)} 
+                                                className="bg-emerald-600 text-white px-4 py-2 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-700 shadow-sm transition-colors flex items-center gap-1"
+                                            >
+                                                <Check size={14}/> Approve
+                                            </button>
+                                        )}
+                                        {expandedDoc === doc.id ? <ChevronUp size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
+                                    </td>
+                                </tr>
+                                
+                                {/* EXPANDED LINE ITEMS ROW */}
+                                {expandedDoc === doc.id && (
+                                    <tr className="bg-gray-50 border-b border-gray-200">
+                                        <td colSpan="5" className="p-0">
+                                            <div className="px-12 py-6 bg-cream-50/50 border-t border-dashed border-gray-200 shadow-inner">
+                                                <h4 className="text-[10px] font-bold uppercase tracking-widest text-gold-600 mb-3 border-b border-gray-200 pb-2">Line Items Requested</h4>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                    {doc.items.map(item => (
+                                                        <div key={item.id} className="bg-white p-3 rounded border border-gray-200 shadow-sm flex justify-between items-center">
+                                                            <span className="font-bold text-gray-900 text-xs">{item.product_name}</span>
+                                                            <span className="text-[10px] font-bold text-gray-500 uppercase bg-gray-100 px-2 py-1 rounded">
+                                                                {item.quantity} {item.base_unit}s
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {doc.notes && (
+                                                    <div className="mt-4 text-xs text-gray-500 italic bg-white p-3 rounded border border-gray-200">
+                                                        <span className="font-bold not-italic text-gray-900 uppercase tracking-widest text-[9px] mr-2">Notes:</span>
+                                                        {doc.notes}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </React.Fragment>
+                        ))}
+                    </tbody>
+                </table>
+            )}
+        </div>
+      )}
+
+    </div>
+  );
+};
+
+export default InventoryDashboard;
