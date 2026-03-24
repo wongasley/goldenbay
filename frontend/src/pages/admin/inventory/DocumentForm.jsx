@@ -124,7 +124,12 @@ const DocumentForm = ({ docType }) => {
     if (lineItems.length === 0) return toast.error("Scan or add at least one item.");
     if (actualDocType === 'INBOUND' && (!dest || !destRack)) return toast.error("Select destination location and rack.");
     if (actualDocType === 'OUTBOUND' && (!source || !sourceRack)) return toast.error("Select source location and rack.");
-    if (actualDocType === 'TRANSFER' && (!source || !sourceRack || !dest || !destRack)) return toast.error("Select source and destination locations and racks.");
+    
+    // FIX: Safely allow same-room transfers, but block identical rack-to-rack transfers.
+    if (actualDocType === 'TRANSFER') {
+        if (!source || !sourceRack || !dest || !destRack) return toast.error("Select source and destination locations and racks.");
+        if (source === dest && sourceRack === destRack) return toast.error("Source and destination cannot be the exact same rack.");
+    }
 
     try {
       await axiosInstance.post('/api/inventory/documents/create/', {
@@ -179,7 +184,8 @@ const DocumentForm = ({ docType }) => {
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-blue-600">Store In (Destination)</label>
                     <select className="w-full p-2 border border-gray-300 rounded text-sm outline-none focus:border-gold-500" value={dest} onChange={e => {setDest(e.target.value); setDestRack('');}}>
                         <option value="">-- Select Room --</option>
-                        {locations.map(l => <option key={l.id} value={l.id} disabled={actualDocType === 'TRANSFER' && l.id.toString() === source}>{l.name}</option>)}
+                        {/* FIX: Removed the disabled condition that blocked same-location selections */}
+                        {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                     </select>
                     <select className="w-full p-2 border border-gray-300 rounded text-sm outline-none focus:border-gold-500" value={destRack} onChange={e => setDestRack(e.target.value)} disabled={!dest}>
                         <option value="">-- Select Rack/Shelf --</option>
@@ -197,7 +203,7 @@ const DocumentForm = ({ docType }) => {
         {/* ADD ITEMS CONTROLS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
-            {/* SCANNER INPUT (REMOVED AGGRESSIVE ONBLUR) */}
+            {/* SCANNER INPUT */}
             <form onSubmit={handleScan} className="relative">
               <input ref={scannerRef} className="absolute opacity-0 w-0 h-0" value={barcodeInput} onChange={e => setBarcodeInput(e.target.value)} />
               <div className="w-full h-full bg-blue-50/50 text-blue-700 py-6 rounded-lg text-center border-2 border-blue-200 border-dashed cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => scannerRef.current?.focus()}>

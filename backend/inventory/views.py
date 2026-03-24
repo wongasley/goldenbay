@@ -101,7 +101,6 @@ class StockLevelListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # FIX: Ensure it strictly filters out any old existing 0 quantity items
         qs = StockLevel.objects.filter(quantity__gt=0).select_related('product', 'location')
         loc = self.request.query_params.get('location')
         if loc:
@@ -127,7 +126,9 @@ class DocumentCreateView(APIView):
                 doc_type=data.get('doc_type'),
                 status=data.get('status', 'PENDING'),
                 source_location_id=data.get('source_location'),
+                source_rack_id=data.get('source_rack'),           # <-- FIX: Now capturing source rack
                 destination_location_id=data.get('destination_location'),
+                destination_rack_id=data.get('destination_rack'), # <-- FIX: Now capturing destination rack
                 notes=data.get('notes'),
                 created_by=request.user
             )
