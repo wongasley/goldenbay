@@ -101,13 +101,13 @@ class StockLevelListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = StockLevel.objects.all().select_related('product', 'location')
+        # FIX: Ensure it strictly filters out any old existing 0 quantity items
+        qs = StockLevel.objects.filter(quantity__gt=0).select_related('product', 'location')
         loc = self.request.query_params.get('location')
         if loc:
             qs = qs.filter(location_id=loc)
         return qs
 
-# --- ADDED: Document List View for the Dashboard ---
 class DocumentListView(generics.ListAPIView):
     serializer_class = InventoryDocumentSerializer
     permission_classes = [IsAuthenticated]

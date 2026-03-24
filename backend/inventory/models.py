@@ -14,7 +14,6 @@ class UnitOfMeasure(models.Model):
     
 class Location(models.Model):
     name = models.CharField(max_length=100, unique=True)
-    # REMOVED is_storage and is_department. Everything is a storage location now!
 
     def __str__(self):
         return self.name
@@ -110,7 +109,12 @@ def process_inventory_movement(sender, instance, **kwargs):
                         raise ValidationError(f"Insufficient stock for {line.product.name} in {instance.source_location.name} ({instance.source_rack.name if instance.source_rack else 'No Rack'})")
                     
                     source_stock.quantity -= line.quantity
-                    source_stock.save()
+                    
+                    # FIX: If quantity drops to 0 (or somehow below), delete the row entirely
+                    if source_stock.quantity <= 0:
+                        source_stock.delete()
+                    else:
+                        source_stock.save()
 
                 # Add to Destination (Inbound Deliveries & Transfers)
                 if instance.doc_type in ['INBOUND', 'TRANSFER'] and instance.destination_location:
