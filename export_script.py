@@ -148,6 +148,7 @@ FILES_TO_READ = [
     'backend/inventory/management/commands/seed_inventory.py',
     'frontend/src/pages/admin/inventory/InventorySettings.jsx',
     
+    
 ]
 
 # 2. Set the name for the final output text file.
