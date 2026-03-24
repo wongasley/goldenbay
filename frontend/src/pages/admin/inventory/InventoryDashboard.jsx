@@ -12,7 +12,6 @@ const InventoryDashboard = () => {
     const fetchData = async () => {
       try {
         const locRes = await axiosInstance.get('/api/inventory/locations/');
-        // FIX: Removed the .filter(l => l.is_storage) since all rooms are now valid storages!
         setLocations(locRes.data);
         if (locRes.data.length > 0) setSelectedLoc(locRes.data[0].id);
       } catch (err) {
@@ -81,7 +80,10 @@ const InventoryDashboard = () => {
                 <tr><td colSpan="4" className="px-6 py-8 text-center text-gray-400">No items stored here.</td></tr>
               ) : stock.map(s => (
                 <tr key={s.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 font-bold text-gray-900">{s.product_name}</td>
+                  <td className="px-6 py-4">
+                    <p className="font-bold text-gray-900">{s.product_name}</p>
+                    {s.product_brand && <p className="text-[10px] text-gray-500 uppercase font-bold">{s.product_brand}</p>}
+                  </td>
                   <td className="px-6 py-4 text-gray-500 font-mono text-xs">{s.product_barcode}</td>
 
                   <td className="px-6 py-4 text-gray-600 font-medium">

@@ -12,7 +12,7 @@ class RackSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class LocationSerializer(serializers.ModelSerializer):
-    racks = RackSerializer(many=True, read_only=True) # Exposes racks to React
+    racks = RackSerializer(many=True, read_only=True)
 
     class Meta:
         model = Location
@@ -25,6 +25,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
 class StockLevelSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
+    product_brand = serializers.CharField(source='product.brand', read_only=True) # <-- ADDED BRAND
     product_barcode = serializers.CharField(source='product.barcode', read_only=True)
     location_name = serializers.CharField(source='location.name', read_only=True)
     base_unit = serializers.CharField(source='product.base_unit', read_only=True)

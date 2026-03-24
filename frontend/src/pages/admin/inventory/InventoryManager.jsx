@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Barcode, Package, Box, X, Save, Edit2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Plus, Database, X, Save, Edit2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosInstance from '../../../utils/axiosInstance';
 
@@ -8,11 +8,6 @@ const InventoryManager = () => {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   
-  const [scanMode, setScanMode] = useState(false);
-  const [scanAction, setScanAction] = useState('IN');
-  const [barcodeInput, setBarcodeInput] = useState('');
-  const scannerInputRef = useRef(null);
-
   const [showAddModal, setShowAddModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [itemForm, setItemForm] = useState({ id: null, name: '', brand: '', description: '', barcode: '', box_barcode: '', base_unit: 'Bottle', units_per_box: 1, cost_price: '' });
@@ -20,35 +15,17 @@ const InventoryManager = () => {
 
   const fetchInventory = async () => {
     try {
-      // FIX: Changed /api/inventory/ to /api/inventory/products/
       const res = await axiosInstance.get(`/api/inventory/products/?search=${search}`);
       setItems(res.data);
       
-      const uomRes = await axiosInstance.get('/api/inventory/uom/'); // <--- ADD THIS
-      setUoms(uomRes.data); // <--- ADD THIS
+      const uomRes = await axiosInstance.get('/api/inventory/uom/');
+      setUoms(uomRes.data);
     } catch (err) {
-      toast.error("Failed to load inventory.");
+      toast.error("Failed to load product catalog.");
     } finally { setLoading(false); }
   };
 
   useEffect(() => { fetchInventory(); }, [search]);
-  useEffect(() => { if (scanMode && scannerInputRef.current) scannerInputRef.current.focus(); }, [scanMode]);
-
-  const handleScanSubmit = async (e) => {
-    e.preventDefault();
-    if (!barcodeInput.trim()) return;
-    try {
-      const res = await axiosInstance.post('/api/inventory/scan/', { barcode: barcodeInput.trim(), action: scanAction });
-      toast.success(res.data.message);
-      fetchInventory();
-    } catch (err) {
-      toast.error(err.response?.data?.error || "Scan failed.");
-      new Audio('/audio/error.mp3').play().catch(()=> {});
-    } finally {
-      setBarcodeInput('');
-      if (scannerInputRef.current) scannerInputRef.current.focus();
-    }
-  };
 
   const handleSaveItem = async (e) => {
     e.preventDefault();
@@ -71,9 +48,15 @@ const InventoryManager = () => {
   const openModal = (item = null) => {
       if (item) {
           setItemForm({ 
-              id: item.product, name: item.product_name, brand: item.brand, description: item.description || '', 
-              barcode: item.product_barcode, box_barcode: item.box_barcode || '', 
-              base_unit: item.base_unit, units_per_box: item.units_per_box, cost_price: item.price 
+              id: item.id, // Correct ID mapping
+              name: item.name, 
+              brand: item.brand || '', 
+              description: item.description || '', 
+              barcode: item.barcode, 
+              box_barcode: item.box_barcode || '', 
+              base_unit: item.base_unit, 
+              units_per_box: item.units_per_box, 
+              cost_price: item.cost_price 
           });
       } else {
           setItemForm({ id: null, name: '', brand: '', description: '', barcode: '', box_barcode: '', base_unit: 'Bottle', units_per_box: 1, cost_price: '' });
@@ -90,13 +73,12 @@ const InventoryManager = () => {
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 font-serif flex items-center gap-3">
-            <div className="p-2 bg-gold-50 rounded-lg border border-gold-100"><Package size={24} className="text-gold-600"/></div>
-            Inventory Manager
+            <div className="p-2 bg-amber-50 rounded-lg border border-amber-100"><Database size={24} className="text-amber-600"/></div>
+            Product Database
           </h1>
-          <p className="text-gray-500 text-xs mt-1 uppercase tracking-widest font-medium">Track stock and edit product details</p>
+          <p className="text-gray-500 text-xs mt-1 uppercase tracking-widest font-medium">Manage master catalog and barcodes</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setScanMode(true)} className="bg-gray-900 text-white px-5 py-2.5 font-bold uppercase tracking-widest text-[10px] rounded-lg shadow-md hover:bg-black transition-all flex items-center gap-2"><Barcode size={16} /> Quick Scan</button>
           <button onClick={() => openModal()} className="bg-gold-600 text-white px-5 py-2.5 font-bold uppercase tracking-widest text-[10px] rounded-lg shadow-md hover:bg-gold-700 transition-all flex items-center gap-2"><Plus size={16} /> New Product</button>
         </div>
       </div>
@@ -107,7 +89,7 @@ const InventoryManager = () => {
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
               <div>
-                 <h2 className="text-lg font-serif text-gray-900 font-bold flex items-center gap-2"><Package size={18} className="text-gold-600"/> {itemForm.id ? 'Edit Product' : 'Add New Product'}</h2>
+                 <h2 className="text-lg font-serif text-gray-900 font-bold flex items-center gap-2"><Database size={18} className="text-gold-600"/> {itemForm.id ? 'Edit Product' : 'Add New Product'}</h2>
                  <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">Central Catalog</p>
               </div>
               <button onClick={() => setShowAddModal(false)} className="p-1 hover:bg-gray-200 rounded text-gray-500"><X size={18}/></button>
@@ -175,7 +157,7 @@ const InventoryManager = () => {
         <div className="p-4 border-b border-gray-200">
             <div className="relative max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                <input type="text" placeholder="Search inventory by name, brand, or barcode..." className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:bg-white focus:border-gold-500 outline-none transition-all" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <input type="text" placeholder="Search catalog by name, brand, or barcode..." className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:bg-white focus:border-gold-500 outline-none transition-all" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
         </div>
         
@@ -183,25 +165,29 @@ const InventoryManager = () => {
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-50 border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-500 font-bold">
               <tr>
-                <th className="px-6 py-4">Item Details</th>
-                <th className="px-6 py-4">Location</th>
-                <th className="px-6 py-4">Quantity</th>
+                <th className="px-6 py-4">Product Details</th>
+                <th className="px-6 py-4">Packaging</th>
+                <th className="px-6 py-4">Cost Price</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
-              {items.map(item => (
+              {loading ? (
+                <tr><td colSpan="4" className="p-8 text-center text-gray-400 animate-pulse">Loading Catalog...</td></tr>
+              ) : items.length === 0 ? (
+                <tr><td colSpan="4" className="p-8 text-center text-gray-400 italic">No items found in catalog.</td></tr>
+              ) : items.map(item => (
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
-                    <p className="font-bold text-gray-900">{item.product_name}</p>
-                    <p className="text-[10px] text-gray-500 uppercase">UPC: {item.product_barcode}</p>
+                    <p className="font-bold text-gray-900">{item.name}</p>
+                    {item.brand && <p className="text-[10px] text-gray-500 uppercase font-bold">{item.brand}</p>}
+                    <p className="text-[10px] text-gray-400 font-mono mt-1">UPC: {item.barcode}</p>
                   </td>
-                  <td className="px-6 py-4 text-gray-600">
-                      <span className="font-bold block">{item.location_name}</span>
-                      <span className="text-xs bg-gray-100 px-2 py-0.5 rounded mt-1 inline-block">{item.rack_name}</span>
+                  <td className="px-6 py-4 text-gray-600 text-xs">
+                      <span className="font-bold">{item.units_per_box}</span> {item.base_unit}s / Box
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="font-bold text-gray-900">{item.quantity} {item.base_unit}s</span>
+                  <td className="px-6 py-4 font-bold text-gray-900">
+                    ₱{Number(item.cost_price).toLocaleString()}
                   </td>
                   <td className="px-6 py-4 text-right">
                      <button onClick={() => openModal(item)} className="p-2 bg-gray-50 text-gray-600 hover:text-gold-600 hover:bg-gold-50 rounded border border-gray-200 transition-colors"><Edit2 size={14}/></button>

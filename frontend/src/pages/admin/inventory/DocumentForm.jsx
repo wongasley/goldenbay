@@ -7,16 +7,15 @@ import { useNavigate } from 'react-router-dom';
 const DocumentForm = ({ docType }) => { 
   const navigate = useNavigate();
   
-  // FIX: Map App.jsx routes to Database Choices safely
   const getActualDocType = () => {
       if (docType === 'DELIVERY') return 'INBOUND';
       if (docType === 'REQUISITION') return 'OUTBOUND';
-      return 'TRANSFER'; // TRANSFER matches perfectly
+      return 'TRANSFER';
   };
   const actualDocType = getActualDocType();
 
   const [locations, setLocations] = useState([]);
-  const [allProducts, setAllProducts] = useState([]); // For manual entry
+  const [allProducts, setAllProducts] = useState([]); // Dynamically filtered
   
   const [source, setSource] = useState('');
   const [sourceRack, setSourceRack] = useState('');
@@ -32,21 +31,43 @@ const DocumentForm = ({ docType }) => {
 
   const scannerRef = useRef(null);
 
+  // Fetch Locations on mount
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchLocations = async () => {
       const locRes = await axiosInstance.get('/api/inventory/locations/');
       setLocations(locRes.data);
-      const prodRes = await axiosInstance.get('/api/inventory/products/');
-      setAllProducts(prodRes.data);
     };
-    fetchData();
+    fetchLocations();
     
     setSource(''); setSourceRack('');
     setDest(''); setDestRack('');
     setLineItems([]);
   }, [docType]);
 
-  // Handle Barcode Scanner
+  // SMART FILTERING: Fetch products based on selected room
+  useEffect(() => {
+      const loadManualProducts = async () => {
+          if (actualDocType === 'INBOUND') {
+              // Deliveries can bring in ANY product from the catalog
+              const res = await axiosInstance.get('/api/inventory/products/');
+              setAllProducts(res.data.map(p => ({ ...p, display_name: p.name })));
+          } else if (source) {
+              // Transfers/Requisitions can ONLY pull from stock existing in the source room
+              const res = await axiosInstance.get(`/api/inventory/stock/?location=${source}`);
+              const availableItems = res.data.map(stock => ({
+                  id: stock.product,
+                  display_name: stock.product_name,
+                  base_unit: stock.base_unit,
+                  current_qty: stock.quantity
+              }));
+              setAllProducts(availableItems);
+          } else {
+              setAllProducts([]);
+          }
+      };
+      loadManualProducts();
+  }, [actualDocType, source]);
+
   const handleScan = async (e) => {
     e.preventDefault();
     const code = barcodeInput.trim();
@@ -58,28 +79,32 @@ const DocumentForm = ({ docType }) => {
       const isBox = res.data.is_box;
       const qtyToAdd = isBox ? product.units_per_box : 1;
 
+      // Ensure the scanned product exists in the source room (if not inbound)
+      if (actualDocType !== 'INBOUND') {
+          const existsInRoom = allProducts.find(p => p.id === product.id);
+          if (!existsInRoom) {
+              toast.error(`${product.name} is not in this room!`);
+              setBarcodeInput('');
+              return;
+          }
+      }
+
       addItemToTable(product, qtyToAdd);
       new Audio('/audio/success.mp3').play().catch(()=>{});
     } catch (err) {
       toast.error("Barcode not recognized.");
+      new Audio('/audio/error.mp3').play().catch(()=>{});
     } finally {
       setBarcodeInput('');
     }
   };
 
-  // Handle Manual Dropdown Selection
   const handleManualAdd = () => {
       if (!selectedManualProduct) return;
-      const product = allProducts.find(p => p.product.toString() === selectedManualProduct || p.id.toString() === selectedManualProduct);
+      const product = allProducts.find(p => p.id.toString() === selectedManualProduct);
       if (product) {
-          // Normalize the product object to match scanner lookup format
-          const formattedProduct = {
-              id: product.product || product.id,
-              name: product.product_name || product.name,
-              base_unit: product.base_unit
-          };
-          addItemToTable(formattedProduct, 1);
-          setSelectedManualProduct(''); // Reset dropdown
+          addItemToTable({ id: product.id, name: product.display_name, base_unit: product.base_unit }, 1);
+          setSelectedManualProduct('');
       }
   };
 
@@ -89,7 +114,7 @@ const DocumentForm = ({ docType }) => {
         if (existing) {
           return prev.map(item => item.product_id === product.id ? { ...item, quantity: item.quantity + qtyToAdd } : item);
         }
-        return [...prev, { product_id: product.id, name: product.name || product.product_name, unit: product.base_unit, quantity: qtyToAdd }];
+        return [...prev, { product_id: product.id, name: product.name, unit: product.base_unit, quantity: qtyToAdd }];
       });
   };
 
@@ -137,7 +162,7 @@ const DocumentForm = ({ docType }) => {
             {actualDocType !== 'INBOUND' && (
                 <div className="space-y-3 p-3 bg-white rounded border border-gray-200 shadow-sm">
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-gold-600">Take From (Source)</label>
-                    <select className="w-full p-2 border border-gray-300 rounded text-sm outline-none focus:border-gold-500" value={source} onChange={e => {setSource(e.target.value); setSourceRack('');}}>
+                    <select className="w-full p-2 border border-gray-300 rounded text-sm outline-none focus:border-gold-500" value={source} onChange={e => {setSource(e.target.value); setSourceRack(''); setLineItems([]);}}>
                         <option value="">-- Select Room --</option>
                         {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                     </select>
@@ -172,24 +197,26 @@ const DocumentForm = ({ docType }) => {
         {/* ADD ITEMS CONTROLS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
-            {/* INVISIBLE SCANNER INPUT */}
+            {/* SCANNER INPUT (REMOVED AGGRESSIVE ONBLUR) */}
             <form onSubmit={handleScan} className="relative">
-              <input ref={scannerRef} autoFocus onBlur={() => setTimeout(() => scannerRef.current?.focus(), 10)} className="absolute opacity-0 w-0 h-0" value={barcodeInput} onChange={e => setBarcodeInput(e.target.value)} />
-              <div className="w-full h-full bg-blue-50/50 text-blue-700 py-6 rounded-lg text-center border-2 border-blue-200 border-dashed cursor-pointer" onClick={() => scannerRef.current?.focus()}>
+              <input ref={scannerRef} className="absolute opacity-0 w-0 h-0" value={barcodeInput} onChange={e => setBarcodeInput(e.target.value)} />
+              <div className="w-full h-full bg-blue-50/50 text-blue-700 py-6 rounded-lg text-center border-2 border-blue-200 border-dashed cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => scannerRef.current?.focus()}>
                 <Barcode size={32} className="mx-auto mb-2 text-blue-400" />
-                <p className="font-bold text-sm">Scanner Ready</p>
-                <p className="text-xs opacity-70">Click here if scanner loses focus</p>
+                <p className="font-bold text-sm">Tap here to Scan</p>
+                <p className="text-xs opacity-70">Focuses the USB scanner</p>
               </div>
             </form>
 
-            {/* MANUAL SELECTOR (For testing without barcode) */}
+            {/* MANUAL SELECTOR */}
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 flex flex-col justify-center">
                 <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">No Scanner? Select Manually</label>
                 <div className="flex gap-2">
                     <select className="flex-1 p-2 border border-gray-300 rounded text-sm outline-none focus:border-gold-500" value={selectedManualProduct} onChange={e => setSelectedManualProduct(e.target.value)}>
                         <option value="">-- Choose Product --</option>
                         {allProducts.map(p => (
-                            <option key={p.id || p.product} value={p.product || p.id}>{p.product_name || p.name}</option>
+                            <option key={p.id} value={p.id}>
+                                {p.display_name} {p.current_qty !== undefined ? `(${p.current_qty} available)` : ''}
+                            </option>
                         ))}
                     </select>
                     <button onClick={handleManualAdd} className="bg-gold-600 text-white px-4 rounded hover:bg-black transition-colors"><Plus size={18}/></button>
