@@ -48,7 +48,7 @@ class ProductListView(generics.ListAPIView):
         qs = Product.objects.all().order_by('name')
         search = self.request.query_params.get('search')
         if search:
-            qs = qs.filter(Q(name__icontains=search) | Q(barcode__icontains=search) | Q(brand__icontains=search))
+            qs = qs.filter(Q(name__icontains=search) | Q(barcode__icontains=search) | Q(brand__icontains=search) | Q(category__icontains=search)) # <-- Added category to search
         return qs
 
 class ProductLookupView(APIView):

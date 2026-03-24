@@ -32,6 +32,7 @@ class Rack(models.Model):
 class Product(models.Model):
     name = models.CharField(max_length=200)
     brand = models.CharField(max_length=100, blank=True, null=True)
+    category = models.CharField(max_length=100, default='Uncategorized')
     description = models.TextField(blank=True, null=True)
     
     barcode = models.CharField(max_length=100, unique=True, db_index=True)

@@ -3,6 +3,28 @@ import { Search, Plus, Database, X, Save, Edit2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosInstance from '../../../utils/axiosInstance';
 
+// Comprehensive Chinese Restaurant Inventory Categories
+const INVENTORY_CATEGORIES = [
+  "Live Seafood",
+  "Frozen Seafood",
+  "Dried Seafood & Delicacies (Abalone, Sea Cucumber, Bird's Nest)",
+  "Meat & Poultry",
+  "Fresh Vegetables & Fruits",
+  "Noodles, Rice & Grains",
+  "Dimsum Ingredients & Wrappers",
+  "Sauces, Oils & Condiments",
+  "Spices & Seasonings",
+  "Premium Tea",
+  "Beverages (Sodas, Juices)",
+  "Liquor, Wine & Beer",
+  "Dry Goods (Mushrooms, Beans, Nuts)",
+  "Dairy & Eggs",
+  "Packaging & Disposables",
+  "Cleaning & Janitorial Supplies",
+  "Kitchen Equipment & Tools",
+  "Miscellaneous"
+];
+
 const InventoryManager = () => {
   const [items, setItems] = useState([]);
   const [search, setSearch] = useState('');
@@ -10,7 +32,12 @@ const InventoryManager = () => {
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [itemForm, setItemForm] = useState({ id: null, name: '', brand: '', description: '', barcode: '', box_barcode: '', base_unit: 'Bottle', units_per_box: 1, cost_price: '' });
+  
+  // Added 'category' to the form state
+  const [itemForm, setItemForm] = useState({ 
+    id: null, name: '', brand: '', category: '', description: '', 
+    barcode: '', box_barcode: '', base_unit: 'Bottle', units_per_box: 1, cost_price: '' 
+  });
   const [uoms, setUoms] = useState([]);
 
   const fetchInventory = async () => {
@@ -29,6 +56,8 @@ const InventoryManager = () => {
 
   const handleSaveItem = async (e) => {
     e.preventDefault();
+    if (!itemForm.category) return toast.error("Please select a category.");
+    
     setIsSaving(true);
     try {
         if (itemForm.id) {
@@ -41,16 +70,17 @@ const InventoryManager = () => {
         setShowAddModal(false);
         fetchInventory();
     } catch (err) {
-        toast.error("Failed to save product.");
+        toast.error("Failed to save product. Barcode might already exist.");
     } finally { setIsSaving(false); }
   };
 
   const openModal = (item = null) => {
       if (item) {
           setItemForm({ 
-              id: item.id, // Correct ID mapping
+              id: item.id, 
               name: item.name, 
               brand: item.brand || '', 
+              category: item.category || '', // Load existing category
               description: item.description || '', 
               barcode: item.barcode, 
               box_barcode: item.box_barcode || '', 
@@ -59,7 +89,10 @@ const InventoryManager = () => {
               cost_price: item.cost_price 
           });
       } else {
-          setItemForm({ id: null, name: '', brand: '', description: '', barcode: '', box_barcode: '', base_unit: 'Bottle', units_per_box: 1, cost_price: '' });
+          setItemForm({ 
+            id: null, name: '', brand: '', category: '', description: '', 
+            barcode: '', box_barcode: '', base_unit: 'Bottle', units_per_box: 1, cost_price: '' 
+          });
       }
       setShowAddModal(true);
   };
@@ -86,7 +119,7 @@ const InventoryManager = () => {
       {/* --- ADD / EDIT ITEM MODAL --- */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
               <div>
                  <h2 className="text-lg font-serif text-gray-900 font-bold flex items-center gap-2"><Database size={18} className="text-gold-600"/> {itemForm.id ? 'Edit Product' : 'Add New Product'}</h2>
@@ -97,8 +130,9 @@ const InventoryManager = () => {
             
             <div className="p-6 overflow-y-auto">
                 <form id="addProductForm" onSubmit={handleSaveItem} className="space-y-5">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="md:col-span-2">
                             <label className={labelClass}>Product Name <span className="text-red-500">*</span></label>
                             <input required type="text" className={inputClass} value={itemForm.name} onChange={e => setItemForm({...itemForm, name: e.target.value})} />
                         </div>
@@ -106,6 +140,17 @@ const InventoryManager = () => {
                             <label className={labelClass}>Brand</label>
                             <input type="text" className={inputClass} value={itemForm.brand} onChange={e => setItemForm({...itemForm, brand: e.target.value})} />
                         </div>
+                    </div>
+
+                    {/* NEW CATEGORY DROPDOWN */}
+                    <div>
+                        <label className={labelClass}>Category <span className="text-red-500">*</span></label>
+                        <select required className={inputClass} value={itemForm.category} onChange={e => setItemForm({...itemForm, category: e.target.value})}>
+                            <option value="" disabled>-- Select a Category --</option>
+                            {INVENTORY_CATEGORIES.map(cat => (
+                                <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                        </select>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded border border-gray-100">
@@ -157,7 +202,7 @@ const InventoryManager = () => {
         <div className="p-4 border-b border-gray-200">
             <div className="relative max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                <input type="text" placeholder="Search catalog by name, brand, or barcode..." className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:bg-white focus:border-gold-500 outline-none transition-all" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <input type="text" placeholder="Search catalog by name, category, or barcode..." className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:bg-white focus:border-gold-500 outline-none transition-all" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
         </div>
         
@@ -180,8 +225,15 @@ const InventoryManager = () => {
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
                     <p className="font-bold text-gray-900">{item.name}</p>
-                    {item.brand && <p className="text-[10px] text-gray-500 uppercase font-bold">{item.brand}</p>}
-                    <p className="text-[10px] text-gray-400 font-mono mt-1">UPC: {item.barcode}</p>
+                    
+                    <div className="flex items-center gap-2 mt-1">
+                        {item.brand && <span className="text-[10px] text-gray-500 uppercase font-bold">{item.brand}</span>}
+                        {item.brand && item.category && <span className="text-gray-300">•</span>}
+                        {/* Display Category Tag */}
+                        {item.category && <span className="text-[9px] bg-gold-50 text-gold-700 border border-gold-200 px-1.5 py-0.5 rounded font-bold uppercase tracking-widest">{item.category}</span>}
+                    </div>
+
+                    <p className="text-[10px] text-gray-400 font-mono mt-1.5">UPC: {item.barcode}</p>
                   </td>
                   <td className="px-6 py-4 text-gray-600 text-xs">
                       <span className="font-bold">{item.units_per_box}</span> {item.base_unit}s / Box
