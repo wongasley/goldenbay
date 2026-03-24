@@ -2,7 +2,8 @@ from django.urls import path
 from .views import (LocationListCreateView, LocationDetailView, RackListCreateView, 
                     RackDetailView, UOMListCreateView, UOMDetailView, ProductListView, 
                     ProductCreateView, ProductUpdateView, StockLevelListView, 
-                    ProductLookupView, DocumentCreateView, DocumentApproveView, DocumentListView)
+                    ProductLookupView, DocumentCreateView, DocumentApproveView, DocumentListView,
+                    BulkUploadProductsView) # <--- IMPORT THE NEW VIEW
 
 urlpatterns = [
     # Settings Endpoints
@@ -18,11 +19,12 @@ urlpatterns = [
     path('products/lookup/', ProductLookupView.as_view()),
     path('products/create/', ProductCreateView.as_view()), 
     path('products/<int:pk>/update/', ProductUpdateView.as_view()),
+    path('products/bulk-upload/', BulkUploadProductsView.as_view()), # <--- ADD THIS NEW ENDPOINT
     
     path('stock/', StockLevelListView.as_view()),
     
     # Document Endpoints
-    path('documents/', DocumentListView.as_view()), # <--- ADDED THIS LINE
+    path('documents/', DocumentListView.as_view()), 
     path('documents/create/', DocumentCreateView.as_view()),
     path('documents/<int:pk>/approve/', DocumentApproveView.as_view()),
 ]

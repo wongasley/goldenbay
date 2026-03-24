@@ -1,9 +1,12 @@
+import csv
+import io
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from django.db import transaction
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import Q
 from .models import Location, Product, StockLevel, InventoryDocument, DocumentLineItem, Rack, UnitOfMeasure
 from .serializers import LocationSerializer, ProductSerializer, StockLevelSerializer, InventoryDocumentSerializer, RackSerializer, UnitOfMeasureSerializer
@@ -163,3 +166,109 @@ class DocumentApproveView(APIView):
             
         except Exception as e:
             return Response({"error": str(e)}, status=400)
+        
+class BulkUploadProductsView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        user = request.user
+        if not (user.is_superuser or user.groups.filter(name__in=['Inventory Manager', 'Admin']).exists()):
+            raise PermissionDenied("Only Inventory Managers can bulk upload products.")
+
+        file = request.FILES.get('file')
+        if not file:
+            return Response({"error": "No file provided."}, status=400)
+
+        if not file.name.endswith('.csv'):
+            return Response({"error": "Please upload a valid CSV file."}, status=400)
+
+        try:
+            # Decode the file
+            decoded_file = file.read().decode('utf-8-sig') # utf-8-sig removes Excel's hidden BOM characters
+            io_string = io.StringIO(decoded_file)
+            reader = csv.DictReader(io_string)
+            
+            products_created = 0
+            products_updated = 0
+            stock_updated = 0
+
+            with transaction.atomic():
+                for row in reader:
+                    # Clean up header keys to be case-insensitive and strip spaces
+                    clean_row = {k.strip().lower(): v.strip() for k, v in row.items() if k}
+                    
+                    name = clean_row.get('name')
+                    barcode = clean_row.get('barcode')
+                    
+                    # Skip empty rows or rows missing critical identifiers
+                    if not name or not barcode:
+                        continue 
+                        
+                    brand = clean_row.get('brand', '')
+                    category = clean_row.get('category', 'Uncategorized')
+                    base_unit = clean_row.get('base_unit', 'Piece')
+                    box_barcode = clean_row.get('box_barcode', '')
+                    
+                    try:
+                        units_per_box = int(clean_row.get('units_per_box', 1))
+                    except ValueError:
+                        units_per_box = 1
+                        
+                    try:
+                        cost_price = float(clean_row.get('cost_price', 0.0))
+                    except ValueError:
+                        cost_price = 0.0
+
+                    # 1. Ensure the Unit of Measure exists
+                    UnitOfMeasure.objects.get_or_create(name=base_unit)
+
+                    # 2. Update or Create the Product based on Barcode
+                    product, created = Product.objects.update_or_create(
+                        barcode=barcode,
+                        defaults={
+                            'name': name,
+                            'brand': brand,
+                            'category': category,
+                            'box_barcode': box_barcode,
+                            'base_unit': base_unit,
+                            'units_per_box': units_per_box,
+                            'cost_price': cost_price
+                        }
+                    )
+                    
+                    if created:
+                        products_created += 1
+                    else:
+                        products_updated += 1
+                        
+                    # 3. Handle Location, Rack, and Stock Assignment (If provided in the CSV)
+                    loc_name = clean_row.get('location')
+                    rack_name = clean_row.get('rack')
+                    qty_str = clean_row.get('quantity')
+                    
+                    if loc_name and rack_name and qty_str:
+                        try:
+                            qty = int(qty_str)
+                            # Auto-create the Room and the Rack if they don't exist yet!
+                            loc, _ = Location.objects.get_or_create(name=loc_name)
+                            rack, _ = Rack.objects.get_or_create(location=loc, name=rack_name)
+                            
+                            # Set the stock level
+                            stock, _ = StockLevel.objects.get_or_create(
+                                product=product,
+                                location=loc,
+                                rack=rack
+                            )
+                            stock.quantity = qty  # Overwrites to establish initial baseline
+                            stock.save()
+                            stock_updated += 1
+                        except ValueError:
+                            pass # Skip if quantity isn't a valid number
+                            
+            return Response({
+                "message": f"Success! {products_created} created, {products_updated} updated. {stock_updated} stock locations set."
+            }, status=200)
+
+        except Exception as e:
+            return Response({"error": f"Failed to process CSV: {str(e)}"}, status=400)

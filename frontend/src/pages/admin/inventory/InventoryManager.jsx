@@ -1,28 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Database, X, Save, Edit2 } from 'lucide-react';
+import { Search, Plus, Database, X, Save, Edit2, Upload, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosInstance from '../../../utils/axiosInstance';
 
-// Comprehensive Chinese Restaurant Inventory Categories
 const INVENTORY_CATEGORIES = [
-  "Live Seafood",
-  "Frozen Seafood",
-  "Dried Seafood & Delicacies (Abalone, Sea Cucumber, Bird's Nest)",
-  "Meat & Poultry",
-  "Fresh Vegetables & Fruits",
-  "Noodles, Rice & Grains",
-  "Dimsum Ingredients & Wrappers",
-  "Sauces, Oils & Condiments",
-  "Spices & Seasonings",
-  "Premium Tea",
-  "Beverages (Sodas, Juices)",
-  "Liquor, Wine & Beer",
-  "Dry Goods (Mushrooms, Beans, Nuts)",
-  "Dairy & Eggs",
-  "Packaging & Disposables",
-  "Cleaning & Janitorial Supplies",
-  "Kitchen Equipment & Tools",
-  "Miscellaneous"
+  "Live Seafood", "Frozen Seafood", "Dried Seafood & Delicacies (Abalone, Sea Cucumber, Bird's Nest)",
+  "Meat & Poultry", "Fresh Vegetables & Fruits", "Noodles, Rice & Grains",
+  "Dimsum Ingredients & Wrappers", "Sauces, Oils & Condiments", "Spices & Seasonings",
+  "Premium Tea", "Beverages (Sodas, Juices)", "Liquor, Wine & Beer",
+  "Dry Goods (Mushrooms, Beans, Nuts)", "Dairy & Eggs", "Packaging & Disposables",
+  "Cleaning & Janitorial Supplies", "Kitchen Equipment & Tools", "Miscellaneous"
 ];
 
 const InventoryManager = () => {
@@ -31,14 +18,15 @@ const InventoryManager = () => {
   const [loading, setLoading] = useState(true);
   
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Added 'category' to the form state
   const [itemForm, setItemForm] = useState({ 
     id: null, name: '', brand: '', category: '', description: '', 
     barcode: '', box_barcode: '', base_unit: 'Bottle', units_per_box: 1, cost_price: '' 
   });
   const [uoms, setUoms] = useState([]);
+  const [csvFile, setCsvFile] = useState(null);
 
   const fetchInventory = async () => {
     try {
@@ -54,6 +42,7 @@ const InventoryManager = () => {
 
   useEffect(() => { fetchInventory(); }, [search]);
 
+  // Handle Single Item Save
   const handleSaveItem = async (e) => {
     e.preventDefault();
     if (!itemForm.category) return toast.error("Please select a category.");
@@ -74,25 +63,54 @@ const InventoryManager = () => {
     } finally { setIsSaving(false); }
   };
 
+  // Handle Bulk CSV Upload
+  const handleBulkUpload = async (e) => {
+      e.preventDefault();
+      if (!csvFile) return toast.error("Please select a CSV file first.");
+
+      setIsSaving(true);
+      const formData = new FormData();
+      formData.append('file', csvFile);
+
+      try {
+          const res = await axiosInstance.post('/api/inventory/products/bulk-upload/', formData, {
+              headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          toast.success(res.data.message, { duration: 5000 });
+          setShowUploadModal(false);
+          setCsvFile(null);
+          fetchInventory();
+      } catch (err) {
+          toast.error(err.response?.data?.error || "Failed to upload CSV.");
+      } finally {
+          setIsSaving(false);
+      }
+  };
+
+  // Generate and Download CSV Template
+  const downloadTemplate = () => {
+      const headers = "Name,Brand,Category,Barcode,Box_Barcode,Base_Unit,Units_Per_Box,Cost_Price,Location,Rack,Quantity\n";
+      const sample1 = "Premium Light Soy Sauce,Lee Kum Kee,Sauces,Oils & Condiments,SOY-123-BOT,SOY-123-BOX,Bottle,12,150.00,DRY STORAGE,Rack 1,50\n";
+      const sample2 = "Live Suahe,,Live Seafood,LIV-SUAHE-001,,Kilogram,1,850.00,KITCHEN,Aquarium 2,15\n";
+      
+      const blob = new Blob([headers + sample1 + sample2], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "GoldenBay_Inventory_Template.csv";
+      a.click();
+      window.URL.revokeObjectURL(url);
+  };
+
   const openModal = (item = null) => {
       if (item) {
           setItemForm({ 
-              id: item.id, 
-              name: item.name, 
-              brand: item.brand || '', 
-              category: item.category || '', // Load existing category
-              description: item.description || '', 
-              barcode: item.barcode, 
-              box_barcode: item.box_barcode || '', 
-              base_unit: item.base_unit, 
-              units_per_box: item.units_per_box, 
-              cost_price: item.cost_price 
+              id: item.id, name: item.name, brand: item.brand || '', category: item.category || '',
+              description: item.description || '', barcode: item.barcode, box_barcode: item.box_barcode || '', 
+              base_unit: item.base_unit, units_per_box: item.units_per_box, cost_price: item.cost_price 
           });
       } else {
-          setItemForm({ 
-            id: null, name: '', brand: '', category: '', description: '', 
-            barcode: '', box_barcode: '', base_unit: 'Bottle', units_per_box: 1, cost_price: '' 
-          });
+          setItemForm({ id: null, name: '', brand: '', category: '', description: '', barcode: '', box_barcode: '', base_unit: 'Bottle', units_per_box: 1, cost_price: '' });
       }
       setShowAddModal(true);
   };
@@ -112,9 +130,65 @@ const InventoryManager = () => {
           <p className="text-gray-500 text-xs mt-1 uppercase tracking-widest font-medium">Manage master catalog and barcodes</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => openModal()} className="bg-gold-600 text-white px-5 py-2.5 font-bold uppercase tracking-widest text-[10px] rounded-lg shadow-md hover:bg-gold-700 transition-all flex items-center gap-2"><Plus size={16} /> New Product</button>
+          <button onClick={() => setShowUploadModal(true)} className="bg-white text-gray-700 border border-gray-200 px-5 py-2.5 font-bold uppercase tracking-widest text-[10px] rounded-lg shadow-sm hover:bg-gray-50 transition-all flex items-center gap-2">
+              <Upload size={16} /> Bulk CSV
+          </button>
+          <button onClick={() => openModal()} className="bg-gold-600 text-white px-5 py-2.5 font-bold uppercase tracking-widest text-[10px] rounded-lg shadow-md hover:bg-gold-700 transition-all flex items-center gap-2">
+              <Plus size={16} /> New Product
+          </button>
         </div>
       </div>
+
+      {/* --- BULK UPLOAD MODAL --- */}
+      {showUploadModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+              <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                  <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
+                      <div>
+                          <h2 className="text-lg font-serif text-gray-900 font-bold flex items-center gap-2"><Upload size={18} className="text-gold-600"/> Import via CSV</h2>
+                          <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">Excel / Sheets Upload</p>
+                      </div>
+                      <button onClick={() => setShowUploadModal(false)} className="p-1 hover:bg-gray-200 rounded text-gray-500"><X size={18}/></button>
+                  </div>
+                  
+                  <div className="p-6">
+                      <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+                          Save time by uploading your inventory via CSV. If a barcode already exists, the system will update the product instead of creating a duplicate. It will also auto-create Locations and Racks if they don't exist yet!
+                      </p>
+                      
+                      <div className="flex justify-center mb-6">
+                          <button onClick={downloadTemplate} className="text-gold-600 font-bold text-xs uppercase tracking-widest flex items-center gap-1.5 hover:text-gold-700 hover:underline">
+                              <Download size={14}/> Download CSV Template
+                          </button>
+                      </div>
+
+                      <form onSubmit={handleBulkUpload}>
+                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50 hover:bg-gray-100 transition-colors relative cursor-pointer">
+                              <input 
+                                  type="file" 
+                                  accept=".csv" 
+                                  required 
+                                  onChange={(e) => setCsvFile(e.target.files[0])}
+                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              />
+                              <Upload size={32} className="mx-auto text-gray-400 mb-3" />
+                              <p className="text-sm font-bold text-gray-700">
+                                  {csvFile ? csvFile.name : "Click to select a CSV file"}
+                              </p>
+                              {!csvFile && <p className="text-xs text-gray-500 mt-1">or drag and drop here</p>}
+                          </div>
+                          
+                          <div className="mt-6 flex gap-3">
+                              <button type="button" onClick={() => setShowUploadModal(false)} className="flex-1 py-3 text-xs font-bold uppercase tracking-widest text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors">Cancel</button>
+                              <button type="submit" disabled={isSaving || !csvFile} className="flex-1 bg-gold-600 text-white py-3 text-xs font-bold uppercase tracking-widest rounded shadow-md hover:bg-black transition-colors disabled:opacity-50">
+                                  {isSaving ? 'Processing...' : 'Upload Now'}
+                              </button>
+                          </div>
+                      </form>
+                  </div>
+              </div>
+          </div>
+      )}
 
       {/* --- ADD / EDIT ITEM MODAL --- */}
       {showAddModal && (
@@ -130,7 +204,6 @@ const InventoryManager = () => {
             
             <div className="p-6 overflow-y-auto">
                 <form id="addProductForm" onSubmit={handleSaveItem} className="space-y-5">
-                    
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="md:col-span-2">
                             <label className={labelClass}>Product Name <span className="text-red-500">*</span></label>
@@ -142,7 +215,6 @@ const InventoryManager = () => {
                         </div>
                     </div>
 
-                    {/* NEW CATEGORY DROPDOWN */}
                     <div>
                         <label className={labelClass}>Category <span className="text-red-500">*</span></label>
                         <select required className={inputClass} value={itemForm.category} onChange={e => setItemForm({...itemForm, category: e.target.value})}>
@@ -229,7 +301,6 @@ const InventoryManager = () => {
                     <div className="flex items-center gap-2 mt-1">
                         {item.brand && <span className="text-[10px] text-gray-500 uppercase font-bold">{item.brand}</span>}
                         {item.brand && item.category && <span className="text-gray-300">•</span>}
-                        {/* Display Category Tag */}
                         {item.category && <span className="text-[9px] bg-gold-50 text-gold-700 border border-gold-200 px-1.5 py-0.5 rounded font-bold uppercase tracking-widest">{item.category}</span>}
                     </div>
 
