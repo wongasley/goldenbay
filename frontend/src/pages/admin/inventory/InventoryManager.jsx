@@ -90,7 +90,10 @@ const InventoryManager = () => {
   // Generate and Download CSV Template
   const downloadTemplate = () => {
       const headers = "Name,Brand,Category,Barcode,Box_Barcode,Base_Unit,Units_Per_Box,Cost_Price,Location,Rack,Quantity\n";
-      const sample1 = "Premium Light Soy Sauce,Lee Kum Kee,Sauces,Oils & Condiments,SOY-123-BOT,SOY-123-BOX,Bottle,12,150.00,DRY STORAGE,Rack 1,50\n";
+      
+      // FIX: Wrapped the category in double quotes so the comma doesn't break the columns
+      const sample1 = 'Premium Light Soy Sauce,Lee Kum Kee,"Sauces, Oils & Condiments",SOY-123-BOT,SOY-123-BOX,Bottle,12,150.00,DRY STORAGE,Rack 1,50\n';
+      
       const sample2 = "Live Suahe,,Live Seafood,LIV-SUAHE-001,,Kilogram,1,850.00,KITCHEN,Aquarium 2,15\n";
       
       const blob = new Blob([headers + sample1 + sample2], { type: 'text/csv;charset=utf-8;' });
