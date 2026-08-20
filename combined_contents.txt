@@ -652,6 +652,7 @@ class ReservationsConfig(AppConfig):
     name = 'reservations'
 
 
+import uuid
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.db.models.signals import post_save
@@ -659,6 +660,7 @@ from django.dispatch import receiver
 from django.contrib.auth.models import User
 from simple_history.models import HistoricalRecords
 from django.db import transaction
+
 
 class DiningArea(models.Model):
     TYPE_CHOICES = [
@@ -708,6 +710,9 @@ class Reservation(models.Model):
         ('SOCIAL', 'Social Media'),
     ]
 
+    # Unique Secure Token for Link Access
+    management_token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+
     # Customer Info
     customer_name = models.CharField(max_length=100)
     customer_contact = models.CharField(max_length=50, help_text="Phone or Viber")
@@ -721,9 +726,7 @@ class Reservation(models.Model):
     pax = models.IntegerField()
     special_request = models.TextField(blank=True, null=True)
         
-    # ADD THIS LINE RIGHT HERE:
     source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='WEB')
-    # System Fields
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -733,7 +736,7 @@ class Reservation(models.Model):
     encoded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='encoded_reservations')
     last_modified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='modified_reservations')
     
-    history = HistoricalRecords() # <--- ADD THIS
+    history = HistoricalRecords()
     
     final_bill_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Total bill paid (for point calculation)")
     points_earned = models.IntegerField(default=0, help_text="Points awarded for this specific visit")
@@ -762,6 +765,7 @@ class Reservation(models.Model):
     def __str__(self):
         return f"{self.customer_name} - {self.date} ({self.session})"
     
+
 class Customer(models.Model):
     name = models.CharField(max_length=200)
     phone = models.CharField(max_length=50, unique=True, null=True, blank=True)
@@ -769,6 +773,7 @@ class Customer(models.Model):
     email = models.EmailField(blank=True, null=True)
     date_of_birth = models.DateField(blank=True, null=True, help_text="Used for automated birthday promos")
     last_birthday_promo_year = models.IntegerField(blank=True, null=True, help_text="Prevents sending multiple times a year")
+    
     # Socials
     wechat = models.CharField(max_length=100, blank=True, null=True)
     viber = models.CharField(max_length=100, blank=True, null=True)
@@ -791,12 +796,11 @@ class Customer(models.Model):
         ordering = ['name']
 
     def __str__(self):
-        # Update this to show the Care Of handler if there is no phone
         contact_info = self.phone or self.care_of or 'No Contact'
         return f"{self.name} ({contact_info})"
     
+
 class RewardItem(models.Model):
-    """ Food items that customers can redeem using their points """
     name = models.CharField(max_length=200)
     size = models.CharField(max_length=50, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
@@ -811,8 +815,8 @@ class RewardItem(models.Model):
     def __str__(self):
         return f"{self.name} ({self.points_required} pts)"
 
+
 class PointTransaction(models.Model):
-    """ The ledger that tracks every point earned or spent """
     TYPE_CHOICES = [
         ('EARNED', 'Earned'),
         ('REDEEMED', 'Redeemed'),
@@ -822,12 +826,10 @@ class PointTransaction(models.Model):
     transaction_type = models.CharField(max_length=10, choices=TYPE_CHOICES)
     points = models.IntegerField(help_text="Amount of points (e.g., 150)")
     
-    # Optional context fields
     amount_spent = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="If EARNED, the bill amount")
     reservation = models.ForeignKey(Reservation, on_delete=models.SET_NULL, null=True, blank=True, related_name='point_transactions', help_text="Null if walk-in")
     reward_item = models.ForeignKey(RewardItem, on_delete=models.SET_NULL, null=True, blank=True, help_text="Filled if REDEEMED")
     
-    # Meta tracking
     created_at = models.DateTimeField(auto_now_add=True)
     encoded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
 
@@ -839,15 +841,10 @@ class PointTransaction(models.Model):
         return f"{self.customer.name} | {sign}{self.points} pts"
         
     def save(self, *args, **kwargs):
-        """ 
-        Automatically update the Customer's total points balance 
-        whenever a new transaction is saved!
-        """
         is_new = self.pk is None
         super().save(*args, **kwargs)
         
         if is_new:
-            # Lock the customer row temporarily to prevent race conditions if multiple cashiers add points at the exact same second
             with transaction.atomic():
                 cust = Customer.objects.select_for_update().get(pk=self.customer.pk)
                 if self.transaction_type == 'EARNED':
@@ -856,28 +853,18 @@ class PointTransaction(models.Model):
                     cust.points_balance -= self.points
                 cust.save(update_fields=['points_balance'])
 
-# --- ADD THIS SIGNAL TO AUTO-SAVE CUSTOMERS ---
+
 @receiver(post_save, sender=Reservation)
 def save_customer_from_reservation(sender, instance, created, **kwargs):
-    """
-    When a Reservation is saved, automatically create or update the Customer 
-    in the Phone Book. It smartly handles both Phone Numbers and 'Care Of' names.
-    """
     if instance.customer_contact:
         try:
-            # 1. Determine if the contact is a phone number or a "Care Of" handler
             contact_str = str(instance.customer_contact).strip()
-            
-            # If the contact string contains letters (A-Z, a-z), treat it as 'care_of'
-            # Otherwise, treat it as a 'phone' number
             is_care_of = any(c.isalpha() for c in contact_str)
 
             customer = None
             customer_created = False
 
-            # 2. Search for existing customer or create new
             if is_care_of:
-                # Search by name AND care_of to avoid mixing up people with the same handler
                 customer, customer_created = Customer.objects.get_or_create(
                     name=instance.customer_name,
                     care_of=contact_str,
@@ -886,13 +873,10 @@ def save_customer_from_reservation(sender, instance, created, **kwargs):
                     }
                 )
             else:
-                # Standard phone number search
-                # Clean the phone number to match phone book formatting
                 clean_phone = ''.join(filter(str.isdigit, contact_str))
                 if clean_phone.startswith('63') and len(clean_phone) == 12:
                     clean_phone = '0' + clean_phone[2:]
                 
-                # Fallback to the raw string if cleaning wiped it out (e.g. they typed symbols only)
                 final_phone = clean_phone if clean_phone else contact_str
 
                 customer, customer_created = Customer.objects.get_or_create(
@@ -903,17 +887,15 @@ def save_customer_from_reservation(sender, instance, created, **kwargs):
                     }
                 )
 
-            # 3. If customer exists, update their latest info
             if not customer_created:
                 customer.last_visit = instance.date
-                # Update email if the reservation has one and the profile doesn't
                 if not customer.email and instance.customer_email:
                     customer.email = instance.customer_email
                 customer.save()
 
         except Exception as e:
-            # Prevents a 500 Server Error if the Phone Book has duplicate numbers or crashes
             print(f"Failed to auto-save customer to phonebook: {e}")
+
 
 class RewardRedemption(models.Model):
     STATUS_CHOICES = [
@@ -925,8 +907,6 @@ class RewardRedemption(models.Model):
     reward_item = models.ForeignKey(RewardItem, on_delete=models.CASCADE)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     created_at = models.DateTimeField(auto_now_add=True)
-    
-    # Track who handed the food to the customer
     fulfilled_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
 
     class Meta:
