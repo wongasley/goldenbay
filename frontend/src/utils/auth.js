@@ -26,8 +26,7 @@ export const canDeleteCustomer = () => {
 
 export const canManageMarketing = () => {
     const role = getUserRole();
-    // Added Owner
-    return role === 'Admin';
+    return role === 'Admin' || role === 'Supervisor';
 };
 
 export const canManageMenu = () => {

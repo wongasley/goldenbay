@@ -42,7 +42,7 @@ const AdminLayout = () => {
   }
 
   if (role === 'Supervisor') {
-    const allowed = ['/staff/bookings', '/staff/menu', '/staff/rewards'];
+    const allowed = ['/staff/bookings', '/staff/menu', '/staff/rewards', '/staff/marketing'];
     const isAllowed = allowed.some(path => location.pathname.startsWith(path));
     if (!isAllowed) {
       return <Navigate to="/staff/bookings" replace />;
@@ -63,7 +63,7 @@ const AdminLayout = () => {
     { path: '/staff/menu', label: 'Menu Manager', icon: Utensils, show: ['Admin', 'Supervisor'].includes(role) },
     { path: '/staff/rewards', label: 'Fulfillment', icon: Gift, show: ['Admin', 'Supervisor'].includes(role) },
     { path: '/staff/customers', label: role === 'Cashier' ? 'Points Terminal' : 'Phone Book', icon: Users, show: ['Admin', 'Cashier'].includes(role) },
-    { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: role === 'Admin' },
+    { path: '/staff/marketing', label: 'Marketing', icon: Megaphone, show: ['Admin', 'Supervisor'].includes(role) },
     { path: '/staff/inventory', label: 'Current Stock', icon: Package, show: ['Admin', 'Inventory Manager', 'Inventory Officer', 'Owner'].includes(role) },
     // --- NEW LINKS ---
     { path: '/staff/inventory/catalog', label: 'Product Database', icon: Database, show: ['Admin', 'Inventory Manager', 'Owner'].includes(role) },
